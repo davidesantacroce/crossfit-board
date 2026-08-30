@@ -681,119 +681,84 @@
       container.appendChild(row);
     }
 
-function parseAndFillBlock(blockId, text) {
-  const block = document.getElementById(`workout-block-${blockId}`);
-  if (!block) return;
+    function parseAndFillBlock(blockId, text) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
 
-  const upperText = text.toUpperCase();
-  let type = 'For Time';
-  if (upperText.includes('AMRAP')) type = 'AMRAP';
-  else if (upperText.includes('EMOM')) type = 'EMOM';
-  else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY') || upperText.includes('+')) type = 'Sets';
+      const upperText = text.toUpperCase();
+      let type = 'For Time';
+      if (upperText.includes('AMRAP')) type = 'AMRAP';
+      else if (upperText.includes('EMOM')) type = 'EMOM';
+      else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY')) type = 'Sets';
 
-  block.querySelector('.block-type').value = type;
-  updateBlockScoreLabel(blockId);
+      block.querySelector('.block-type').value = type;
+      updateBlockScoreLabel(blockId);
 
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  let exercises = [];
-  const athleteName = localStorage.getItem('activeAthlete') || '';
-  const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
+      const lines = text.split('\n');
+      let exercises = [];
+      const athleteName = localStorage.getItem('activeAthlete') || '';
+      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
 
-  lines.forEach(line => {
-    let cleanLine = line;
-    
-    // Salta righe di servizio o intestazioni non valide
-    if (/^(AMRAP|FOR TIME|EMOM|ROUND|WOD|REST|-)/i.test(cleanLine) && cleanLine.length < 15 && !cleanLine.includes('%')) {
-      return;
-    }
+      lines.forEach(line => {
+        let cleanLine = line.trim();
+        if (!cleanLine) return;
 
-    let repsMatch = cleanLine.match(/^([\d\/\-+x]+)\s*(?:reps?)?\s*(.*)/i);
-    let reps = '';
-    let restOfLine = cleanLine;
+        let repsMatch = cleanLine.match(/^([\d\/\-]+)\s*(?:reps?)?\s*(.*)/i);
+        let reps = '';
+        let restOfLine = cleanLine;
 
-    if (repsMatch) {
-      reps = repsMatch[1].trim();
-      restOfLine = repsMatch[2].trim();
-    }
+        if (repsMatch) {
+          reps = repsMatch[1];
+          restOfLine = repsMatch[2];
+        }
 
-    let weightStr = '';
-    let percentMatch = restOfLine.match(/(\d{2,3})\s*%/);
-    
-    if (percentMatch) {
-      let percentage = parseInt(percentMatch[1]);
-      let matchedRm = athleteMaxs.find(m => restOfLine.toLowerCase().includes(m.movement.toLowerCase().split(' ')[0]));
-      
-      if (matchedRm && !isNaN(matchedRm.weight)) {
-        let calculatedWeight = Math.round((parseFloat(matchedRm.weight) * percentage) / 100);
-        weightStr = `${calculatedWeight} kg (${percentage}%)`;
-      } else {
-        weightStr = `${percentage}%`;
+        let weightStr = '';
+        let percentMatch = restOfLine.match(/(\d{2,3})\s*%/);
+        
+        if (percentMatch) {
+          let percentage = parseInt(percentMatch[1]);
+          let matchedRm = athleteMaxs.find(m => restOfLine.toLowerCase().includes(m.movement.toLowerCase().split(' ')[0]));
+          
+          if (matchedRm && !isNaN(matchedRm.weight)) {
+            let calculatedWeight = Math.round((parseFloat(matchedRm.weight) * percentage) / 100);
+            weightStr = `${calculatedWeight} kg (${percentage}%)`;
+          } else {
+            weightStr = `${percentage}%`;
+          }
+        } else {
+          let kgMatch = restOfLine.match(/(\d+)\s*(?:kg|lbs)/i);
+          if (kgMatch) weightStr = kgMatch[0];
+        }
+
+        let movementName = restOfLine.replace(/@?\s*\d{2,3}\s*%.*/g, '').trim();
+        if (!movementName) movementName = restOfLine;
+
+        if (movementName.length > 2) {
+          exercises.push({ reps, name: movementName, weight: weightStr });
+        }
+      });
+
+      const container = block.querySelector('.block-exercises-container');
+      container.innerHTML = exercises.map(ex => `
+        <div class="exercise-row">
+          <input type="text" placeholder="Reps" value="${ex.reps || ''}">
+          <input type="text" placeholder="Movimento" value="${ex.name || ''}">
+          <input type="text" placeholder="Kg/%" value="${ex.weight || ''}">
+          <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        </div>
+      `).join('');
+
+      if (exercises.length === 0) {
+        container.innerHTML = `
+          <div class="exercise-row">
+            <input type="text" placeholder="Reps" value="">
+            <input type="text" placeholder="Movimento" value="">
+            <input type="text" placeholder="Kg/%" value="">
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+          </div>
+        `;
       }
-    } else {
-      let kgMatch = restOfLine.match(/(\d+)\s*(?:kg|lbs)/i);
-      if (kgMatch) weightStr = kgMatch[0];
     }
-
-    let movementName = restOfLine.replace(/@?\s*\d{2,3}\s*%.*/g, '').trim();
-    if (!movementName) movementName = restOfLine;
-
-    if (movementName.length > 1) {
-      exercises.push({ reps, name: movementName, weight: weightStr });
-    }
-  });
-
-  const container = block.querySelector('.block-exercises-container');
-  
-  if (exercises.length === 0) {
-    container.innerHTML = `
-      <div class="exercise-row">
-        <input type="text" placeholder="Reps" value="">
-        <input type="text" placeholder="Movimento" value="">
-        <input type="text" placeholder="Kg/%" value="">
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-      </div>
-    `;
-    return;
-  }
-
-  // Genera dinamicamente una riga per ogni singolo elemento estratto dall'OCR
-  container.innerHTML = exercises.map(ex => `
-    <div class="exercise-row">
-      <input type="text" placeholder="Reps" value="${ex.reps || ''}">
-      <input type="text" placeholder="Movimento" value="${ex.name || ''}">
-      <input type="text" placeholder="Kg/%" value="${ex.weight || ''}">
-      <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-    </div>
-  `).join('');
-}
-
-
-  const container = block.querySelector('.block-exercises-container');
-  
-  // Se l'OCR non ha trovato movimenti validi, lascia una riga vuota pulita
-  if (exercises.length === 0) {
-    container.innerHTML = `
-      <div class="exercise-row">
-        <input type="text" placeholder="Reps" value="">
-        <input type="text" placeholder="Movimento" value="">
-        <input type="text" placeholder="Kg/%" value="">
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-      </div>
-    `;
-    return;
-  }
-
-  // Genera dinamicamente le righe in base al numero esatto di movimenti trovati
-  container.innerHTML = exercises.map(ex => `
-    <div class="exercise-row">
-      <input type="text" placeholder="Reps" value="${ex.reps || ''}">
-      <input type="text" placeholder="Movimento" value="${ex.name || ''}">
-      <input type="text" placeholder="Kg/%" value="${ex.weight || ''}">
-      <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-    </div>
-  `).join('');
-}
-
 
     async function saveWodSession() {
       const url = getScriptUrl();
