@@ -480,10 +480,9 @@
       fetchCloudData();
     }
 
-    // --- FUNZIONE DI PARSING AUTOMATICO E CALCOLO PERCENTUALI ---
     function parseWodText(text) {
       const container = document.getElementById('exercisesContainer');
-      container.innerHTML = ''; // Pulisci la lista corrente
+      container.innerHTML = '';
       
       if (!text.trim()) return;
 
@@ -495,7 +494,6 @@
         let cleanLine = line.trim();
         if (!cleanLine) return;
 
-        // Cerca pattern tipo ripetizioni iniziali (es. "10", "15x", "21-15-9")
         let repsMatch = cleanLine.match(/^([\d\/\-]+)\s*(?:reps?)?\s*(.*)/i);
         let reps = '';
         let restOfLine = cleanLine;
@@ -505,13 +503,11 @@
           restOfLine = repsMatch[2];
         }
 
-        // Cerca percentuali es. "70%", "80%."
         let weightStr = '';
         let percentMatch = restOfLine.match(/(\d{2,3})\s*%/);
         
         if (percentMatch) {
           let percentage = parseInt(percentMatch[1]);
-          // Cerca a quale massimale si riferisce confrontando le parole chiave
           let matchedRm = athleteMaxs.find(m => restOfLine.toLowerCase().includes(m.movement.toLowerCase().split(' ')[0]));
           
           if (matchedRm && !isNaN(matchedRm.weight)) {
@@ -521,14 +517,12 @@
             weightStr = `${percentage}%`;
           }
         } else {
-          // Cerca eventuale peso fisso espresso in kg (es. 60kg, 43/30 kg)
           let kgMatch = restOfLine.match(/(\d+)\s*(?:kg|lbs)/i);
           if (kgMatch) {
             weightStr = kgMatch[0];
           }
         }
 
-        // Pulizia del nome del movimento rimuovendo la parte del peso/percentuale dal testo principale se desiderato
         let movementName = restOfLine.replace(/@?\s*\d{2,3}\s*%.*/g, '').trim();
         if (!movementName) movementName = restOfLine;
 
@@ -717,48 +711,49 @@
       document.getElementById('status').innerText = 'Analisi OCR...';
       try {
         const worker = await Tesseract.createWorker('eng');
-        const ret = await worker.recognize(canvas);
+        const ret = await worker.recognize(canvas.toDataURL());
         await worker.terminate();
-        const extractedText = ret.data.text.trim();
-        document.getElementById('wodNotes').value = extractedText;
-        parseWodText(extractedText); // Avvia l'estrazione automatica dei movimenti e percentuali
-        document.getElementById('status').innerText = 'WOD estratto e movimenti caricati!';
+        
+        document.getElementById('wodNotes').value = ret.data.text;
+        parseWodText(ret.data.text);
+        document.getElementById('status').innerText = 'Analisi completata con successo!';
       } catch (err) {
-        document.getElementById('status').innerText = 'Errore OCR';
+        console.error(err);
+        document.getElementById('status').innerText = 'Errore durante la scansione OCR.';
       }
     }
 
-    function uploadLogo(input, key) {
+    function uploadLogo(input, type) {
       const file = input.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (e) => {
-        localStorage.setItem(key, e.target.result);
+        const base64 = e.target.result;
+        localStorage.setItem(type, base64);
         loadSavedLogos();
       };
       reader.readAsDataURL(file);
     }
 
     function loadSavedLogos() {
-      ['gymLogo', 'progLogo'].forEach(key => {
-        const val = localStorage.getItem(key);
-        if (val) {
-          const id = key === 'gymLogo' ? 'headerLogoGym' : 'headerLogoProg';
-          const imgEl = document.getElementById(id);
-          const previewEl = document.getElementById(key === 'gymLogo' ? 'previewGymLogo' : 'previewProgLogo');
-          if (imgEl) { imgEl.src = val; imgEl.style.display = 'block'; }
-          if (previewEl) { previewEl.src = val; }
-        }
-      });
-    }
+      const gymLogo = localStorage.getItem('gymLogo');
+      const progLogo = localStorage.getItem('progLogo');
+      
+      const imgGymHeader = document.getElementById('headerLogoGym');
+      const previewGym = document.getElementById('previewGymLogo');
+      if (gymLogo) {
+        imgGymHeader.src = gymLogo;
+        imgGymHeader.style.display = 'block';
+        previewGym.src = gymLogo;
+      }
 
-    function removeLogo(key) {
-      localStorage.removeItem(key);
-      const id = key === 'gymLogo' ? 'headerLogoGym' : 'headerLogoProg';
-      const previewEl = document.getElementById(key === 'gymLogo' ? 'previewGymLogo' : 'previewProgLogo');
-      const imgEl = document.getElementById(id);
-      if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
-      if (previewEl) { previewEl.src = ''; }
+      const imgProgHeader = document.getElementById('headerLogoProg');
+      const previewProg = document.getElementById('previewProgLogo');
+      if (progLogo) {
+        imgProgHeader.src = progLogo;
+        imgProgHeader.style.display = 'block';
+        previewProg.src = progLogo;
+      }
     }
   </script>
 </body>
