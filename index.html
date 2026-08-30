@@ -82,7 +82,7 @@
     .rx-btn.active { background: #2e7d32; color: #fff; border-color: #2e7d32; }
 
     .set-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .set-number { font-weight: 800; color: var(--text-muted); width: 20px; text-align: right; }
+    .set-number { font-weight: 800; color: var(--text-muted); width: 30px; text-align: right; }
     
     .exercise-row { display: grid; grid-template-columns: 80px 1fr 35px; gap: 8px; align-items: center; margin-bottom: 10px; }
     .exercise-row.has-weight { grid-template-columns: 80px 1fr 120px 35px; }
@@ -646,6 +646,7 @@
       const type = document.getElementById('wodType').value;
       const container = document.getElementById('dynamicResultContainer');
       const label = document.getElementById('resultLabel');
+      const wodNotesText = document.getElementById('wodNotes')?.value || '';
 
       if (!container || !label) return;
 
@@ -664,12 +665,25 @@
             <input type="number" id="resReps" placeholder="Reps">
           </div>`;
       } else if (type === 'Sets') {
-        label.innerText = 'SCORE SETS / CARICHI';
+        let detectedSets = 5; // Default di fallback
+        
+        const lines = wodNotesText.split('\n').filter(l => l.trim() !== '');
+        if (lines.length > 1) {
+          detectedSets = lines.length;
+        } else {
+          const matchSets = wodNotesText.match(/(\d+)\s*(?:sets?|rounds?|alzate)/i);
+          if (matchSets && matchSets[1]) {
+            let parsed = parseInt(matchSets[1], 10);
+            if (parsed > 0 && parsed <= 20) detectedSets = parsed;
+          }
+        }
+
+        label.innerText = `SCORE SETS / CARICHI (${detectedSets} ALZATE)`;
         let html = '';
-        for (let i = 1; i <= 5; i++) {
+        for (let i = 1; i <= detectedSets; i++) {
           html += `
             <div class="set-row">
-              <span class="set-number">${i}</span>
+              <span class="set-number">${i}°</span>
               <input type="text" class="set-input" placeholder="Carico set ${i}">
             </div>`;
         }
