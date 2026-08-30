@@ -157,10 +157,10 @@
         <button type="button" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
       </div>
       
-      <div class="form-row" style="margin-bottom: 16px;">
-        <div class="form-group" style="flex: 1;">
-          <label>DATA SESSIONE</label>
-          <input type="date" id="wodDate">
+      <div class="form-row" style="margin-bottom: 16px; justify-content: center;">
+        <div class="form-group" style="max-width: 250px; width: 100%; text-align: center;">
+          <label style="text-align: center;">DATA SESSIONE</label>
+          <input type="date" id="wodDate" style="text-align: center;">
         </div>
       </div>
 
@@ -800,7 +800,6 @@
       history.slice().reverse().forEach(item => {
         let contentHtml = '';
         
-        // Compatibilità sia con il vecchio formato a blocco singolo che con il nuovo array "blocks"
         if (item.blocks && Array.isArray(item.blocks)) {
           contentHtml = item.blocks.map(b => {
             let exHtml = (b.exercises || []).map(ex => `
@@ -863,3 +862,10 @@
   </script>
 </body>
 </html>
+```[cite: 1]
+
+<ElicitationsGroup message="Come vuoi proseguire?">
+<Elicitation label="Add custom workout tag" query="Add custom workout tag" query_intent="CLICKABLE_SUGGESTION" />
+<Elicitation label="Create export feature" query="Create export feature" query_intent="CLICKABLE_SUGGESTION" />
+<Elicitation label="Explore performance charts" query="Explore performance charts" query_intent="CLICKABLE_SUGGESTION" />
+</ElicitationsGroup>
