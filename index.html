@@ -151,7 +151,7 @@
     <div class="card">
       <div class="card-title">SELEZIONE ATLETA E WOD</div>
       <label for="imageInput" class="btn-import">📷 Carica Screenshot WOD</label>
-      <input type="file" id="imageInput" accept="image/*" multiple>
+      <input type="file" id="imageInput" accept="image/*" multiple onchange="handleImageUpload(this)">
       <div id="galleryContainer" class="gallery-container"></div>
       <div id="status"></div>
     </div>
@@ -292,6 +292,8 @@
     let currentMode = 'RX';
     let cropper = null;
     let globalData = { wods: [], athletes: [], massimali: [] };
+    let uploadedImages = [];
+    let currentImageIndex = 0;
     
     const CROSSFIT_STANDARD_RMS = [
       "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",
@@ -512,6 +514,95 @@
       fetchCloudData();
     }
 
+    function handleImageUpload(input) {
+      if (input.files && input.files.length > 0) {
+        Array.from(input.files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            uploadedImages.push(e.target.result);
+            renderGallery();
+            if (uploadedImages.length === 1) {
+              openCropModal(0);
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    function renderGallery() {
+      const container = document.getElementById('galleryContainer');
+      container.innerHTML = '';
+      uploadedImages.forEach((imgSrc, index) => {
+        const thumb = document.createElement('img');
+        thumb.src = imgSrc;
+        thumb.className = `gallery-thumb ${index === currentImageIndex ? 'active' : ''}`;
+        thumb.onclick = () => openCropModal(index);
+        container.appendChild(thumb);
+      });
+    }
+
+    function openCropModal(index) {
+      currentImageIndex = index;
+      renderGallery();
+      const modal = document.getElementById('cropModal');
+      const image = document.getElementById('cropImage');
+      image.src = uploadedImages[index];
+      modal.classList.add('active');
+
+      if (cropper) {
+        cropper.destroy();
+      }
+      cropper = new Cropper(image, {
+        aspectRatio: NaN,
+        viewMode: 1,
+      });
+    }
+
+    function closeCropModal() {
+      document.getElementById('cropModal').classList.remove('active');
+      if (cropper) {
+        cropper.destroy();
+        cropper = null;
+      }
+    }
+
+    async function confirmCropAndScan() {
+      if (!cropper) return;
+      const canvas = cropper.getCroppedCanvas();
+      closeCropModal();
+
+      const statusEl = document.getElementById('status');
+      statusEl.innerText = "Elaborazione OCR in corso...";
+
+      try {
+        const worker = await Tesseract.createWorker('eng+ita');
+        const ret = await worker.recognize(canvas.toDataURL());
+        await worker.terminate();
+
+        const text = ret.data.text;
+        document.getElementById('wodNotes').value = text;
+        parseWodText(text);
+        statusEl.innerText = "Estrazione completata!";
+      } catch (err) {
+        console.error(err);
+        statusEl.innerText = "Errore durante l'estrazione OCR.";
+      }
+    }
+
+    function addExerciseRow(reps = '', name = '', weight = '') {
+      const container = document.getElementById('exercisesContainer');
+      const row = document.createElement('div');
+      row.className = weight ? 'exercise-row has-weight' : 'exercise-row';
+      row.innerHTML = `
+        <input type="text" placeholder="Reps" value="${reps}">
+        <input type="text" placeholder="Movimento" value="${name}">
+        ${weight !== undefined ? `<input type="text" placeholder="Kg/%" value="${weight}">` : ''}
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(row);
+    }
+
     function parseWodText(text) {
       const container = document.getElementById('exercisesContainer');
       container.innerHTML = '';
@@ -531,7 +622,7 @@
         wodTypeSelect.value = 'Sets';
       }
       
-      renderResultFields();
+      renderResultFields(false);
 
       const lines = text.split('\n');
       const athleteName = localStorage.getItem('activeAthlete') || '';
@@ -575,6 +666,100 @@
 
         addExerciseRow(reps, movementName, weightStr);
       });
+    }
+
+    function renderResultFields(initialBuild = true) {
+      const type = document.getElementById('wodType').value;
+      const container = document.getElementById('dynamicResultContainer');
+      const label = document.getElementById('resultLabel');
+      const wodNotesText = document.getElementById('wodNotes')?.value || '';
+
+      if (!container || !label) return;
+
+      if (type === 'For Time') {
+        label.innerText = 'SCORE (TIME)';
+        container.innerHTML = `
+          <div class="form-row">
+            <input type="number" id="resMin" placeholder="Minuti">
+            <input type="number" id="resSec" placeholder="Secondi">
+          </div>`;
+      } else if (type === 'AMRAP') {
+        label.innerText = 'SCORE (ROUNDS + REPS)';
+        container.innerHTML = `
+          <div class="form-row">
+            <input type="number" id="resRounds" placeholder="Rounds">
+            <input type="number" id="resReps" placeholder="Reps">
+          </div>`;
+      } else if (type === 'Sets' || type === 'EMOM') {
+        label.innerText = type === 'Sets' ? 'SCORE SETS / CARICHI' : 'SCORE EMOM / DETTAGLI';
+        
+        let existingValues = [];
+        if (!initialBuild) {
+          document.querySelectorAll('.set-input').forEach(inp => existingValues.push(inp.value));
+        } else {
+          const lines = wodNotesText.split('\n').filter(l => l.trim() !== '');
+          if (lines.length > 1) {
+            existingValues = lines.map(() => '');
+          } else {
+            const matchSets = wodNotesText.match(/(\d+)\s*(?:sets?|rounds?|alzate)/i);
+            let count = (matchSets && matchSets[1]) ? parseInt(matchSets[1], 10) : 5;
+            if (count > 25) count = 25;
+            existingValues = new Array(Math.max(count, 1)).fill('');
+          }
+        }
+
+        if (existingValues.length === 0) existingValues = [''];
+
+        let html = '<div id="setsListContainer">';
+        existingValues.forEach((val, i) => {
+          html += `
+            <div class="set-row">
+              <span class="set-number">#${i+1}</span>
+              <input type="text" class="set-input" placeholder="Es. 80kg o Reps" value="${val}">
+              <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+            </div>
+          `;
+        });
+        html += '</div>';
+        html += `<button type="button" class="btn-add" onclick="addSetRow()">+ Aggiungi Set</button>`;
+        container.innerHTML = html;
+      }
+    }
+
+    function addSetRow() {
+      const container = document.getElementById('setsListContainer');
+      if (!container) return;
+      const index = container.children.length + 1;
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      row.innerHTML = `
+        <span class="set-number">#${index}</span>
+        <input type="text" class="set-input" placeholder="Es. 80kg o Reps" value="">
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(row);
+    }
+
+    function getFormattedResult() {
+      const type = document.getElementById('wodType').value;
+      if (type === 'For Time') {
+        const m = document.getElementById('resMin')?.value || '0';
+        const s = document.getElementById('resSec')?.value || '00';
+        return `${m}:${s.padStart(2, '0')}`;
+      } else if (type === 'AMRAP') {
+        const r = document.getElementById('resRounds')?.value || '0';
+        const reps = document.getElementById('resReps')?.value || '0';
+        return `${r} Rounds + ${reps} Reps`;
+      } else {
+        const inputs = document.querySelectorAll('.set-input');
+        let setResults = [];
+        inputs.forEach((inp, idx) => {
+          if (inp.value.trim() !== '') {
+            setResults.append ? null : setResults.push(`Set ${idx+1}: ${inp.value}`);
+          }
+        });
+        return setResults.length > 0 ? setResults.join(', ') : 'Completato';
+      }
     }
 
     async function saveWod() {
@@ -627,7 +812,6 @@
         }
       }
 
-      // Aggiorna anche localmente
       globalData.wods = globalData.wods.filter(item => String(item.id) !== String(id));
       renderHistory();
     }
@@ -693,193 +877,6 @@
       currentMode = mode;
       document.getElementById('btnRx').classList.toggle('active', mode === 'RX');
       document.getElementById('btnScaled').classList.toggle('active', mode === 'SCALED');
-    }
-
-    function renderResultFields(initialBuild = true) {
-      const type = document.getElementById('wodType').value;
-      const container = document.getElementById('dynamicResultContainer');
-      const label = document.getElementById('resultLabel');
-      const wodNotesText = document.getElementById('wodNotes')?.value || '';
-
-      if (!container || !label) return;
-
-      if (type === 'For Time') {
-        label.innerText = 'SCORE (TIME)';
-        container.innerHTML = `
-          <div class="form-row">
-            <input type="number" id="resMin" placeholder="Minuti">
-            <input type="number" id="resSec" placeholder="Secondi">
-          </div>`;
-      } else if (type === 'AMRAP') {
-        label.innerText = 'SCORE (ROUNDS + REPS)';
-        container.innerHTML = `
-          <div class="form-row">
-            <input type="number" id="resRounds" placeholder="Rounds">
-            <input type="number" id="resReps" placeholder="Reps">
-          </div>`;
-      } else if (type === 'Sets') {
-        label.innerText = 'SCORE SETS / CARICHI';
-        
-        let existingValues = [];
-        if (!initialBuild) {
-          document.querySelectorAll('.set-input').forEach(inp => existingValues.push(inp.value));
-        } else {
-          const lines = wodNotesText.split('\n').filter(l => l.trim() !== '');
-          if (lines.length > 1) {
-            existingValues = lines.map(() => '');
-          } else {
-            const matchSets = wodNotesText.match(/(\d+)\s*(?:sets?|rounds?|alzate)/i);
-            let count = (matchSets && matchSets[1]) ? parseInt(matchSets[1], 10) : 5;
-            if (count > 25) count = 25;
-            existingValues = new Array(Math.max(count, 1)).fill('');
-          }
-        }
-
-        if (existingValues.length === 0) existingValues = [''];
-
-        let html = '<div id="setsListContainer">';
-        existingValues.forEach((val, i) => {
-          html += `
-            <div class="set-row" data-index="${i}">
-              <span class="set-number">${i+1}°</span>
-              <input type="text" class="set-input" placeholder="Carico set ${i+1}" value="${val}">
-              <button type="button" class="btn-remove" onclick="removeSetRow(this)">✕</button>
-            </div>`;
-        });
-        html += '</div>';
-        html += `<button type="button" class="btn-add" onclick="addSetRow()">+ Aggiungi Set</button>`;
-        container.innerHTML = html;
-      } else if (type === 'EMOM') {
-        label.innerText = 'SCORE EMOM';
-        container.innerHTML = `
-          <div class="form-row">
-            <select id="resEmomStatus">
-              <option value="Completato">Completato</option>
-              <option value="Fallito">Fallito</option>
-            </select>
-            <input type="number" id="resEmomMin" placeholder="Minuto completato">
-          </div>`;
-      }
-    }
-
-    function addSetRow(value = '') {
-      const listContainer = document.getElementById('setsListContainer');
-      if (!listContainer) return;
-      const count = listContainer.children.length + 1;
-      const row = document.createElement('div');
-      row.className = 'set-row';
-      row.innerHTML = `
-        <span class="set-number">${count}°</span>
-        <input type="text" class="set-input" placeholder="Carico set ${count}" value="${value}">
-        <button type="button" class="btn-remove" onclick="removeSetRow(this)">✕</button>
-      `;
-      listContainer.appendChild(row);
-      updateSetNumbers();
-    }
-
-    function removeSetRow(btn) {
-      const row = btn.parentElement;
-      row.remove();
-      updateSetNumbers();
-    }
-
-    function updateSetNumbers() {
-      const rows = document.querySelectorAll('.set-row');
-      rows.forEach((row, index) => {
-        const numSpan = row.querySelector('.set-number');
-        const input = row.querySelector('.set-input');
-        if (numSpan) numSpan.innerText = `${index + 1}°`;
-        if (input && !input.placeholder.includes(index + 1)) {
-          input.placeholder = `Carico set ${index + 1}`;
-        }
-      });
-    }
-
-    function addExerciseRow(reps = '', name = '', weight = '') {
-      const container = document.getElementById('exercisesContainer');
-      const row = document.createElement('div');
-      row.className = `exercise-row ${weight ? 'has-weight' : ''}`;
-      row.innerHTML = `
-        <input type="text" placeholder="Reps" value="${reps}">
-        <input type="text" placeholder="Movimento" value="${name}">
-        <input type="text" placeholder="Kg/%" value="${weight}">
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-      `;
-      container.appendChild(row);
-    }
-
-    function getFormattedResult() {
-      const type = document.getElementById('wodType').value;
-      if (type === 'For Time') {
-        const mins = document.getElementById('resMin')?.value || '0';
-        const secs = (document.getElementById('resSec')?.value || '0').padStart(2, '0');
-        return `${mins}:${secs}`;
-      }
-      if (type === 'AMRAP') {
-        const rds = document.getElementById('resRounds')?.value || '0';
-        const reps = document.getElementById('resReps')?.value || '0';
-        return `${rds} rds + ${reps} reps`;
-      }
-      if (type === 'Sets') {
-        let res = [];
-        document.querySelectorAll('.set-input').forEach((inp, i) => {
-          if (inp.value.trim()) res.push(`Set ${i+1}: ${inp.value.trim()}`);
-        });
-        return res.join(', ');
-      }
-      if (type === 'EMOM') {
-        const status = document.getElementById('resEmomStatus')?.value || 'Completato';
-        const min = document.getElementById('resEmomMin')?.value || '';
-        return min ? `${status} (Min ${min})` : status;
-      }
-      return '';
-    }
-
-    document.getElementById('imageInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = document.createElement('img');
-        img.src = event.target.result;
-        img.className = 'gallery-thumb active';
-        document.getElementById('galleryContainer').innerHTML = '';
-        document.getElementById('galleryContainer').appendChild(img);
-        openCropModal(event.target.result);
-      };
-      reader.readAsDataURL(file);
-    });
-
-    function openCropModal(src) {
-      const cropImg = document.getElementById('cropImage');
-      cropImg.src = src;
-      document.getElementById('cropModal').classList.add('active');
-      if (cropper) cropper.destroy();
-      cropper = new Cropper(cropImg, { viewMode: 1 });
-    }
-
-    function closeCropModal() {
-      document.getElementById('cropModal').classList.remove('active');
-      if (cropper) cropper.destroy();
-    }
-
-    async function confirmCropAndScan() {
-      if (!cropper) return;
-      const canvas = cropper.getCroppedCanvas();
-      closeCropModal();
-      document.getElementById('status').innerText = 'Analisi OCR...';
-      try {
-        const worker = await Tesseract.createWorker('eng');
-        const ret = await worker.recognize(canvas.toDataURL());
-        await worker.terminate();
-        
-        document.getElementById('wodNotes').value = ret.data.text;
-        parseWodText(ret.data.text);
-        document.getElementById('status').innerText = 'Analisi completata con successo!';
-      } catch (err) {
-        console.error(err);
-        document.getElementById('status').innerText = 'Errore durante la scansione OCR.';
-      }
     }
   </script>
 </body>
