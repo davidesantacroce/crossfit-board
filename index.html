@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>THE BOARD</title>
+  <title>GLI SCAPPATI DI BICOCCA CON MAYHEM</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
   <style>
     :root {
       --bg-color: #121316;
@@ -14,7 +16,6 @@
       --text: #ffffff;
       --text-muted: #8e94a0;
       --border: #333740;
-      --success: #4caf50;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -23,46 +24,49 @@
       margin: 0;
       padding: 16px;
     }
+    
     .header { 
       margin-bottom: 20px; 
-      text-align: center; 
-    }
-    .logos-wrapper {
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
       display: flex;
-      justify-content: center;
       align-items: center;
-      gap: 16px;
-      margin-bottom: 12px;
-      padding: 0 8px;
+      justify-content: space-between;
+      gap: 12px;
     }
-    .logo-slot {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      flex: 1;
-      max-width: 140px;
-    }
-    .logo-slot span {
-      font-size: 8px;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-    }
-    .logo-slot img {
-      height: 36px;
-      width: 100%;
-      object-fit: contain;
+    .header-logo {
+      max-height: 50px;
+      max-width: 50px;
+      object-fit: cover;
+      border-radius: 50%;
+      mix-blend-mode: lighten;
       display: none;
     }
-    .header h1 { font-size: 26px; font-weight: 900; letter-spacing: 1px; margin: 0; text-transform: uppercase; }
-    .header p { color: var(--text-muted); margin: 4px 0 0 0; font-size: 13px; }
-    
+    .header-title-box {
+      flex: 1;
+      text-align: center;
+    }
+    .header-title-box h1 { 
+      font-size: 20px; 
+      font-weight: 900; 
+      letter-spacing: 1px; 
+      margin: 0; 
+      text-transform: uppercase; 
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .header-title-box p { 
+      color: var(--text-muted); 
+      margin: 4px 0 0 0; 
+      font-size: 12px; 
+    }
+
     .nav { display: flex; gap: 8px; margin-bottom: 20px; }
     .nav button {
+      flex: 1;
       background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted);
-      padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 12px;
-      text-transform: uppercase; cursor: pointer; flex: 1;
+      padding: 10px 8px; border-radius: 8px; font-weight: 700; font-size: 11px;
+      text-transform: uppercase; cursor: pointer; text-align: center;
     }
     .nav button.active { background: var(--accent); color: var(--text); border-color: var(--accent); }
 
@@ -83,6 +87,50 @@
     }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
+    .logo-preview-box {
+      width: 100%;
+      height: 90px;
+      background: var(--input-bg);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .logo-preview-box img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+      border-radius: 50%;
+    }
+
+    .gallery-container {
+      display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-top: 12px;
+    }
+    .gallery-thumb {
+      width: 70px; height: 90px; border-radius: 6px; object-fit: cover;
+      border: 2px solid var(--border); cursor: pointer; opacity: 0.6; transition: all 0.2s;
+    }
+    .gallery-thumb.active { border-color: var(--accent); opacity: 1; }
+
+    .crop-modal {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); z-index: 1000; padding: 16px; box-sizing: border-box; flex-direction: column;
+    }
+    .crop-modal.active { display: flex; }
+    .crop-container { flex: 1; max-height: 80vh; background: #000; border-radius: 8px; overflow: hidden; }
+    .crop-actions { display: flex; gap: 12px; margin-top: 16px; }
+
+    .wod-explanation-box {
+      background-color: #23272f; border: 2px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 16px;
+    }
+    .wod-explanation-box label { color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: 0.5px; }
+    .wod-explanation-box textarea {
+      background: #17191d; color: #f0f0f0; font-family: monospace; font-size: 13px; line-height: 1.5; min-height: 120px; border: 1px solid #3a3f4d;
+    }
+
     .rx-scaled-toggle { display: flex; gap: 10px; margin-top: 10px; }
     .rx-btn {
       flex: 1; padding: 12px; background: var(--input-bg); border: 1px solid var(--border);
@@ -94,89 +142,69 @@
     .set-number { font-weight: 800; color: var(--text-muted); width: 20px; text-align: right; }
     .set-label { color: var(--text-muted); font-size: 12px; font-weight: 700; width: 60px; }
 
-    .exercise-row {
-      display: grid;
-      grid-template-columns: 80px 1fr 35px;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    .exercise-row.has-weight {
-      grid-template-columns: 80px 1fr 100px 35px;
-    }
-    .btn-remove {
-      background: #c62828; color: white; border: none; border-radius: 6px;
-      height: 42px; font-weight: bold; cursor: pointer;
-    }
-    .btn-add {
-      background: var(--input-bg); border: 1px dashed var(--border); color: var(--text-muted);
-      width: 100%; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 8px;
-    }
+    .exercise-row { display: grid; grid-template-columns: 80px 1fr 35px; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .exercise-row.has-weight { grid-template-columns: 80px 1fr 120px 35px; }
+    .btn-remove { background: #c62828; color: white; border: none; border-radius: 6px; height: 42px; font-weight: bold; cursor: pointer; }
+    .btn-add { background: var(--input-bg); border: 1px dashed var(--border); color: var(--text-muted); width: 100%; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 8px; }
 
-    .btn-main {
-      width: 100%; background: var(--accent); color: var(--text); border: none;
-      padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase;
-      font-size: 14px; cursor: pointer; margin-top: 10px;
-    }
-    .btn-import {
-      background: var(--input-bg); border: 1px dashed var(--accent); color: var(--accent);
-      text-align: center; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; display: block;
-    }
+    .rm-row { display: grid; grid-template-columns: 1fr 100px 35px; gap: 8px; align-items: center; margin-bottom: 8px; }
+
+    .btn-main { width: 100%; background: var(--accent); color: var(--text); border: none; padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; margin-top: 10px; }
+    .btn-secondary { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; flex: 1; }
+    .btn-import { background: var(--input-bg); border: 1px dashed var(--accent); color: var(--accent); text-align: center; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; display: block; }
+    
+    .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; position: relative; }
+    .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .btn-delete { background: #c62828; border: 1px solid #c62828; color: #ffffff; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
+
     #imageInput { display: none; }
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
-    .history-item { border-bottom: 1px solid var(--border); padding: 12px 0; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
   </style>
 </head>
 <body>
 
+  <!-- HEADER CON LOGHI -->
   <div class="header">
-    <div class="logos-wrapper">
-      <div class="logo-slot">
-        <span>Box</span>
-        <img id="boxLogoPreview" src="" alt="Logo Box">
-      </div>
-      <div class="logo-slot">
-        <span>Programmazione</span>
-        <img id="progLogoPreview" src="" alt="Logo Programmazione">
-      </div>
+    <img id="headerLogoGym" class="header-logo" alt="Logo Palestra">
+    <div class="header-title-box">
+      <h1>GLI SCAPPATI DI BICOCCA CON MAYHEM</h1>
+      <p>i tuoi numeri, solo tuoi</p>
     </div>
-    <h1>THE BOARD</h1>
-    <p>i tuoi numeri, solo tuoi</p>
+    <img id="headerLogoProg" class="header-logo" alt="Logo Programmazione">
   </div>
 
   <div class="nav">
     <button class="active" onclick="switchTab('registra')">REGISTRA</button>
-    <button onclick="switchTab('profilo')">PROFILO</button>
     <button onclick="switchTab('storico')">STORICO</button>
+    <button onclick="switchTab('impostazioni')">IMPOSTAZIONI</button>
   </div>
 
   <!-- TAB REGISTRA -->
   <div id="tab-registra" class="tab-content active">
-    
     <div class="card">
       <div class="card-title">IMPORTA DA FOTO</div>
-      <label for="imageInput" class="btn-import">📷 Carica Screenshot WOD</label>
-      <input type="file" id="imageInput" accept="image/*">
+      <label for="imageInput" class="btn-import">📷 Carica uno o più Screenshot</label>
+      <input type="file" id="imageInput" accept="image/*" multiple>
+      <div id="galleryContainer" class="gallery-container"></div>
       <div id="status"></div>
     </div>
 
     <div class="card">
       <div class="card-title">NUOVO RISULTATO</div>
-
-      <div class="form-group">
-        <label>ATLETA (NOME E COGNOME)</label>
-        <input type="text" id="athleteName" placeholder="Es. Mario Rossi">
+      <div class="wod-explanation-box">
+        <label>📋 SPIEGAZIONE / PROGRAMMA WOD (ESTRATTO)</label>
+        <textarea id="wodNotes" placeholder="Seleziona e ritaglia un WOD per estrarre il testo..."></textarea>
       </div>
-      
+
       <div class="form-row">
         <div class="form-group">
           <label>TIPO</label>
           <select id="wodType" onchange="renderResultFields()">
             <option value="For Time">For Time</option>
             <option value="AMRAP">AMRAP</option>
-            <option value="Sets">Sets / Massimali (1RM)</option>
+            <option value="Sets">Sets / Strength</option>
             <option value="EMOM">EMOM</option>
           </select>
         </div>
@@ -188,7 +216,7 @@
 
       <div class="form-group">
         <label>TITOLO O WOD</label>
-        <input type="text" id="wodTitle" placeholder="Es. Fran o Power Snatch">
+        <input type="text" id="wodTitle" placeholder="Es. Go Vols o Power Snatch + Snatch">
       </div>
 
       <div class="form-group">
@@ -210,54 +238,7 @@
         </div>
       </div>
 
-      <div class="form-group">
-        <label>NOTE</label>
-        <textarea id="wodNotes" placeholder="Sensazioni, pesi usati, scaling..."></textarea>
-      </div>
-
-      <button class="btn-main" id="btnSave" onclick="saveWod()">SALVA E INVIA A CLOUD</button>
-    </div>
-
-  </div>
-
-  <!-- TAB PROFILO -->
-  <div id="tab-profilo" class="tab-content">
-    <div class="card">
-      <div class="card-title">IMPOSTAZIONI PROFILO ATLETA</div>
-      <div class="form-group">
-        <label>NOME COMPLETO</label>
-        <input type="text" id="profileName" placeholder="Es. Mario Rossi">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>SESSO</label>
-          <select id="profileGender">
-            <option value="M">Uomo (M)</option>
-            <option value="F">Donna (F)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>PESO (KG)</label>
-          <input type="number" id="profileWeight" placeholder="75">
-        </div>
-        <div class="form-group">
-          <label>ALTEZZA (CM)</label>
-          <input type="number" id="profileHeight" placeholder="175">
-        </div>
-      </div>
-      <button class="btn-main" onclick="saveProfile()">SALVA PROFILO SU CLOUD</button>
-    </div>
-
-    <div class="card">
-      <div class="card-title">GESTIONE LOGHI</div>
-      <div class="form-group">
-        <label>LOGO DEL BOX</label>
-        <input type="file" id="boxLogoInput" accept="image/*" onchange="handleLogoUpload(event, 'box')">
-      </div>
-      <div class="form-group" style="margin-bottom: 0;">
-        <label>LOGO PROGRAMMAZIONE</label>
-        <input type="file" id="progLogoInput" accept="image/*" onchange="handleLogoUpload(event, 'prog')">
-      </div>
+      <button class="btn-main" onclick="saveWod()">SALVA</button>
     </div>
   </div>
 
@@ -265,15 +246,72 @@
   <div id="tab-storico" class="tab-content">
     <div class="card">
       <div class="card-title">I TUOI ALLENAMENTI</div>
+      <div class="form-group">
+        <input type="text" id="searchWod" placeholder="🔍 Cerca WOD per nome o esercizio..." oninput="renderHistory()">
+      </div>
       <div id="historyList">Nessun allenamento salvato.</div>
     </div>
   </div>
 
-  <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz-uccgu2EuyehI3kxqqIAfRmBRbNKR2Bhmty8QjsejKKqcgvYJB2M9ZwJ7SdoGQQmU-g/exec";
+  <!-- TAB IMPOSTAZIONI -->
+  <div id="tab-impostazioni" class="tab-content">
+    
+    <!-- SEZIONE MASSIMALI / PERCENTUALI -->
+    <div class="card">
+      <div class="card-title">I TUOI MASSIMALI (1RM)</div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-top: -10px; margin-bottom: 16px;">
+        Inserisci i tuoi 1RM in Kg. L'app li userà per calcolare in automatico i carichi quando nello screenshot viene rilevata una percentuale (es. @55% 1RM Snatch).
+      </p>
+      <div id="rmContainer"></div>
+      <button type="button" class="btn-add" onclick="addRmRow()">+ Aggiungi Massimale</button>
+      <button class="btn-main" style="margin-top: 12px;" onclick="saveRmList()">SALVA MASSIMALI</button>
+    </div>
 
+    <!-- SEZIONE PERSONALIZZAZIONE LOGHI -->
+    <div class="card">
+      <div class="card-title">PERSONALIZZAZIONE LOGHI</div>
+      
+      <div class="form-group">
+        <label>LOGO PALESTRA (SINISTRA)</label>
+        <input type="file" id="gymLogoInput" accept="image/*" onchange="uploadLogo(this, 'gymLogo')">
+        <div class="logo-preview-box">
+          <img id="previewGymLogo" alt="Nessun logo palestra">
+        </div>
+        <button class="btn-secondary" style="margin-top:8px; width:100%;" onclick="removeLogo('gymLogo')">Rimuovi Logo Palestra</button>
+      </div>
+
+      <div class="form-group" style="margin-top: 24px;">
+        <label>LOGO PROGRAMMAZIONE (DESTRA)</label>
+        <input type="file" id="progLogoInput" accept="image/*" onchange="uploadLogo(this, 'progLogo')">
+        <div class="logo-preview-box">
+          <img id="previewProgLogo" alt="Nessun logo programmazione">
+        </div>
+        <button class="btn-secondary" style="margin-top:8px; width:100%;" onclick="removeLogo('progLogo')">Rimuovi Logo Programmazione</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL RITAGLIO FOTO -->
+  <div id="cropModal" class="crop-modal">
+    <div style="text-align: center; color: #fff; font-weight: bold; margin-bottom: 8px;">RITAGLIA IL WOD DA ANALIZZARE</div>
+    <div class="crop-container">
+      <img id="cropImage" src="" style="max-width: 100%;">
+    </div>
+    <div class="crop-actions">
+      <button class="btn-secondary" onclick="closeCropModal()">ANNULLA</button>
+      <button class="btn-main" style="flex:1;" onclick="confirmCropAndScan()">ESTRAI WOD</button>
+    </div>
+  </div>
+
+  <script>
     let currentMode = 'RX';
     let detectedSetsCount = 0;
+    let cropper = null;
+
+    const DEFAULT_MOVEMENTS = [
+      "Snatch", "Power Snatch", "Hang Snatch", "Clean", "Power Clean", "Clean and Jerk",
+      "Back Squat", "Front Squat", "Overhead Squat", "Deadlift", "Strict Press", "Push Press", "Bench Press"
+    ];
 
     const BODYWEIGHT_MOVEMENTS = [
       "Pull Ups", "Chest to Bar", "C2B", "Bar Muscle Up", "BMU", "Ring Muscle Up", "RMU", 
@@ -287,57 +325,120 @@
 
     const ALL_MOVEMENTS = [
       ...BODYWEIGHT_MOVEMENTS,
-      "Power Snatch", "Hang Power Snatch", "Squat Snatch", "Hang Squat Snatch", "Snatch Balance", "Muscle Snatch", "Snatch Shrugs", "High Hang Snatch Shrugs", "Snatch",
-      "Power Clean", "Hang Power Clean", "Squat Clean", "Hang Squat Clean", "Clean and Jerk", "Push Jerk", "Split Jerk", "Push Press", "Strict Press", "Shoulder Press", "Clean",
-      "Back Squat", "Front Squat", "Overhead Squat", "OHS", "Deadlift", "Sumo Deadlift High Pull", "SDHP", "Thruster", "Cluster",
+      "Power Snatch + Snatch", "Power Snatch", "Hang Power Snatch", "Squat Snatch", "Hang Squat Snatch", "Snatch Balance", "Muscle Snatch", "Snatch Shrugs", "High Hang Snatch Shrugs", "Snatch",
+      "Power Clean + Clean", "Power Clean", "Hang Power Clean", "Squat Clean", "Hang Squat Clean", "Clean and Jerk", "Push Jerk", "Split Jerk", "Push Press", "Strict Press", "Shoulder Press", "Clean",
+      "Back Squat", "Front Squat", "Overhead Squat", "OHS", "Deadlift", "Sumo Deadlift High Pull", "SDHP", "Thruster", "Cluster", "Bench Press",
       "DB Snatch", "DB Clean", "DB Thruster", "DB Devil Press", "Devil Press", "DB Lunge", "KB Swing", "American KB Swing", "Russian KB Swing", "Goblet Squat", "Farmer Carry", "Turkish Get-Up", "Wall Balls", "Walking Lunge", "Overhead Lunge"
     ];
 
-    window.onload = () => {
-      document.getElementById('wodDate').valueAsDate = new Date();
-      const savedName = localStorage.getItem('board_athlete_name') || '';
-      document.getElementById('athleteName').value = savedName;
-      document.getElementById('profileName').value = savedName;
-      document.getElementById('profileWeight').value = localStorage.getItem('board_athlete_weight') || '';
-      document.getElementById('profileHeight').value = localStorage.getItem('board_athlete_height') || '';
-      document.getElementById('profileGender').value = localStorage.getItem('board_athlete_gender') || 'M';
-      
+    document.getElementById('wodDate').valueAsDate = new Date();
+
+    window.onload = function() {
       loadSavedLogos();
+      renderRmList();
       renderResultFields();
     };
 
-    function handleLogoUpload(event, type) {
-      const file = event.target.files[0];
+    function renderRmList() {
+      const container = document.getElementById('rmContainer');
+      container.innerHTML = '';
+      const savedRm = JSON.parse(localStorage.getItem('rm_list') || 'null');
+      const rmData = savedRm || DEFAULT_MOVEMENTS.map(m => ({ name: m, weight: '' }));
+
+      rmData.forEach(item => {
+        addRmRow(item.name, item.weight);
+      });
+    }
+
+    function addRmRow(name = '', weight = '') {
+      const container = document.getElementById('rmContainer');
+      const row = document.createElement('div');
+      row.className = 'rm-row';
+      row.innerHTML = `
+        <input type="text" class="rm-name" placeholder="Es. Snatch" value="${name}">
+        <input type="number" class="rm-weight" placeholder="1RM (Kg)" value="${weight}">
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(row);
+    }
+
+    function saveRmList() {
+      const rows = document.querySelectorAll('.rm-row');
+      const rmData = [];
+      rows.forEach(row => {
+        const name = row.querySelector('.rm-name').value.trim();
+        const weight = row.querySelector('.rm-weight').value.trim();
+        if (name !== '') {
+          rmData.push({ name, weight: weight ? parseFloat(weight) : '' });
+        }
+      });
+      localStorage.setItem('rm_list', JSON.stringify(rmData));
+      alert('Massimali salvati con successo!');
+    }
+
+    function getCalculatedWeight(movementName, percentage, targetRmName = '') {
+      const savedRm = JSON.parse(localStorage.getItem('rm_list') || '[]');
+      if (!savedRm || savedRm.length === 0) return `@${percentage}%`;
+
+      let found = null;
+      if (targetRmName) {
+        found = savedRm.find(item => item.name.toLowerCase() === targetRmName.toLowerCase());
+      }
+
+      if (!found) {
+        found = savedRm.find(item => {
+          const regex = new RegExp(`\\b${item.name}\\b`, 'i');
+          return regex.test(movementName) || movementName.toLowerCase().includes(item.name.toLowerCase());
+        });
+      }
+
+      if (found && found.weight) {
+        const calculated = Math.round((found.weight * percentage) / 100);
+        return `${calculated} kg (@${percentage}%)`;
+      }
+
+      return `@${percentage}%`;
+    }
+
+    function loadSavedLogos() {
+      const gymLogo = localStorage.getItem('gymLogo');
+      const progLogo = localStorage.getItem('progLogo');
+
+      if (gymLogo) {
+        document.getElementById('headerLogoGym').src = gymLogo;
+        document.getElementById('headerLogoGym').style.display = 'block';
+        document.getElementById('previewGymLogo').src = gymLogo;
+      } else {
+        document.getElementById('headerLogoGym').style.display = 'none';
+        document.getElementById('previewGymLogo').removeAttribute('src');
+      }
+
+      if (progLogo) {
+        document.getElementById('headerLogoProg').src = progLogo;
+        document.getElementById('headerLogoProg').style.display = 'block';
+        document.getElementById('previewProgLogo').src = progLogo;
+      } else {
+        document.getElementById('headerLogoProg').style.display = 'none';
+        document.getElementById('previewProgLogo').removeAttribute('src');
+      }
+    }
+
+    function uploadLogo(input, key) {
+      const file = input.files[0];
       if (!file) return;
 
       const reader = new FileReader();
       reader.onload = function(e) {
         const base64Image = e.target.result;
-        if (type === 'box') {
-          localStorage.setItem('board_box_logo', base64Image);
-          showLogo('box', base64Image);
-        } else {
-          localStorage.setItem('board_prog_logo', base64Image);
-          showLogo('prog', base64Image);
-        }
+        localStorage.setItem(key, base64Image);
+        loadSavedLogos();
       };
       reader.readAsDataURL(file);
     }
 
-    function loadSavedLogos() {
-      const savedBoxLogo = localStorage.getItem('board_box_logo');
-      if (savedBoxLogo) showLogo('box', savedBoxLogo);
-
-      const savedProgLogo = localStorage.getItem('board_prog_logo');
-      if (savedProgLogo) showLogo('prog', savedProgLogo);
-    }
-
-    function showLogo(type, src) {
-      const img = document.getElementById(type === 'box' ? 'boxLogoPreview' : 'progLogoPreview');
-      if (img) {
-        img.src = src;
-        img.style.display = 'block';
-      }
+    function removeLogo(key) {
+      localStorage.removeItem(key);
+      loadSavedLogos();
     }
 
     function setMode(mode) {
@@ -349,16 +450,17 @@
     function switchTab(tab) {
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
       if(tab === 'registra') {
         document.querySelector('.nav button:nth-child(1)').classList.add('active');
         document.getElementById('tab-registra').classList.add('active');
-      } else if(tab === 'profilo') {
+      } else if(tab === 'storico') {
         document.querySelector('.nav button:nth-child(2)').classList.add('active');
-        document.getElementById('tab-profilo').classList.add('active');
-      } else {
-        document.querySelector('.nav button:nth-child(3)').classList.add('active');
         document.getElementById('tab-storico').classList.add('active');
         renderHistory();
+      } else if(tab === 'impostazioni') {
+        document.querySelector('.nav button:nth-child(3)').classList.add('active');
+        document.getElementById('tab-impostazioni').classList.add('active');
       }
     }
 
@@ -384,15 +486,15 @@
           </div>
         `;
       } else if (type === 'Sets') {
-        label.innerText = 'SCORE PER SET / MASSIMALE (KG / REPS)';
+        label.innerText = 'SCORE PER SET (KG / REPS)';
         let count = detectedSetsCount > 0 ? detectedSetsCount : 5;
         let html = '';
         for (let i = 1; i <= count; i++) {
           html += `
             <div class="set-row">
               <span class="set-number">${i}</span>
-              <input type="text" class="set-input" placeholder="Carico / Esito set ${i}">
-              <span class="set-label">reps/kg</span>
+              <input type="text" class="set-input" placeholder="Carico o esito set ${i}">
+              <span class="set-label">reps</span>
             </div>
           `;
         }
@@ -414,22 +516,17 @@
     function addExerciseRow(reps = '', name = '', weight = '') {
       const container = document.getElementById('exercisesContainer');
       const row = document.createElement('div');
-
       const isBodyweight = BODYWEIGHT_MOVEMENTS.some(b => new RegExp(`\\b${b}\\b`, 'i').test(name));
       const showWeight = weight !== '' || (!isBodyweight && name !== '');
 
       row.className = `exercise-row ${showWeight ? 'has-weight' : ''}`;
-      
       let html = `
         <input type="text" placeholder="Reps/Dist" value="${reps}">
         <input type="text" placeholder="Movimento" value="${name}" oninput="checkWeightVisibility(this)">
       `;
-
-      if (showWeight) {
-        html += `<input type="text" placeholder="Kg / lbs / %" value="${weight}">`;
-      }
-
+      if (showWeight) html += `<input type="text" placeholder="Kg / lbs / %" value="${weight}">`;
       html += `<button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>`;
+      
       row.innerHTML = html;
       container.appendChild(row);
     }
@@ -453,23 +550,63 @@
     }
 
     const imageInput = document.getElementById('imageInput');
+    const galleryContainer = document.getElementById('galleryContainer');
     const status = document.getElementById('status');
 
-    imageInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    imageInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
 
-      status.innerText = 'Analisi screenshot in corso...';
+      galleryContainer.innerHTML = '';
+      files.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = document.createElement('img');
+          img.src = event.target.result;
+          img.className = 'gallery-thumb' + (index === 0 ? ' active' : '');
+          img.onclick = () => openCropModal(event.target.result, img);
+          galleryContainer.appendChild(img);
+          if (index === 0) openCropModal(event.target.result, img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    function openCropModal(imageSrc, thumbElement) {
+      document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+      if(thumbElement) thumbElement.classList.add('active');
+
+      const cropImg = document.getElementById('cropImage');
+      cropImg.src = imageSrc;
+
+      const modal = document.getElementById('cropModal');
+      modal.classList.add('active');
+
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(cropImg, { viewMode: 1, autoCropArea: 0.8, background: false, zoomable: true });
+    }
+
+    function closeCropModal() {
+      document.getElementById('cropModal').classList.remove('active');
+      if (cropper) cropper.destroy();
+    }
+
+    async function confirmCropAndScan() {
+      if (!cropper) return;
+      const canvas = cropper.getCroppedCanvas();
+      closeCropModal();
+
+      status.innerText = 'Analisi selezione in corso...';
       document.getElementById('exercisesContainer').innerHTML = '';
       detectedSetsCount = 0;
 
       try {
         const worker = await Tesseract.createWorker('eng');
-        const ret = await worker.recognize(file);
+        const ret = await worker.recognize(canvas);
         const text = ret.data.text;
         await worker.terminate();
 
-        status.innerText = 'WOD importato con successo!';
+        status.innerText = 'WOD estratto con successo!';
         document.getElementById('wodNotes').value = text.trim();
 
         const numberListMatches = text.match(/^\s*([1-9])\s+(?=\w|\d)/gm);
@@ -484,7 +621,7 @@
           detectedSetsCount = numberListMatches.length;
         } else if (/1RM|@\d+%|sets|rest/i.test(text)) {
           selectType.value = 'Sets';
-          const lineSets = text.split('\n').filter(l => /@\d+%/i.test(l));
+          const lineSets = text.split('\n').filter(l => /@?\d+%/i.test(l));
           if (lineSets.length > 0) detectedSetsCount = lineSets.length;
         }
 
@@ -492,20 +629,34 @@
 
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length > 0) {
-          document.getElementById('wodTitle').value = lines[0].replace(/Score|Log Result/gi, '').substring(0, 35).trim();
+          let rawTitle = lines[0]
+            .replace(/^[\s\.\*\-\–\—\•\(o\)]+/gi, '')
+            .replace(/^[O0]\s+/i, '')
+            .replace(/Score|Log Result/gi, '')
+            .trim();
+          
+          document.getElementById('wodTitle').value = rawTitle.substring(0, 35).trim();
         }
 
         lines.forEach(line => {
-          if (/workout overview|look for|http|deload|options|public notes|private notes/i.test(line)) return;
+          if (/workout overview|look for|http|deload|options|public notes|private notes|rest/i.test(line)) return;
 
-          let matchedMovement = ALL_MOVEMENTS.find(m => new RegExp(`\\b${m}\\b`, 'i').test(line));
-
+          let matchedMovement = ALL_MOVEMENTS.find(m => new RegExp(`\\b${m.replace('+', '\\+')}\\b`, 'i').test(line));
           if (matchedMovement) {
-            let reps = '';
-            let weight = '';
+            let reps = '', weight = '';
+            
+            const percentMatch = line.match(/@?\s*(\d+)\s*%\s*(?:1RM\s*([a-zA-Z\s]+))?/i);
             const weightMatch = line.match(/(@?\d+[-%]*\d*%\s*\w*|\(\d+\/\d+\)|\d+\s*kg|\d+\s*lbs)/i);
-            if (weightMatch) weight = weightMatch[0].trim();
-            const repsMatch = line.match(/^(\d+\s*(m|Rounds|Sets|Reps)?)/i);
+
+            if (percentMatch) {
+              const pct = parseFloat(percentMatch[1]);
+              const targetRmName = percentMatch[2] ? percentMatch[2].trim() : '';
+              weight = getCalculatedWeight(matchedMovement, pct, targetRmName);
+            } else if (weightMatch) {
+              weight = weightMatch[0].trim();
+            }
+
+            const repsMatch = line.match(/^(\d+\s*(?:Power Snatch|Snatch|Clean|Jerk|Reps|Sets)?)/i);
             if (repsMatch) reps = repsMatch[0].trim();
 
             addExerciseRow(reps, matchedMovement, weight);
@@ -515,11 +666,11 @@
         if (document.getElementById('exercisesContainer').children.length === 0) {
           addExerciseRow('', '', '');
         }
-
       } catch (err) {
         status.innerText = 'Errore durante la lettura dell\'immagine.';
+        console.error(err);
       }
-    });
+    }
 
     function getFormattedResult() {
       const type = document.getElementById('wodType').value;
@@ -535,9 +686,7 @@
         const inputs = document.querySelectorAll('.set-input');
         let results = [];
         inputs.forEach((input, index) => {
-          if (input.value.trim() !== '') {
-            results.push(`Set ${index + 1}: ${input.value}`);
-          }
+          if (input.value.trim() !== '') results.push(`Set ${index + 1}: ${input.value}`);
         });
         return results.join(', ');
       } else if (type === 'EMOM') {
@@ -548,26 +697,10 @@
       return '';
     }
 
-    async function saveWod() {
-      const athleteName = document.getElementById('athleteName').value.trim();
-      if (!athleteName) {
-        alert("Inserisci il nome dell'atleta prima di salvare!");
-        return;
-      }
-
-      localStorage.setItem('board_athlete_name', athleteName);
-
-      const type = document.getElementById('wodType').value;
-      const title = document.getElementById('wodTitle').value;
-      const score = getFormattedResult();
-      const notes = document.getElementById('wodNotes').value;
-
-      const btnSave = document.getElementById('btnSave');
-      btnSave.innerText = "INVIO IN CORSO...";
-      btnSave.disabled = true;
-
+    function saveWod() {
       const exerciseRows = document.querySelectorAll('.exercise-row');
       let exercisesList = [];
+
       exerciseRows.forEach(row => {
         const inputs = row.querySelectorAll('input');
         if(inputs[1] && inputs[1].value.trim() !== '') {
@@ -579,114 +712,82 @@
         }
       });
 
-      const fullNotes = `Movimenti:\n${exercisesList.map(ex => `${ex.reps} ${ex.name} ${ex.weight}`).join('\n')}\n\nNote:\n${notes}`;
-
-      const payload = {
-        azione: type === "Sets" ? "salva_pr" : "salva_wod",
-        nome: athleteName,
-        nomeWod: title || type,
-        esercizio: title || "Massimale",
-        score: score,
-        peso: score,
-        modalita: currentMode,
-        note: fullNotes
+      const entry = {
+        id: String(Date.now()),
+        type: document.getElementById('wodType').value,
+        mode: currentMode,
+        date: document.getElementById('wodDate').value,
+        title: document.getElementById('wodTitle').value || 'Allenamento Senza Nome',
+        exercises: exercisesList,
+        result: getFormattedResult(),
+        notes: document.getElementById('wodNotes').value
       };
 
-      try {
-        await fetch(SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+      let history = JSON.parse(localStorage.getItem('board_history') || '[]');
+      history.unshift(entry);
+      localStorage.setItem('board_history', JSON.stringify(history));
 
-        let history = JSON.parse(localStorage.getItem('board_history') || '[]');
-        history.unshift({
-          id: Date.now(),
-          type: type,
-          mode: currentMode,
-          date: document.getElementById('wodDate').value,
-          title: title,
-          exercises: exercisesList,
-          result: score,
-          notes: notes
-        });
-        localStorage.setItem('board_history', JSON.stringify(history));
-
-        alert("Allenamento salvato con successo su Cloud!");
-        document.getElementById('wodTitle').value = '';
-        document.getElementById('wodNotes').value = '';
-        document.getElementById('exercisesContainer').innerHTML = '';
-        document.getElementById('status').innerText = '';
-        renderResultFields();
-      } catch (e) {
-        alert("Errore durante l'invio su Cloud: " + e.message);
-      } finally {
-        btnSave.innerText = "SALVA E INVIA A CLOUD";
-        btnSave.disabled = false;
-      }
+      alert('Allenamento salvato con successo!');
+      
+      document.getElementById('wodType').value = 'For Time';
+      document.getElementById('wodDate').valueAsDate = new Date();
+      document.getElementById('wodTitle').value = '';
+      document.getElementById('wodNotes').value = '';
+      document.getElementById('imageInput').value = '';
+      document.getElementById('galleryContainer').innerHTML = '';
+      document.getElementById('status').innerText = '';
+      document.getElementById('exercisesContainer').innerHTML = '';
+      
+      detectedSetsCount = 0;
+      setMode('RX');
+      renderResultFields();
     }
 
-    async function saveProfile() {
-      const name = document.getElementById('profileName').value.trim();
-      const weight = document.getElementById('profileWeight').value;
-      const height = document.getElementById('profileHeight').value;
-      const gender = document.getElementById('profileGender').value;
-
-      if (!name) {
-        alert("Inserisci il nome!");
-        return;
-      }
-
-      localStorage.setItem('board_athlete_name', name);
-      localStorage.setItem('board_athlete_weight', weight);
-      localStorage.setItem('board_athlete_height', height);
-      localStorage.setItem('board_athlete_gender', gender);
-      document.getElementById('athleteName').value = name;
-
-      const payload = {
-        azione: "salva_profilo",
-        nome: name,
-        sesso: gender,
-        peso: weight,
-        altezza: height
-      };
-
-      try {
-        await fetch(SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        alert("Profilo aggiornato sul Cloud!");
-      } catch (e) {
-        alert("Errore durante il salvataggio del profilo.");
+    function deleteWod(id) {
+      if (confirm('Sei sicuro di voler eliminare questo allenamento?')) {
+        let history = JSON.parse(localStorage.getItem('board_history') || '[]');
+        history = history.filter(item => String(item.id) !== String(id));
+        localStorage.setItem('board_history', JSON.stringify(history));
+        renderHistory();
       }
     }
 
     function renderHistory() {
       const historyList = document.getElementById('historyList');
+      const searchQuery = (document.getElementById('searchWod')?.value || '').toLowerCase().trim();
       let history = JSON.parse(localStorage.getItem('board_history') || '[]');
 
+      if (searchQuery !== '') {
+        history = history.filter(item => {
+          const titleMatch = item.title.toLowerCase().includes(searchQuery);
+          const typeMatch = item.type.toLowerCase().includes(searchQuery);
+          const notesMatch = item.notes ? item.notes.toLowerCase().includes(searchQuery) : false;
+          const exerciseMatch = item.exercises.some(ex => ex.name.toLowerCase().includes(searchQuery));
+          return titleMatch || typeMatch || notesMatch || exerciseMatch;
+        });
+      }
+
       if (history.length === 0) {
-        historyList.innerHTML = '<p style="color:var(--text-muted)">Nessun salvataggio trovato.</p>';
+        historyList.innerHTML = '<p style="color:var(--text-muted)">Nessun allenamento trovato.</p>';
         return;
       }
 
       historyList.innerHTML = history.map(item => `
         <div class="history-item">
-          <div style="font-size:11px; color:var(--accent); font-weight:800;">
-            ${item.type} • ${item.mode || 'RX'} • ${item.date}
+          <div class="history-item-header">
+            <div style="font-size:11px; color:var(--accent); font-weight:800;">
+              ${item.type} • ${item.mode || 'RX'} • ${item.date}
+            </div>
+            <button class="btn-delete" onclick="deleteWod('${item.id}')">Elimina</button>
           </div>
-          <div style="font-size:16px; font-weight:700; margin:4px 0;">${item.title || 'Senza Titolo'}</div>
+          <div style="font-size:16px; font-weight:700; margin:6px 0;">${item.title}</div>
           ${item.exercises && item.exercises.length > 0 ? `
             <ul style="padding-left:18px; margin:8px 0; font-size:13px; color:#ddd;">
               ${item.exercises.map(ex => `<li><strong>${ex.reps}</strong> ${ex.name} ${ex.weight ? `<em>(${ex.weight})</em>` : ''}</li>`).join('')}
             </ul>
           ` : ''}
-          ${item.result ? `<div style="color:var(--success); font-weight:700; font-size:13px;">Risultato: ${item.result}</div>` : ''}
-          ${item.notes ? `<div style="font-size:12px; color:var(--text-muted); margin-top:4px; white-space: pre-wrap;">${item.notes}</div>` : ''}
+          ${item.result ? `<div style="color:#4caf50; font-weight:700; font-size:13px; margin-top:6px;">Risultato: ${item.result}</div>` : ''}
+          ${item.notes ? `<div style="font-size:12px; color:var(--text-muted); margin-top:6px; white-space: pre-wrap; background: #17191d; padding: 8px; border-radius: 6px;">${item.notes}</div>` : ''}
         </div>
       `).join('');
     }
