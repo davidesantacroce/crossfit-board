@@ -343,6 +343,7 @@
       const container = document.getElementById('rmContainer');
       container.innerHTML = '';
       const savedRm = JSON.parse(localStorage.getItem('rm_list') || 'null');
+
       const rmData = savedRm || DEFAULT_MOVEMENTS.map(m => ({ name: m, weight: '' }));
 
       rmData.forEach(item => {
@@ -768,28 +769,39 @@
       }
 
       if (history.length === 0) {
-        historyList.innerHTML = '<p style="color:var(--text-muted)">Nessun allenamento trovato.</p>';
+        historyList.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento trovato.</p>';
         return;
       }
 
-      historyList.innerHTML = history.map(item => `
-        <div class="history-item">
-          <div class="history-item-header">
-            <div style="font-size:11px; color:var(--accent); font-weight:800;">
-              ${item.type} • ${item.mode || 'RX'} • ${item.date}
+      let html = '';
+      history.forEach(item => {
+        let exercisesHtml = '';
+        if (item.exercises && item.exercises.length > 0) {
+          exercisesHtml = item.exercises.map(ex => `
+            <div style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">
+              • ${ex.reps ? ex.reps + ' ' : ''}<b>${ex.name}</b> ${ex.weight ? '(' + ex.weight + ')' : ''}
             </div>
-            <button class="btn-delete" onclick="deleteWod('${item.id}')">Elimina</button>
+          `).join('');
+        }
+
+        html += `
+          <div class="history-item">
+            <div class="history-item-header">
+              <div>
+                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${item.mode}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${item.date}</span>
+                <div style="font-size: 15px; font-weight: 800; margin-top: 4px; color: var(--text);">${item.title} (${item.type})</div>
+              </div>
+              <button class="btn-delete" onclick="deleteWod('${item.id}')">Elimina</button>
+            </div>
+            <div style="margin-top: 8px;">${exercisesHtml}</div>
+            ${item.result ? `<div style="margin-top: 8px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${item.result}</div>` : ''}
+            ${item.notes ? `<div style="margin-top: 8px; font-size: 12px; color: var(--text-muted); background: var(--input-bg); padding: 8px; border-radius: 6px; white-space: pre-line;">${item.notes}</div>` : ''}
           </div>
-          <div style="font-size:16px; font-weight:700; margin:6px 0;">${item.title}</div>
-          ${item.exercises && item.exercises.length > 0 ? `
-            <ul style="padding-left:18px; margin:8px 0; font-size:13px; color:#ddd;">
-              ${item.exercises.map(ex => `<li><strong>${ex.reps}</strong> ${ex.name} ${ex.weight ? `<em>(${ex.weight})</em>` : ''}</li>`).join('')}
-            </ul>
-          ` : ''}
-          ${item.result ? `<div style="color:#4caf50; font-weight:700; font-size:13px; margin-top:6px;">Risultato: ${item.result}</div>` : ''}
-          ${item.notes ? `<div style="font-size:12px; color:var(--text-muted); margin-top:6px; white-space: pre-wrap; background: #17191d; padding: 8px; border-radius: 6px;">${item.notes}</div>` : ''}
-        </div>
-      `).join('');
+        `;
+      });
+
+      historyList.innerHTML = html;
     }
   </script>
 </body>
