@@ -148,7 +148,7 @@
   <!-- TAB REGISTRA -->
   <div id="tab-registra" class="tab-content active">
     <div class="card">
-      <div class="card-title">CARICA WOD</div>
+      <div class="card-title">SELEZIONE ATLETA E WOD</div>
       <label for="imageInput" class="btn-import">📷 Carica Screenshot WOD</label>
       <input type="file" id="imageInput" accept="image/*" multiple>
       <div id="galleryContainer" class="gallery-container"></div>
@@ -159,7 +159,7 @@
       <div class="card-title">DETTAGLI RISULTATO</div>
       <div class="wod-explanation-box">
         <label>📋 SPIEGAZIONE WOD</label>
-        <textarea id="wodNotes" placeholder="Seleziona e ritaglia un WOD..."></textarea>
+        <textarea id="wodNotes" placeholder="Seleziona e ritaglia un WOD..." oninput="parseWodText(this.value)"></textarea>
       </div>
 
       <div class="form-row">
@@ -184,7 +184,7 @@
       </div>
 
       <div class="form-group">
-        <label>MOVIMENTI</label>
+        <label>MOVIMENTI (Estratti automaticamente)</label>
         <div id="exercisesContainer"></div>
         <button type="button" class="btn-add" onclick="addExerciseRow()">+ Aggiungi Movimento</button>
       </div>
@@ -321,10 +321,7 @@
 
     async function fetchCloudData() {
       const url = getScriptUrl();
-      if (!url) {
-        updateConnectionIndicator(false);
-        return;
-      }
+      if (!url) return;
       try {
         const res = await fetch(url + "?action=getData");
         if (res.ok) {
@@ -332,12 +329,9 @@
           updateConnectionIndicator(true);
           renderHistory();
           loadLocalMassimaliAndProfile();
-        } else {
-          updateConnectionIndicator(true);
         }
       } catch (err) {
         console.error("Errore sincronizzazione cloud:", err);
-        updateConnectionIndicator(true);
       }
     }
 
@@ -484,6 +478,62 @@
       }
       alert('Massimali e parametri CrossFit salvati con successo!');
       fetchCloudData();
+    }
+
+    // --- FUNZIONE DI PARSING AUTOMATICO E CALCOLO PERCENTUALI ---
+    function parseWodText(text) {
+      const container = document.getElementById('exercisesContainer');
+      container.innerHTML = ''; // Pulisci la lista corrente
+      
+      if (!text.trim()) return;
+
+      const lines = text.split('\n');
+      const athleteName = localStorage.getItem('activeAthlete') || '';
+      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
+
+      lines.forEach(line => {
+        let cleanLine = line.trim();
+        if (!cleanLine) return;
+
+        // Cerca pattern tipo ripetizioni iniziali (es. "10", "15x", "21-15-9")
+        let repsMatch = cleanLine.match(/^([\d\/\-]+)\s*(?:reps?)?\s*(.*)/i);
+        let reps = '';
+        let restOfLine = cleanLine;
+
+        if (repsMatch) {
+          reps = repsMatch[1];
+          restOfLine = repsMatch[2];
+        }
+
+        // Cerca percentuali es. "70%", "80%."
+        let weightStr = '';
+        let percentMatch = restOfLine.match(/(\d{2,3})\s*%/);
+        
+        if (percentMatch) {
+          let percentage = parseInt(percentMatch[1]);
+          // Cerca a quale massimale si riferisce confrontando le parole chiave
+          let matchedRm = athleteMaxs.find(m => restOfLine.toLowerCase().includes(m.movement.toLowerCase().split(' ')[0]));
+          
+          if (matchedRm && !isNaN(matchedRm.weight)) {
+            let calculatedWeight = Math.round((parseFloat(matchedRm.weight) * percentage) / 100);
+            weightStr = `${calculatedWeight} kg (${percentage}%)`;
+          } else {
+            weightStr = `${percentage}%`;
+          }
+        } else {
+          // Cerca eventuale peso fisso espresso in kg (es. 60kg, 43/30 kg)
+          let kgMatch = restOfLine.match(/(\d+)\s*(?:kg|lbs)/i);
+          if (kgMatch) {
+            weightStr = kgMatch[0];
+          }
+        }
+
+        // Pulizia del nome del movimento rimuovendo la parte del peso/percentuale dal testo principale se desiderato
+        let movementName = restOfLine.replace(/@?\s*\d{2,3}\s*%.*/g, '').trim();
+        if (!movementName) movementName = restOfLine;
+
+        addExerciseRow(reps, movementName, weightStr);
+      });
     }
 
     async function saveWod() {
@@ -669,8 +719,10 @@
         const worker = await Tesseract.createWorker('eng');
         const ret = await worker.recognize(canvas);
         await worker.terminate();
-        document.getElementById('wodNotes').value = ret.data.text.trim();
-        document.getElementById('status').innerText = 'WOD estratto!';
+        const extractedText = ret.data.text.trim();
+        document.getElementById('wodNotes').value = extractedText;
+        parseWodText(extractedText); // Avvia l'estrazione automatica dei movimenti e percentuali
+        document.getElementById('status').innerText = 'WOD estratto e movimenti caricati!';
       } catch (err) {
         document.getElementById('status').innerText = 'Errore OCR';
       }
