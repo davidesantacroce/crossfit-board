@@ -89,7 +89,8 @@
     .btn-remove { background: #c62828; color: white; border: none; border-radius: 6px; height: 42px; font-weight: bold; cursor: pointer; }
     .btn-add { background: var(--input-bg); border: 1px dashed var(--border); color: var(--text-muted); width: 100%; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 8px; }
 
-    .rm-row { display: grid; grid-template-columns: 1fr 100px 35px; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .rm-row { display: grid; grid-template-columns: 1fr 100px; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .rm-row span { font-size: 13px; font-weight: 700; color: var(--text); padding: 10px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; }
 
     .btn-main { width: 100%; background: var(--accent); color: var(--text); border: none; padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; margin-top: 10px; }
     .btn-secondary { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; flex: 1; }
@@ -219,13 +220,12 @@
           <input type="number" step="0.1" id="profileWeight" placeholder="Kg">
         </div>
       </div>
-      <button class="btn-main" onclick="saveProfile()">SALVA PROFILO</button>
+      <button class="btn-main" onclick="saveProfile()">REGISTRA / SALVA ATLETA</button>
     </div>
 
     <div class="card">
-      <div class="card-title">MASSIMALI (1RM)</div>
+      <div class="card-title">MASSIMALI STANDARD CROSSFIT (1RM)</div>
       <div id="rmContainer"></div>
-      <button type="button" class="btn-add" onclick="addRmRow()">+ Aggiungi Massimale</button>
       <button class="btn-main" style="margin-top: 12px;" onclick="saveMassimaliCloud()">SALVA MASSIMALI</button>
     </div>
   </div>
@@ -233,12 +233,10 @@
   <!-- TAB IMPOSTAZIONI -->
   <div id="tab-impostazioni" class="tab-content">
     <div class="card">
-      <div class="card-title">URL GOOGLE APPS SCRIPT</div>
-      <div class="form-group">
-        <label>INSERISCI URL WEB APP</label>
-        <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-      </div>
-      <button class="btn-main" onclick="saveScriptUrl()">SALVA URL</button>
+      <div class="card-title">STATO CONNESSIONE CLOUD</div>
+      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+        Il collegamento al Foglio Google è integrato e configurato globalmente per tutti gli utenti dell'applicazione.
+      </p>
     </div>
 
     <div class="card">
@@ -271,26 +269,34 @@
     let cropper = null;
     let globalData = { wods: [], athletes: [], massimali: [] };
     
-    const DEFAULT_MOVEMENTS = ["Snatch", "Power Snatch", "Clean", "Clean and Jerk", "Back Squat", "Front Squat", "Deadlift", "Bench Press"];
+    // Massimali Standard CrossFit predefiniti
+    const CROSSFIT_STANDARD_RMS = [
+      "Snatch",
+      "Power Snatch",
+      "Clean",
+      "Power Clean",
+      "Clean and Jerk",
+      "Back Squat",
+      "Front Squat",
+      "Overhead Squat",
+      "Deadlift",
+      "Bench Press",
+      "Push Press",
+      "Thruster"
+    ];
 
     document.getElementById('wodDate').valueAsDate = new Date();
 
     window.onload = function() {
       loadSavedLogos();
-      // Imposta direttamente il link nel campo e avvia il recupero dati
-      document.getElementById('scriptUrlInput').value = getScriptUrl();
       fetchCloudData();
       loadActiveAthlete();
       renderResultFields();
     };
 
+    // URL di Google Apps Script hardcoded nel codice
     function getScriptUrl() {
       return "https://script.google.com/macros/s/AKfycbw_YgOOas-ZHpliLQE0n7Tvs6vfoW0MMY1Qhn_9LqoRsAmr8S4EDjxJCu1T8j-Up5kl4Q/exec";
-    }
-
-    function saveScriptUrl() {
-      alert('URL integrato nel codice e sincronizzazione in corso...');
-      fetchCloudData();
     }
 
     async function fetchCloudData() {
@@ -340,7 +346,10 @@
 
     function loadLocalMassimaliAndProfile() {
       const athleteName = localStorage.getItem('activeAthlete');
-      if (!athleteName) return;
+      if (!athleteName) {
+        renderRmContainer();
+        return;
+      }
 
       const ath = globalData.athletes.find(a => a.name.toLowerCase() === athleteName.toLowerCase());
       if (ath) {
@@ -349,15 +358,27 @@
         document.getElementById('profileWeight').value = ath.weight;
       }
 
+      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
+      const maxsMap = {};
+      athleteMaxs.forEach(m => { maxsMap[m.movement.toLowerCase()] = m.weight; });
+
+      renderRmContainer(maxsMap);
+    }
+
+    function renderRmContainer(savedMaxs = {}) {
       const container = document.getElementById('rmContainer');
       container.innerHTML = '';
-      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
       
-      if (athleteMaxs.length > 0) {
-        athleteMaxs.forEach(m => addRmRow(m.movement, m.weight));
-      } else {
-        DEFAULT_MOVEMENTS.forEach(m => addRmRow(m, ''));
-      }
+      CROSSFIT_STANDARD_RMS.forEach(movement => {
+        const val = savedMaxs[movement.toLowerCase()] || '';
+        const row = document.createElement('div');
+        row.className = 'rm-row';
+        row.innerHTML = `
+          <span>${movement}</span>
+          <input type="number" step="0.5" class="rm-weight" data-movement="${movement}" placeholder="Kg" value="${val}">
+        `;
+        container.appendChild(row);
+      });
     }
 
     async function saveProfile() {
@@ -377,21 +398,9 @@
       
       if (url) {
         await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
-        alert('Profilo salvato sul cloud!');
+        alert('Atleta registrato e salvato sul cloud!');
         fetchCloudData();
       }
-    }
-
-    function addRmRow(name = '', weight = '') {
-      const container = document.getElementById('rmContainer');
-      const row = document.createElement('div');
-      row.className = 'rm-row';
-      row.innerHTML = `
-        <input type="text" class="rm-name" placeholder="Es. Snatch" value="${name}">
-        <input type="number" class="rm-weight" placeholder="1RM (Kg)" value="${weight}">
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-      `;
-      container.appendChild(row);
     }
 
     async function saveMassimaliCloud() {
@@ -399,10 +408,10 @@
       const athleteName = localStorage.getItem('activeAthlete');
       if (!athleteName) { alert('Seleziona o salva prima il tuo profilo atleta!'); return; }
 
-      const rows = document.querySelectorAll('.rm-row');
-      for (let row of rows) {
-        const movement = row.querySelector('.rm-name').value.trim();
-        const weight = row.querySelector('.rm-weight').value.trim();
+      const rows = document.querySelectorAll('.rm-weight');
+      for (let input of rows) {
+        const movement = input.getAttribute('data-movement');
+        const weight = input.value.trim();
         if (movement && weight && url) {
           await fetch(url, {
             method: 'POST',
@@ -410,7 +419,7 @@
           });
         }
       }
-      alert('Massimali salvati con successo!');
+      alert('Massimali standard salvati con successo!');
       fetchCloudData();
     }
 
