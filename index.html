@@ -649,7 +649,7 @@
       }
     }
 
-    function addScoreRow(blockId) {
+    function addScoreRow(blockId, prefillReps = "", prefillName = "", prefillWeight = "") {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
       const containerEl = block.querySelector('.block-score-inputs-container');
@@ -658,24 +658,28 @@
       const row = document.createElement('div');
       row.className = 'exercise-row block-score-row';
       row.innerHTML = `
-        <input type="text" placeholder="Set/Reps" value="">
-        <input type="text" placeholder="Esercizio" value="">
-        <input type="text" placeholder="Kg / Carico" value="">
+        <input type="text" placeholder="Set/Reps" value="${prefillReps}">
+        <input type="text" placeholder="Esercizio" value="${prefillName}">
+        <input type="text" placeholder="Kg / Carico" value="${prefillWeight}">
         <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
       `;
-      containerEl.insertBefore(row, addBtn);
+      if (addBtn) {
+        containerEl.insertBefore(row, addBtn);
+      } else {
+        containerEl.appendChild(row);
+      }
     }
 
-    function addExerciseToBlock(blockId) {
+    function addExerciseToBlock(blockId, prefillReps = "", prefillName = "", prefillWeight = "") {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
       const container = block.querySelector('.block-exercises-container');
       const row = document.createElement('div');
       row.className = 'exercise-row';
       row.innerHTML = `
-        <input type="text" placeholder="Reps" value="">
-        <input type="text" placeholder="Movimento" value="">
-        <input type="text" placeholder="Kg/%" value="">
+        <input type="text" placeholder="Reps" value="${prefillReps}">
+        <input type="text" placeholder="Movimento" value="${prefillName}">
+        <input type="text" placeholder="Kg/%" value="${prefillWeight}">
         <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
       `;
       container.appendChild(row);
@@ -746,44 +750,30 @@
       });
 
       const container = block.querySelector('.block-exercises-container');
+      container.innerHTML = '';
       
       if (exercises.length === 0) {
-        container.innerHTML = `
-          <div class="exercise-row">
-            <input type="text" placeholder="Reps" value="">
-            <input type="text" placeholder="Movimento" value="">
-            <input type="text" placeholder="Kg/%" value="">
-            <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-          </div>
-        `;
+        addExerciseToBlock(blockId);
         return;
       }
 
-      container.innerHTML = exercises.map(ex => `
-        <div class="exercise-row">
-          <input type="text" placeholder="Reps" value="${ex.reps || ''}">
-          <input type="text" placeholder="Movimento" value="${ex.name || ''}">
-          <input type="text" placeholder="Kg/%" value="${ex.weight || ''}">
-          <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-        </div>
-      `).join('');
+      exercises.forEach(ex => {
+        addExerciseToBlock(blockId, ex.reps, ex.name, ex.weight);
+      });
 
       if (type === 'Sets' && scoreRows.length > 0) {
         const scoreContainerEl = block.querySelector('.block-score-inputs-container');
         if (scoreContainerEl) {
-          let scoreHtml = scoreRows.map(sr => `
-            <div class="exercise-row block-score-row">
-              <input type="text" placeholder="Set/Reps" value="${sr.reps}">
-              <input type="text" placeholder="Esercizio" value="${sr.name}">
-              <input type="text" placeholder="Kg / Carico" value="${sr.weight}">
-              <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-            </div>
-          `).join('');
-          
-          scoreContainerEl.innerHTML = `
-            ${scoreHtml}
-            <button type="button" class="btn-add" onclick="addScoreRow(${blockId})">+ Aggiungi Serie/Carico</button>
-          `;
+          scoreContainerEl.innerHTML = '';
+          scoreRows.forEach(sr => {
+            addScoreRow(blockId, sr.reps, sr.name, sr.weight);
+          });
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'btn-add';
+          addBtn.innerText = '+ Aggiungi Serie/Carico';
+          addBtn.onclick = () => addScoreRow(blockId);
+          scoreContainerEl.appendChild(addBtn);
         }
       }
     }
@@ -836,16 +826,25 @@
       };
 
       if (url) {
-        await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
-        alert('Sessione multi-blocco salvata sul Foglio Google!');
-        fetchCloudData();
-        
-        document.getElementById('workoutBlocksContainer').innerHTML = '';
-        blockCounter = 0;
-        document.getElementById('wodDate').valueAsDate = new Date();
-        addWorkoutBlock();
-        
-        switchTab('storico');
+        try {
+          const response = await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
+          if (response.ok) {
+            alert('Sessione multi-blocco salvata sul Foglio Google!');
+            await fetchCloudData();
+            
+            document.getElementById('workoutBlocksContainer').innerHTML = '';
+            blockCounter = 0;
+            document.getElementById('wodDate').valueAsDate = new Date();
+            addWorkoutBlock();
+            
+            switchTab('storico');
+          } else {
+            alert('Errore durante il salvataggio sul cloud.');
+          }
+        } catch (err) {
+          console.error("Errore salvataggio WOD:", err);
+          alert('Errore di connessione durante il salvataggio.');
+        }
       }
     }
 
@@ -870,6 +869,8 @@
 
     function renderHistory() {
       const historyList = document.getElementById('historyList');
+      if (!historyList) return;
+      
       const searchQuery = (document.getElementById('searchWod')?.value || '').toLowerCase().trim();
       const activeAthlete = localStorage.getItem('activeAthlete');
       
@@ -947,7 +948,6 @@
           </div>
         `;
       });
-      historyList.html = html;
       historyList.innerHTML = html;
     }
 
