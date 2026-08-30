@@ -708,13 +708,40 @@
       updateBlockScoreLabel(blockId);
 
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      // --- Individua un titolo dalla prima riga utile ---
+      let titleLineIndex = -1;
+      let titleCandidate = '';
+      if (lines.length > 0) {
+        titleLineIndex = 0;
+        titleCandidate = lines[0];
+        // Se la prima riga è solo una parola chiave di tipo (es. "AMRAP" da sola),
+        // usa la riga successiva come titolo
+        if (/^(AMRAP|FOR TIME|EMOM|WOD|METCON)\s*[:\-]?\s*$/i.test(titleCandidate) && lines.length > 1) {
+          titleLineIndex = 1;
+          titleCandidate = lines[1];
+        }
+        // Limita la lunghezza per evitare di infilare una riga di esercizio come titolo
+        if (titleCandidate.length > 40) {
+          titleCandidate = titleCandidate.substring(0, 40).trim();
+        }
+      }
+      const titleInput = block.querySelector('.block-title');
+      if (titleInput && titleCandidate) {
+        titleInput.value = titleCandidate; // .value non passa per innerHTML, non serve escaping
+      }
+      // --- fine parte titolo ---
+
       let exercises = [];
       let scoreRows = [];
       const athleteName = localStorage.getItem('activeAthlete') || '';
       const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
       const STOPWORDS = new Set(['di', 'e', 'a', 'the', 'of']);
 
-      lines.forEach(line => {
+      lines.forEach((line, idx) => {
+        // Salta la riga già usata come titolo
+        if (idx === titleLineIndex) return;
+
         let cleanLine = line;
         
         if (/^(AMRAP|FOR TIME|EMOM|ROUND|WOD|REST|-)/i.test(cleanLine) && cleanLine.length < 15 && !cleanLine.includes('%')) {
