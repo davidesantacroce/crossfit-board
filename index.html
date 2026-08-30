@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THE BOARD</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #121316;
+      --card-bg: #1c1e22;
+      --input-bg: #272a30;
+      --accent: #e64a19;
+      --text: #ffffff;
+      --text-muted: #8e94a0;
+      --border: #333740;
+      --success: #4caf50;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      margin: 0;
+      padding: 16px;
+    }
+    .header { margin-bottom: 20px; }
+    .header h1 { font-size: 28px; font-weight: 900; letter-spacing: 1px; margin: 0; text-transform: uppercase; }
+    .header p { color: var(--text-muted); margin: 4px 0 0 0; font-size: 14px; }
+    
+    .nav { display: flex; gap: 8px; margin-bottom: 20px; }
+    .nav button {
+      background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted);
+      padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 12px;
+      text-transform: uppercase; cursor: pointer; flex: 1;
+    }
+    .nav button.active { background: var(--accent); color: var(--text); border-color: var(--accent); }
+
+    .card {
+      background: var(--card-bg); border-radius: 14px; padding: 20px;
+      border: 1px solid var(--border); margin-bottom: 20px;
+    }
+    .card-title { font-size: 13px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 16px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+
+    label { display: block; font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+    input, select, textarea {
+      width: 100%; background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; box-sizing: border-box; outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+
+    .exercise-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 100px 35px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .btn-remove {
+      background: #c62828; color: white; border: none; border-radius: 6px;
+      height: 42px; font-weight: bold; cursor: pointer;
+    }
+    .btn-add {
+      background: var(--input-bg); border: 1px dashed var(--border); color: var(--text-muted);
+      width: 100%; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 8px;
+    }
+
+    .btn-main {
+      width: 100%; background: var(--accent); color: var(--text); border: none;
+      padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase;
+      font-size: 14px; cursor: pointer; margin-top: 10px;
+    }
+    .btn-import {
+      background: var(--input-bg); border: 1px dashed var(--accent); color: var(--accent);
+      text-align: center; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; display: block;
+    }
+    #imageInput { display: none; }
+    #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
+    .history-item { border-bottom: 1px solid var(--border); padding: 12px 0; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>THE BOARD</h1>
+    <p>I tuoi numeri, solo tuoi</p>
+  </div>
+
+  <div class="nav">
+    <button class="active" onclick="switchTab('registra')">REGISTRA</button>
+    <button onclick="switchTab('profilo')">PROFILO</button>
+    <button onclick="switchTab('storico')">STORICO</button>
+  </div>
+
+  <!-- TAB REGISTRA -->
+  <div id="tab-registra" class="tab-content active">
+    
+    <div class="card">
+      <div class="card-title">IMPORTA DA FOTO</div>
+      <label for="imageInput" class="btn-import">📷 Carica Screenshot WOD</label>
+      <input type="file" id="imageInput" accept="image/*">
+      <div id="status"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">NUOVO RISULTATO</div>
+      
+      <div class="form-group">
+        <label>ATLETA (NOME E COGNOME)</label>
+        <input type="text" id="athleteName" placeholder="Es. Mario Rossi">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>TIPO</label>
+          <select id="wodType">
+            <option value="WOD">WOD</option>
+            <option value="Forza">Forza (1RM/PR)</option>
+            <option value="Skill">Skill</option>
+            <option value="Benchmark">Benchmark</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>MODALITÀ</label>
+          <select id="wodMode">
+            <option value="RX">RX</option>
+            <option value="Scaled">Scaled</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>TITOLO O MOVIMENTO PRINCIPALE</label>
+        <input type="text" id="wodTitle" placeholder="Es. Fran / Power Snatch">
+      </div>
+
+      <div class="form-group">
+        <label>MOVIMENTI (Reps / Movimento / Carico)</label>
+        <div id="exercisesContainer"></div>
+        <button type="button" class="btn-add" onclick="addExerciseRow()">+ Aggiungi Movimento</button>
+      </div>
+
+      <div class="form-group">
+        <label>RISULTATO / SCORE</label>
+        <input type="text" id="wodResult" placeholder="Es. 12:34, 5 Giri + 12 reps, 120kg">
+      </div>
+
+      <div class="form-group">
+        <label>NOTE & CARICHI DETTAGLIATI</label>
+        <textarea id="wodNotes" placeholder="Dettagli, sensazioni..."></textarea>
+      </div>
+
+      <button class="btn-main" id="btnSave" onclick="saveWod()">SALVA E INVIA A CLOUD</button>
+    </div>
+
+  </div>
+
+  <!-- TAB PROFILO -->
+  <div id="tab-profilo" class="tab-content">
+    <div class="card">
+      <div class="card-title">IMPOSTAZIONI PROFILO ATLETA</div>
+      <div class="form-group">
+        <label>NOME COMPLETO</label>
+        <input type="text" id="profileName" placeholder="Es. Mario Rossi">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>SESSO</label>
+          <select id="profileGender">
+            <option value="M">Uomo (M)</option>
+            <option value="F">Donna (F)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>PESO (KG)</label>
+          <input type="number" id="profileWeight" placeholder="75">
+        </div>
+        <div class="form-group">
+          <label>ALTEZZA (CM)</label>
+          <input type="number" id="profileHeight" placeholder="175">
+        </div>
+      </div>
+      <button class="btn-main" onclick="saveProfile()">SALVA PROFILO SU CLOUD</button>
+    </div>
+  </div>
+
+  <!-- TAB STORICO -->
+  <div id="tab-storico" class="tab-content">
+    <div class="card">
+      <div class="card-title">I TUOI ALLENAMENTI (LOCALI)</div>
+      <div id="historyList">Nessun allenamento salvato in locale.</div>
+    </div>
+  </div>
+
+  <script>
+    // URL del tuo Google Apps Script Backend
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz-uccgu2EuyehI3kxqqIAfRmBRbNKR2Bhmty8QjsejKKqcgvYJB2M9ZwJ7SdoGQQmU-g/exec";
+
+    const CROSSFIT_MOVEMENTS = [
+      "Power Snatch", "Hang Power Snatch", "Squat Snatch", "Hang Squat Snatch", "Snatch Balance", "Muscle Snatch", "Snatch Shrugs", "High Hang Snatch Shrugs", "Snatch",
+      "Power Clean", "Hang Power Clean", "Squat Clean", "Hang Squat Clean", "Clean and Jerk", "Push Jerk", "Split Jerk", "Push Press", "Strict Press", "Shoulder Press", "Clean",
+      "Back Squat", "Front Squat", "Overhead Squat", "OHS", "Air Squat", "Deadlift", "Sumo Deadlift High Pull", "SDHP", "Thruster", "Cluster",
+      "Pull Ups", "Chest to Bar", "C2B", "Bar Muscle Up", "BMU", "Ring Muscle Up", "RMU", "Toes to Bar", "T2B", "Knees to Elbows", "Ring Dips", "Dips", "Strict Pull Ups",
+      "Handstand Push Ups", "HSPU", "Strict HSPU", "Handstand Walk", "Push Ups", "Burpees", "Burpee Box Jump Over", "Pistols", "Single Leg Squat", "Sit Ups", "AbMat Sit Ups", "V-Ups", "L-Sit",
+      "DB Snatch", "DB Clean", "DB Thruster", "DB Devil Press", "Devil Press", "DB Lunge", "KB Swing", "American KB Swing", "Russian KB Swing", "Goblet Squat", "Farmer Carry", "Turkish Get-Up",
+      "Box Jumps", "Box Step Ups", "Tall Box Jumps", "Double Unders", "DU", "Single Unders", "Row", "Run", "Shuttle Run", "Echo Bike", "Assault Bike", "BikeErg", "SkiErg", "Ski", "Wall Balls", "Rope Climb", "Legless Rope Climb", "Pegboard", "Walking Lunge", "Overhead Lunge"
+    ];
+
+    // Caricamento dati salvati nel browser
+    window.onload = () => {
+      const savedName = localStorage.getItem('board_athlete_name') || '';
+      document.getElementById('athleteName').value = savedName;
+      document.getElementById('profileName').value = savedName;
+      document.getElementById('profileWeight').value = localStorage.getItem('board_athlete_weight') || '';
+      document.getElementById('profileHeight').value = localStorage.getItem('board_athlete_height') || '';
+      document.getElementById('profileGender').value = localStorage.getItem('board_athlete_gender') || 'M';
+    };
+
+    function switchTab(tab) {
+      document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      if(tab === 'registra') {
+        document.querySelector('.nav button:nth-child(1)').classList.add('active');
+        document.getElementById('tab-registra').classList.add('active');
+      } else if(tab === 'profilo') {
+        document.querySelector('.nav button:nth-child(2)').classList.add('active');
+        document.getElementById('tab-profilo').classList.add('active');
+      } else {
+        document.querySelector('.nav button:nth-child(3)').classList.add('active');
+        document.getElementById('tab-storico').classList.add('active');
+        renderHistory();
+      }
+    }
+
+    function addExerciseRow(reps = '', name = '', weight = '') {
+      const container = document.getElementById('exercisesContainer');
+      const row = document.createElement('div');
+      row.className = 'exercise-row';
+      row.innerHTML = `
+        <input type="text" placeholder="Reps/Sets" value="${reps}">
+        <input type="text" placeholder="Movimento" value="${name}">
+        <input type="text" placeholder="Kg / %" value="${weight}">
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(row);
+    }
+
+    // Carica screenshot via OCR
+    document.getElementById('imageInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const status = document.getElementById('status');
+      status.innerText = 'Analisi immagine in corso...';
+      document.getElementById('exercisesContainer').innerHTML = '';
+
+      try {
+        const worker = await Tesseract.createWorker('eng');
+        const ret = await worker.recognize(file);
+        const text = ret.data.text;
+        await worker.terminate();
+
+        status.innerText = 'Movimenti identificati!';
+        document.getElementById('wodNotes').value = text.trim();
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        if (lines.length > 0) document.getElementById('wodTitle').value = lines[0].substring(0, 35);
+
+        lines.forEach(line => {
+          if (/workout overview|look for|http|deload|options/i.test(line)) return;
+          let matchedMovement = CROSSFIT_MOVEMENTS.find(m => new RegExp(`\\b${m}\\b`, 'i').test(line));
+          if (matchedMovement) {
+            let reps = '', weight = '';
+            const weightMatch = line.match(/(@?\d+[-%]*\d*%\s*\w*|\(\d+\/\d+\)|\d+\s*kg|\d+\s*lbs)/i);
+            if (weightMatch) weight = weightMatch[0].trim();
+            const repsMatch = line.match(/^(\d+\s*(m|Rounds|Sets)?)/i);
+            if (repsMatch) reps = repsMatch[0].trim();
+            addExerciseRow(reps, matchedMovement, weight);
+          }
+        });
+
+        if (document.getElementById('exercisesContainer').children.length === 0) addExerciseRow('', '', '');
+      } catch (err) {
+        status.innerText = 'Errore durante la lettura dell\'immagine.';
+      }
+    });
+
+    // Salva WOD (Locale + Google Sheet)
+    async function saveWod() {
+      const athleteName = document.getElementById('athleteName').value.trim();
+      if (!athleteName) {
+        alert("Inserisci il nome dell'atleta prima di salvare!");
+        return;
+      }
+
+      localStorage.setItem('board_athlete_name', athleteName);
+
+      const type = document.getElementById('wodType').value;
+      const title = document.getElementById('wodTitle').value;
+      const score = document.getElementById('wodResult').value;
+      const mode = document.getElementById('wodMode').value;
+      const notes = document.getElementById('wodNotes').value;
+
+      const btnSave = document.getElementById('btnSave');
+      btnSave.innerText = "INVIO IN CORSO...";
+      btnSave.disabled = true;
+
+      const exerciseRows = document.querySelectorAll('.exercise-row');
+      let exercisesText = [];
+      exerciseRows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        if(inputs[1].value.trim() !== '') {
+          exercisesText.push(`${inputs[0].value} ${inputs[1].value} ${inputs[2].value}`.trim());
+        }
+      });
+
+      const fullNotes = `Movimenti:\n${exercisesText.join('\n')}\n\nNote:\n${notes}`;
+
+      // 1. Invio a Google Sheets
+      const payload = {
+        azione: type === "Forza" ? "salva_pr" : "salva_wod",
+        nome: athleteName,
+        nomeWod: title || type,
+        esercizio: title || "PR",
+        score: score,
+        peso: score,
+        modalita: mode,
+        note: fullNotes
+      };
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        // 2. Salvataggio locale su browser
+        let history = JSON.parse(localStorage.getItem('board_history') || '[]');
+        history.unshift({ date: new Date().toLocaleDateString(), title, type, score, notes: fullNotes });
+        localStorage.setItem('board_history', JSON.stringify(history));
+
+        alert("Allenamento salvato con successo su Cloud!");
+        document.getElementById('wodTitle').value = '';
+        document.getElementById('wodResult').value = '';
+        document.getElementById('wodNotes').value = '';
+        document.getElementById('exercisesContainer').innerHTML = '';
+      } catch (e) {
+        alert("Errore durante l'invio su Cloud: " + e.message);
+      } finally {
+        btnSave.innerText = "SALVA E INVIA A CLOUD";
+        btnSave.disabled = false;
+      }
+    }
+
+    // Salva Profilo Atleta su Google Sheets
+    async function saveProfile() {
+      const name = document.getElementById('profileName').value.trim();
+      const weight = document.getElementById('profileWeight').value;
+      const height = document.getElementById('profileHeight').value;
+      const gender = document.getElementById('profileGender').value;
+
+      if (!name) {
+        alert("Inserisci il nome!");
+        return;
+      }
+
+      localStorage.setItem('board_athlete_name', name);
+      localStorage.setItem('board_athlete_weight', weight);
+      localStorage.setItem('board_athlete_height', height);
+      localStorage.setItem('board_athlete_gender', gender);
+      document.getElementById('athleteName').value = name;
+
+      const payload = {
+        azione: "salva_profilo",
+        nome: name,
+        sesso: gender,
+        peso: weight,
+        altezza: height
+      };
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        alert("Profilo aggiornato sul Cloud!");
+      } catch (e) {
+        alert("Errore durante il salvataggio del profilo.");
+      }
+    }
+
+    function renderHistory() {
+      const historyList = document.getElementById('historyList');
+      let history = JSON.parse(localStorage.getItem('board_history') || '[]');
+      if (history.length === 0) {
+        historyList.innerHTML = '<p style="color:var(--text-muted)">Nessun salvataggio locale.</p>';
+        return;
+      }
+      historyList.innerHTML = history.map(item => `
+        <div class="history-item">
+          <div style="font-size:11px; color:var(--accent); font-weight:800;">${item.type} • ${item.date}</div>
+          <div style="font-size:16px; font-weight:700; margin:4px 0;">${item.title || 'Senza Titolo'}</div>
+          ${item.score ? `<div style="color:var(--success); font-weight:700; font-size:13px;">Risultato: ${item.score}</div>` : ''}
+          ${item.notes ? `<div style="font-size:12px; color:var(--text-muted); margin-top:4px; white-space: pre-wrap;">${item.notes}</div>` : ''}
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
