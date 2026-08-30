@@ -486,6 +486,21 @@
       
       if (!text.trim()) return;
 
+      const upperText = text.toUpperCase();
+      const wodTypeSelect = document.getElementById('wodType');
+      
+      if (upperText.includes('AMRAP')) {
+        wodTypeSelect.value = 'AMRAP';
+      } else if (upperText.includes('FOR TIME') || upperText.includes('TIME')) {
+        wodTypeSelect.value = 'For Time';
+      } else if (upperText.includes('EMOM')) {
+        wodTypeSelect.value = 'EMOM';
+      } else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY')) {
+        wodTypeSelect.value = 'Sets';
+      }
+      
+      renderResultFields();
+
       const lines = text.split('\n');
       const athleteName = localStorage.getItem('activeAthlete') || '';
       const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
@@ -632,22 +647,43 @@
       const container = document.getElementById('dynamicResultContainer');
       const label = document.getElementById('resultLabel');
 
+      if (!container || !label) return;
+
       if (type === 'For Time') {
         label.innerText = 'SCORE (TIME)';
-        container.innerHTML = `<div class="form-row"><input type="number" id="resMin" placeholder="mins"><input type="number" id="resSec" placeholder="secs"></div>`;
+        container.innerHTML = `
+          <div class="form-row">
+            <input type="number" id="resMin" placeholder="Minuti">
+            <input type="number" id="resSec" placeholder="Secondi">
+          </div>`;
       } else if (type === 'AMRAP') {
         label.innerText = 'SCORE (ROUNDS + REPS)';
-        container.innerHTML = `<div class="form-row"><input type="number" id="resRounds" placeholder="Rounds"><input type="number" id="resReps" placeholder="Reps"></div>`;
+        container.innerHTML = `
+          <div class="form-row">
+            <input type="number" id="resRounds" placeholder="Rounds">
+            <input type="number" id="resReps" placeholder="Reps">
+          </div>`;
       } else if (type === 'Sets') {
-        label.innerText = 'SCORE SETS';
+        label.innerText = 'SCORE SETS / CARICHI';
         let html = '';
         for (let i = 1; i <= 5; i++) {
-          html += `<div class="set-row"><span class="set-number">${i}</span><input type="text" class="set-input" placeholder="Carico set ${i}"></div>`;
+          html += `
+            <div class="set-row">
+              <span class="set-number">${i}</span>
+              <input type="text" class="set-input" placeholder="Carico set ${i}">
+            </div>`;
         }
         container.innerHTML = html;
       } else if (type === 'EMOM') {
         label.innerText = 'SCORE EMOM';
-        container.innerHTML = `<div class="form-row"><select id="resEmomStatus"><option value="Completato">Completato</option><option value="Fallito">Fallito</option></select><input type="number" id="resEmomMin" placeholder="Minuto"></div>`;
+        container.innerHTML = `
+          <div class="form-row">
+            <select id="resEmomStatus">
+              <option value="Completato">Completato</option>
+              <option value="Fallito">Fallito</option>
+            </select>
+            <input type="number" id="resEmomMin" placeholder="Minuto completato">
+          </div>`;
       }
     }
 
@@ -666,14 +702,29 @@
 
     function getFormattedResult() {
       const type = document.getElementById('wodType').value;
-      if (type === 'For Time') return `${document.getElementById('resMin')?.value || '0'}:${(document.getElementById('resSec')?.value || '0').padStart(2, '0')}`;
-      if (type === 'AMRAP') return `${document.getElementById('resRounds')?.value || '0'} rds + ${document.getElementById('resReps')?.value || '0'} reps`;
+      if (type === 'For Time') {
+        const mins = document.getElementById('resMin')?.value || '0';
+        const secs = (document.getElementById('resSec')?.value || '0').padStart(2, '0');
+        return `${mins}:${secs}`;
+      }
+      if (type === 'AMRAP') {
+        const rds = document.getElementById('resRounds')?.value || '0';
+        const reps = document.getElementById('resReps')?.value || '0';
+        return `${rds} rds + ${reps} reps`;
+      }
       if (type === 'Sets') {
         let res = [];
-        document.querySelectorAll('.set-input').forEach((inp, i) => { if(inp.value) res.push(`Set ${i+1}: ${inp.value}`); });
+        document.querySelectorAll('.set-input').forEach((inp, i) => {
+          if (inp.value.trim()) res.push(`Set ${i+1}: ${inp.value.trim()}`);
+        });
         return res.join(', ');
       }
-      return document.getElementById('resEmomStatus')?.value || '';
+      if (type === 'EMOM') {
+        const status = document.getElementById('resEmomStatus')?.value || 'Completato';
+        const min = document.getElementById('resEmomMin')?.value || '';
+        return min ? `${status} (Min ${min})` : status;
+      }
+      return '';
     }
 
     document.getElementById('imageInput').addEventListener('change', (e) => {
@@ -720,39 +771,6 @@
       } catch (err) {
         console.error(err);
         document.getElementById('status').innerText = 'Errore durante la scansione OCR.';
-      }
-    }
-
-    function uploadLogo(input, type) {
-      const file = input.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target.result;
-        localStorage.setItem(type, base64);
-        loadSavedLogos();
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function loadSavedLogos() {
-      const gymLogo = localStorage.getItem('gymLogo');
-      const progLogo = localStorage.getItem('progLogo');
-      
-      const imgGymHeader = document.getElementById('headerLogoGym');
-      const previewGym = document.getElementById('previewGymLogo');
-      if (gymLogo) {
-        imgGymHeader.src = gymLogo;
-        imgGymHeader.style.display = 'block';
-        previewGym.src = gymLogo;
-      }
-
-      const imgProgHeader = document.getElementById('headerLogoProg');
-      const previewProg = document.getElementById('previewProgLogo');
-      if (progLogo) {
-        imgProgHeader.src = progLogo;
-        imgProgHeader.style.display = 'block';
-        previewProg.src = progLogo;
       }
     }
   </script>
