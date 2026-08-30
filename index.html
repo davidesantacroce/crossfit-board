@@ -130,12 +130,12 @@
   </div>
 
   <div class="header">
-    <img id="headerLogoGym" class="header-logo" alt="Logo">
+    <img id="headerLogoGym" class="header-logo" alt="Logo Gym">
     <div class="header-title-box">
       <h1>GLI SCAPPATI DI BICOCCA</h1>
       <p id="activeAthleteDisplay">Atleta: Nessuno Selezionato</p>
     </div>
-    <img id="headerLogoProg" class="header-logo" alt="Logo">
+    <img id="headerLogoProg" class="header-logo" alt="Logo Prog">
   </div>
 
   <div class="nav">
@@ -317,6 +317,38 @@
 
     function getScriptUrl() {
       return "https://script.google.com/macros/s/AKfycbw_YgOOas-ZHpliLQE0n7Tvs6vfoW0MMY1Qhn_9LqoRsAmr8S4EDjxJCu1T8j-Up5kl4Q/exec";
+    }
+
+    // Gestione loghi salvati in localStorage
+    function loadSavedLogos() {
+      const gymLogo = localStorage.getItem('gymLogo');
+      const progLogo = localStorage.getItem('progLogo');
+      
+      const headerGym = document.getElementById('headerLogoGym');
+      const headerProg = document.getElementById('headerLogoProg');
+      const previewGym = document.getElementById('previewGymLogo');
+      const previewProg = document.getElementById('previewProgLogo');
+
+      if (gymLogo) {
+        if (headerGym) { headerGym.src = gymLogo; headerGym.style.display = 'block'; }
+        if (previewGym) previewGym.src = gymLogo;
+      }
+      if (progLogo) {
+        if (headerProg) { headerProg.src = progLogo; headerProg.style.display = 'block'; }
+        if (previewProg) previewProg.src = progLogo;
+      }
+    }
+
+    function uploadLogo(input, type) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const dataUrl = e.target.result;
+          localStorage.setItem(type, dataUrl);
+          loadSavedLogos();
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
     }
 
     async function fetchCloudData() {
@@ -642,7 +674,8 @@
       document.getElementById('btnScaled').classList.toggle('active', mode === 'SCALED');
     }
 
-    function renderResultFields() {
+    // Funzione aggiornata per la gestione dinamica e la modifica manuale dei set/alzate
+    function renderResultFields(forcedCount = null) {
       const type = document.getElementById('wodType').value;
       const container = document.getElementById('dynamicResultContainer');
       const label = document.getElementById('resultLabel');
@@ -665,21 +698,31 @@
             <input type="number" id="resReps" placeholder="Reps">
           </div>`;
       } else if (type === 'Sets') {
-        let detectedSets = 5; // Default di fallback
-        
-        const lines = wodNotesText.split('\n').filter(l => l.trim() !== '');
-        if (lines.length > 1) {
-          detectedSets = lines.length;
+        let detectedSets = 5; // Default
+
+        if (forcedCount !== null) {
+          detectedSets = parseInt(forcedCount, 10);
         } else {
-          const matchSets = wodNotesText.match(/(\d+)\s*(?:sets?|rounds?|alzate)/i);
-          if (matchSets && matchSets[1]) {
-            let parsed = parseInt(matchSets[1], 10);
-            if (parsed > 0 && parsed <= 20) detectedSets = parsed;
+          const lines = wodNotesText.split('\n').filter(l => l.trim() !== '');
+          if (lines.length > 1) {
+            detectedSets = lines.length;
+          } else {
+            const matchSets = wodNotesText.match(/(\d+)\s*(?:sets?|rounds?|alzate)/i);
+            if (matchSets && matchSets[1]) {
+              let parsed = parseInt(matchSets[1], 10);
+              if (parsed > 0 && parsed <= 25) detectedSets = parsed;
+            }
           }
         }
 
         label.innerText = `SCORE SETS / CARICHI (${detectedSets} ALZATE)`;
-        let html = '';
+        
+        let html = `
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 800;">Modifica num. set:</span>
+            <input type="number" id="manualSetCount" value="${detectedSets}" min="1" max="25" style="width: 80px; padding: 6px;" onchange="renderResultFields(this.value)">
+          </div>`;
+
         for (let i = 1; i <= detectedSets; i++) {
           html += `
             <div class="set-row">
