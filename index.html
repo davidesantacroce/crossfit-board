@@ -277,22 +277,19 @@
 
     window.onload = function() {
       loadSavedLogos();
-      const savedUrl = localStorage.getItem('scriptUrl');
-      if (savedUrl) {
-        document.getElementById('scriptUrlInput').value = savedUrl;
-        fetchCloudData();
-      }
+      // Imposta direttamente il link nel campo e avvia il recupero dati
+      document.getElementById('scriptUrlInput').value = getScriptUrl();
+      fetchCloudData();
       loadActiveAthlete();
       renderResultFields();
     };
 
     function getScriptUrl() {
-      return document.getElementById('scriptUrlInput').value.trim();
+      return "https://script.google.com/macros/s/AKfycbw_YgOOas-ZHpliLQE0n7Tvs6vfoW0MMY1Qhn_9LqoRsAmr8S4EDjxJCu1T8j-Up5kl4Q/exec";
     }
 
     function saveScriptUrl() {
-      localStorage.setItem('scriptUrl', getScriptUrl());
-      alert('URL salvato! Sincronizzazione in corso...');
+      alert('URL integrato nel codice e sincronizzazione in corso...');
       fetchCloudData();
     }
 
@@ -382,8 +379,6 @@
         await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
         alert('Profilo salvato sul cloud!');
         fetchCloudData();
-      } else {
-        alert('Inserisci prima l\'URL di Apps Script nelle impostazioni!');
       }
     }
 
@@ -451,8 +446,6 @@
         alert('WOD salvato sul Foglio Google!');
         fetchCloudData();
         switchTab('storico');
-      } else {
-        alert('Configura l\'URL di Apps Script nelle impostazioni.');
       }
     }
 
