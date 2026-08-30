@@ -98,6 +98,7 @@
     
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
     
     #imageInput { display: none; }
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
@@ -611,6 +612,26 @@
       }
     }
 
+    async function deleteWod(id) {
+      if (!confirm('Vuoi davvero eliminare questo allenamento?')) return;
+      
+      const url = getScriptUrl();
+      if (url) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'deleteWod', id: String(id) })
+          });
+        } catch (err) {
+          console.error("Errore eliminazione dal cloud:", err);
+        }
+      }
+
+      // Aggiorna anche localmente
+      globalData.wods = globalData.wods.filter(item => String(item.id) !== String(id));
+      renderHistory();
+    }
+
     function renderHistory() {
       const historyList = document.getElementById('historyList');
       const searchQuery = (document.getElementById('searchWod')?.value || '').toLowerCase().trim();
@@ -634,7 +655,7 @@
 
       let html = '';
       history.slice().reverse().forEach(item => {
-        let exercisesHtml = item.exercises.map(ex => `
+        let exercisesHtml = (item.exercises || []).map(ex => `
           <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
             • ${ex.reps ? ex.reps + ' ' : ''}<b>${ex.name}</b> ${ex.weight ? '(' + ex.weight + ')' : ''}
           </div>
@@ -648,6 +669,7 @@
                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${item.date}</span>
                 <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${item.title} (${item.type})</div>
               </div>
+              <button class="btn-delete-history" onclick="deleteWod('${item.id}')">✕ Elimina</button>
             </div>
             <div style="margin-top: 6px;">${exercisesHtml}</div>
             ${item.result ? `<div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${item.result}</div>` : ''}
