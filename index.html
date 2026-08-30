@@ -61,10 +61,6 @@
     }
     .logo-preview-box img { max-height: 100%; max-width: 100%; object-fit: contain; border-radius: 50%; }
 
-    .gallery-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-top: 12px; }
-    .gallery-thumb { width: 70px; height: 90px; border-radius: 6px; object-fit: cover; border: 2px solid var(--border); cursor: pointer; opacity: 0.6; }
-    .gallery-thumb.active { border-color: var(--accent); opacity: 1; }
-
     .crop-modal {
       display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.85); z-index: 1000; padding: 16px; box-sizing: border-box; flex-direction: column;
@@ -95,7 +91,6 @@
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
     
-    #imageInput { display: none; }
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -143,14 +138,6 @@
 
   <!-- TAB REGISTRA -->
   <div id="tab-registra" class="tab-content active">
-    <div class="card">
-      <div class="card-title">CARICA SCREENSHOT WOD</div>
-      <label for="imageInput" class="btn-import">📷 Carica Screenshot WOD</label>
-      <input type="file" id="imageInput" accept="image/*" multiple onchange="handleImageUpload(this)">
-      <div id="galleryContainer" class="gallery-container"></div>
-      <div id="status"></div>
-    </div>
-
     <div class="card">
       <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
         <span>BLOCCHI DI ALLENAMENTO</span>
@@ -260,13 +247,15 @@
     </div>
   </div>
 
+  <input type="file" id="globalImageInput" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
+
   <script>
     let currentMode = 'RX';
     let cropper = null;
     let globalData = { wods: [], athletes: [], massimali: [] };
-    let uploadedImages = [];
-    let currentImageIndex = 0;
     let blockCounter = 0;
+    let activeBlockIdForScan = null;
+    let pendingCropFile = null;
     
     const CROSSFIT_STANDARD_RMS = [
       "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",
@@ -293,9 +282,9 @@
       }
     };
 
-   function getScriptUrl() {
-  return "https://script.google.com/macros/s/AKfycbw_YgOOas-ZHpliLQE0n7Tvs6vfoW0MMY1Qhn_9LqoRsAmr8S4EDjxJCu1T8j-Up5kl4Q/exec";
-}
+    function getScriptUrl() {
+      return "https://script.google.com/macros/s/AKfycbw_YgOOas-ZHpliLQE0n7Tvs6vfoW0MMY1Qhn_9LqoRsAmr8S4EDjxJCu1T8j-Up5kl4Q/exec";
+    }
 
     function loadSavedLogos() {
       const gymLogo = localStorage.getItem('gymLogo');
@@ -489,40 +478,28 @@
       fetchCloudData();
     }
 
+    function triggerBlockImageUpload(blockId) {
+      activeBlockIdForScan = blockId;
+      const fileInput = document.getElementById('globalImageInput');
+      fileInput.value = '';
+      fileInput.click();
+    }
+
     function handleImageUpload(input) {
-      if (input.files && input.files.length > 0) {
-        Array.from(input.files).forEach(file => {
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            uploadedImages.push(e.target.result);
-            renderGallery();
-            if (uploadedImages.length === 1) {
-              openCropModal(0);
-            }
-          };
-          reader.readAsDataURL(file);
-        });
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          pendingCropFile = e.target.result;
+          openCropModal();
+        };
+        reader.readAsDataURL(input.files[0]);
       }
     }
 
-    function renderGallery() {
-      const container = document.getElementById('galleryContainer');
-      container.innerHTML = '';
-      uploadedImages.forEach((imgSrc, index) => {
-        const thumb = document.createElement('img');
-        thumb.src = imgSrc;
-        thumb.className = `gallery-thumb ${index === currentImageIndex ? 'active' : ''}`;
-        thumb.onclick = () => openCropModal(index);
-        container.appendChild(thumb);
-      });
-    }
-
-    function openCropModal(index) {
-      currentImageIndex = index;
-      renderGallery();
+    function openCropModal() {
       const modal = document.getElementById('cropModal');
       const image = document.getElementById('cropImage');
-      image.src = uploadedImages[index];
+      image.src = pendingCropFile;
       modal.classList.add('active');
 
       if (cropper) {
@@ -540,15 +517,15 @@
         cropper.destroy();
         cropper = null;
       }
+      pendingCropFile = null;
+      activeBlockIdForScan = null;
     }
 
     async function confirmCropAndScan() {
-      if (!cropper) return;
+      if (!cropper || activeBlockIdForScan === null) return;
       const canvas = cropper.getCroppedCanvas();
+      const targetBlockId = activeBlockIdForScan;
       closeCropModal();
-
-      const statusEl = document.getElementById('status');
-      statusEl.innerText = "Elaborazione OCR in corso...";
 
       try {
         const worker = await Tesseract.createWorker('eng+ita');
@@ -556,25 +533,10 @@
         await worker.terminate();
 
         const text = ret.data.text;
-        statusEl.innerText = "Estrazione completata!";
-        
-        document.getElementById('workoutBlocksContainer').innerHTML = '';
-        blockCounter = 0;
-
-        const sections = text.split(/(?=PART\s*\d|WOD\s*\d|STRENGTH|METCON)/i);
-        
-        if (sections.length > 1) {
-          sections.forEach((sec, idx) => {
-            if(sec.trim()) {
-              parseAndAddBlock("For Time", `Parte ${idx+1}`, sec.trim());
-            }
-          });
-        } else {
-          parseAndAddBlock("For Time", "WOD", text.trim());
-        }
+        parseAndFillBlock(targetBlockId, text);
       } catch (err) {
         console.error(err);
-        statusEl.innerText = "Errore durante l'estrazione OCR.";
+        alert("Errore durante l'estrazione OCR.");
       }
     }
 
@@ -607,16 +569,20 @@
         `;
       }
 
+      let currentId = blockCounter;
       blockDiv.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <label style="color: var(--accent);">🔥 PARTE #${blockCounter}</label>
-          <button type="button" class="btn-remove" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="document.getElementById('workout-block-${blockCounter}').remove()">Rimuovi</button>
+          <label style="color: var(--accent);">🔥 PARTE #${currentId}</label>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn-secondary" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="triggerBlockImageUpload(${currentId})">📷 Carica Foto</button>
+            <button type="button" class="btn-remove" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="document.getElementById('workout-block-${currentId}').remove()">✕</button>
+          </div>
         </div>
         
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
             <label>TIPO</label>
-            <select class="block-type">
+            <select class="block-type" onchange="updateBlockScoreLabel(${currentId})">
               <option value="For Time" ${prefillType === 'For Time' ? 'selected' : ''}>For Time</option>
               <option value="AMRAP" ${prefillType === 'AMRAP' ? 'selected' : ''}>AMRAP</option>
               <option value="Sets" ${prefillType === 'Sets' ? 'selected' : ''}>Sets / Strength</option>
@@ -634,23 +600,100 @@
           <div class="block-exercises-container">
             ${exercisesHtml}
           </div>
-          <button type="button" class="btn-add" onclick="addExerciseToBlock(${blockCounter})">+ Aggiungi Movimento</button>
+          <button type="button" class="btn-add" onclick="addExerciseToBlock(${currentId})">+ Aggiungi Movimento</button>
         </div>
 
         <div class="form-group">
-          <label>SCORE / RISULTATO PARZIALE</label>
-          <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="${prefillNotes}">
+          <label class="block-score-label">SCORE / RISULTATO PARZIALE</label>
+          <div class="block-score-inputs-container">
+            <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="${prefillNotes}">
+          </div>
         </div>
       `;
       container.appendChild(blockDiv);
+      updateBlockScoreLabel(currentId);
     }
 
-    function parseAndAddBlock(defaultType, title, text) {
+    function updateBlockScoreLabel(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
+      const typeSelect = block.querySelector('.block-type');
+      const labelEl = block.querySelector('.block-score-label');
+      const containerEl = block.querySelector('.block-score-inputs-container');
+      
+      const selectedType = typeSelect.value;
+      
+      if (selectedType === 'Sets') {
+        labelEl.innerText = "RISULTATO (SERIE E CARICHI)";
+        containerEl.innerHTML = `
+          <div class="exercise-row block-score-row">
+            <input type="text" placeholder="Set/Reps" value="">
+            <input type="text" placeholder="Esercizio" value="">
+            <input type="text" placeholder="Kg / Carico" value="">
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+          </div>
+          <button type="button" class="btn-add" onclick="addScoreRow(${blockId})">+ Aggiungi Serie/Carico</button>
+        `;
+      } else {
+        if (selectedType === 'For Time') {
+          labelEl.innerText = "SCORE / TEMPO IMPIEGATO";
+        } else if (selectedType === 'AMRAP') {
+          labelEl.innerText = "SCORE / ROUNDS & REPS";
+        } else if (selectedType === 'EMOM') {
+          labelEl.innerText = "SCORE / COMPLETATO O NOTE";
+        } else {
+          labelEl.innerText = "SCORE / RISULTATO PARZIALE";
+        }
+        containerEl.innerHTML = `
+          <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="">
+        `;
+      }
+    }
+
+    function addScoreRow(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
+      const containerEl = block.querySelector('.block-score-inputs-container');
+      const addBtn = containerEl.querySelector('.btn-add');
+      
+      const row = document.createElement('div');
+      row.className = 'exercise-row block-score-row';
+      row.innerHTML = `
+        <input type="text" placeholder="Set/Reps" value="">
+        <input type="text" placeholder="Esercizio" value="">
+        <input type="text" placeholder="Kg / Carico" value="">
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      containerEl.insertBefore(row, addBtn);
+    }
+
+    function addExerciseToBlock(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
+      const container = block.querySelector('.block-exercises-container');
+      const row = document.createElement('div');
+      row.className = 'exercise-row';
+      row.innerHTML = `
+        <input type="text" placeholder="Reps" value="">
+        <input type="text" placeholder="Movimento" value="">
+        <input type="text" placeholder="Kg/%" value="">
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(row);
+    }
+
+    function parseAndFillBlock(blockId, text) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
+
       const upperText = text.toUpperCase();
-      let type = defaultType;
+      let type = 'For Time';
       if (upperText.includes('AMRAP')) type = 'AMRAP';
       else if (upperText.includes('EMOM')) type = 'EMOM';
       else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY')) type = 'Sets';
+
+      block.querySelector('.block-type').value = type;
+      updateBlockScoreLabel(blockId);
 
       const lines = text.split('\n');
       let exercises = [];
@@ -696,22 +739,26 @@
         }
       });
 
-      addWorkoutBlock(type, title, "", exercises);
-    }
-
-    function addExerciseToBlock(blockId) {
-      const block = document.getElementById(`workout-block-${blockId}`);
-      if (!block) return;
       const container = block.querySelector('.block-exercises-container');
-      const row = document.createElement('div');
-      row.className = 'exercise-row';
-      row.innerHTML = `
-        <input type="text" placeholder="Reps" value="">
-        <input type="text" placeholder="Movimento" value="">
-        <input type="text" placeholder="Kg/%" value="">
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-      `;
-      container.appendChild(row);
+      container.innerHTML = exercises.map(ex => `
+        <div class="exercise-row">
+          <input type="text" placeholder="Reps" value="${ex.reps || ''}">
+          <input type="text" placeholder="Movimento" value="${ex.name || ''}">
+          <input type="text" placeholder="Kg/%" value="${ex.weight || ''}">
+          <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        </div>
+      `).join('');
+
+      if (exercises.length === 0) {
+        container.innerHTML = `
+          <div class="exercise-row">
+            <input type="text" placeholder="Reps" value="">
+            <input type="text" placeholder="Movimento" value="">
+            <input type="text" placeholder="Kg/%" value="">
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+          </div>
+        `;
+      }
     }
 
     async function saveWodSession() {
@@ -726,10 +773,23 @@
       blockElements.forEach(block => {
         const type = block.querySelector('.block-type').value;
         const title = block.querySelector('.block-title').value || 'WOD';
-        const result = block.querySelector('.block-result').value || '';
+        
+        let result = '';
+        if (type === 'Sets') {
+          let scoreRowsData = [];
+          block.querySelectorAll('.block-score-row').forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            if(inputs[1] && inputs[1].value.trim() !== '') {
+              scoreRowsData.push({ reps: inputs[0].value, name: inputs[1].value, weight: inputs[2] ? inputs[2].value : '' });
+            }
+          });
+          result = scoreRowsData;
+        } else {
+          result = block.querySelector('.block-result') ? block.querySelector('.block-result').value : '';
+        }
         
         let exercises = [];
-        block.querySelectorAll('.exercise-row').forEach(row => {
+        block.querySelectorAll('.block-exercises-container .exercise-row').forEach(row => {
           const inputs = row.querySelectorAll('input');
           if(inputs[1] && inputs[1].value.trim() !== '') {
             exercises.push({ reps: inputs[0].value, name: inputs[1].value, weight: inputs[2] ? inputs[2].value : '' });
@@ -752,6 +812,13 @@
         await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
         alert('Sessione multi-blocco salvata sul Foglio Google!');
         fetchCloudData();
+        
+        // Svuota i dati nel tab registra
+        document.getElementById('workoutBlocksContainer').innerHTML = '';
+        blockCounter = 0;
+        document.getElementById('wodDate').valueAsDate = new Date();
+        addWorkoutBlock();
+        
         switchTab('storico');
       }
     }
@@ -807,11 +874,24 @@
                 • ${ex.reps ? ex.reps + ' ' : ''}<b>${ex.name}</b> ${ex.weight ? '(' + ex.weight + ')' : ''}
               </div>
             `).join('');
+
+            let scoreHtml = '';
+            if (b.type === 'Sets' && Array.isArray(b.result)) {
+              let setsRows = b.result.map(sr => `
+                <div style="font-size: 12px; color: #2e7d32; margin-left: 10px;">
+                  • ${sr.reps ? sr.reps + ' ' : ''}<b>${sr.name}</b> ${sr.weight ? '(' + sr.weight + ')' : ''}
+                </div>
+              `).join('');
+              scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score (Serie/Carichi):</div>${setsRows}`;
+            } else if (b.result) {
+              scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${b.result}</div>`;
+            }
+
             return `
-              <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border);">
+              <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
                 <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${b.title} (${b.type})</div>
-                <div>${exHtml}</div>
-                ${b.result ? `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${b.result}</div>` : ''}
+                <div style="margin-top: 4px;">${exHtml}</div>
+                ${scoreHtml}
               </div>
             `;
           }).join('');
@@ -862,10 +942,3 @@
   </script>
 </body>
 </html>
-```[cite: 1]
-
-<ElicitationsGroup message="Come vuoi proseguire?">
-<Elicitation label="Add custom workout tag" query="Add custom workout tag" query_intent="CLICKABLE_SUGGESTION" />
-<Elicitation label="Create export feature" query="Create export feature" query_intent="CLICKABLE_SUGGESTION" />
-<Elicitation label="Explore performance charts" query="Explore performance charts" query_intent="CLICKABLE_SUGGESTION" />
-</ElicitationsGroup>
