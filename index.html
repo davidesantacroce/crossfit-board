@@ -255,6 +255,15 @@
     let blockCounter = 0;
     let activeBlockIdForScan = null;
     let pendingCropFile = null;
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;');
+    }
     
     const CROSSFIT_STANDARD_RMS = [
       "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",
@@ -424,8 +433,8 @@
         const row = document.createElement('div');
         row.className = 'rm-row';
         row.innerHTML = `
-          <span>${movement}</span>
-          <input type="text" class="rm-weight" data-movement="${movement}" placeholder="Kg / Reps / Tempo" value="${val}">
+          <span>${escapeHtml(movement)}</span>
+          <input type="text" class="rm-weight" data-movement="${escapeHtml(movement)}" placeholder="Kg / Reps / Tempo" value="${escapeHtml(val)}">
         `;
         container.appendChild(row);
       });
@@ -551,9 +560,9 @@
       if (prefillExercises && prefillExercises.length > 0) {
         exercisesHtml = prefillExercises.map(ex => `
           <div class="exercise-row">
-            <input type="text" placeholder="Reps" value="${ex.reps || ''}">
-            <input type="text" placeholder="Movimento" value="${ex.name || ''}">
-            <input type="text" placeholder="Kg/%" value="${ex.weight || ''}">
+            <input type="text" placeholder="Reps" value="${escapeHtml(ex.reps || '')}">
+            <input type="text" placeholder="Movimento" value="${escapeHtml(ex.name || '')}">
+            <input type="text" placeholder="Kg/%" value="${escapeHtml(ex.weight || '')}">
             <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
           </div>
         `).join('');
@@ -590,7 +599,7 @@
           </div>
           <div class="form-group" style="flex: 1;">
             <label>TITOLO</label>
-            <input type="text" class="block-title" placeholder="Es. Metcon 1" value="${prefillTitle}">
+            <input type="text" class="block-title" placeholder="Es. Metcon 1" value="${escapeHtml(prefillTitle)}">
           </div>
         </div>
 
@@ -605,7 +614,7 @@
         <div class="form-group">
           <label class="block-score-label">SCORE / RISULTATO PARZIALE</label>
           <div class="block-score-inputs-container">
-            <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="${prefillNotes}">
+            <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="${escapeHtml(prefillNotes)}">
           </div>
         </div>
       `;
@@ -658,9 +667,9 @@
       const row = document.createElement('div');
       row.className = 'exercise-row block-score-row';
       row.innerHTML = `
-        <input type="text" placeholder="Set/Reps" value="${prefillReps}">
-        <input type="text" placeholder="Esercizio" value="${prefillName}">
-        <input type="text" placeholder="Kg / Carico" value="${prefillWeight}">
+        <input type="text" placeholder="Set/Reps" value="${escapeHtml(prefillReps)}">
+        <input type="text" placeholder="Esercizio" value="${escapeHtml(prefillName)}">
+        <input type="text" placeholder="Kg / Carico" value="${escapeHtml(prefillWeight)}">
         <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
       `;
       if (addBtn) {
@@ -677,9 +686,9 @@
       const row = document.createElement('div');
       row.className = 'exercise-row';
       row.innerHTML = `
-        <input type="text" placeholder="Reps" value="${prefillReps}">
-        <input type="text" placeholder="Movimento" value="${prefillName}">
-        <input type="text" placeholder="Kg/%" value="${prefillWeight}">
+        <input type="text" placeholder="Reps" value="${escapeHtml(prefillReps)}">
+        <input type="text" placeholder="Movimento" value="${escapeHtml(prefillName)}">
+        <input type="text" placeholder="Kg/%" value="${escapeHtml(prefillWeight)}">
         <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
       `;
       container.appendChild(row);
@@ -693,7 +702,7 @@
       let type = 'For Time';
       if (upperText.includes('AMRAP')) type = 'AMRAP';
       else if (upperText.includes('EMOM')) type = 'EMOM';
-      else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY') || upperText.includes('+') || upperText.includes('1 RM')) type = 'Sets';
+      else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY') || upperText.includes('1 RM')) type = 'Sets';
 
       block.querySelector('.block-type').value = type;
       updateBlockScoreLabel(blockId);
@@ -703,6 +712,7 @@
       let scoreRows = [];
       const athleteName = localStorage.getItem('activeAthlete') || '';
       const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
+      const STOPWORDS = new Set(['di', 'e', 'a', 'the', 'of']);
 
       lines.forEach(line => {
         let cleanLine = line;
@@ -715,7 +725,7 @@
         let reps = '';
         let restOfLine = cleanLine;
 
-        if (repsMatch) {
+        if (repsMatch && repsMatch[2].trim().length > 0) {
           reps = repsMatch[1].trim();
           restOfLine = repsMatch[2].trim();
         }
@@ -725,7 +735,11 @@
         
         if (percentMatch) {
           let percentage = parseInt(percentMatch[1]);
-          let matchedRm = athleteMaxs.find(m => restOfLine.toLowerCase().includes(m.movement.toLowerCase().split(' ')[0]) || m.movement.toLowerCase().includes('snatch'));
+          let matchedRm = athleteMaxs.find(m => {
+            const words = m.movement.toLowerCase().split(' ')
+              .filter(w => w.length > 2 && !STOPWORDS.has(w));
+            return words.some(word => restOfLine.toLowerCase().includes(word));
+          });
           
           if (matchedRm && !isNaN(matchedRm.weight)) {
             let calculatedWeight = Math.round((parseFloat(matchedRm.weight) * percentage) / 100);
@@ -898,7 +912,7 @@
           contentHtml = item.blocks.map(b => {
             let exHtml = (b.exercises || []).map(ex => `
               <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
-                • ${ex.reps ? ex.reps + ' ' : ''}<b>${ex.name}</b> ${ex.weight ? '(' + ex.weight + ')' : ''}
+                • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
               </div>
             `).join('');
 
@@ -906,17 +920,17 @@
             if (b.type === 'Sets' && Array.isArray(b.result)) {
               let setsRows = b.result.map(sr => `
                 <div style="font-size: 12px; color: #2e7d32; margin-left: 10px;">
-                  • ${sr.reps ? sr.reps + ' ' : ''}<b>${sr.name}</b> ${sr.weight ? '(' + sr.weight + ')' : ''}
+                  • ${escapeHtml(sr.reps || '')} <b>${escapeHtml(sr.name || '')}</b> ${sr.weight ? '(' + escapeHtml(sr.weight) + ')' : ''}
                 </div>
               `).join('');
               scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score (Serie/Carichi):</div>${setsRows}`;
             } else if (b.result) {
-              scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${b.result}</div>`;
+              scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${escapeHtml(b.result)}</div>`;
             }
 
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
-                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${b.title} (${b.type})</div>
+                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
                 <div style="margin-top: 4px;">${exHtml}</div>
                 ${scoreHtml}
               </div>
@@ -925,13 +939,13 @@
         } else {
           let exercisesHtml = (item.exercises || []).map(ex => `
             <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
-              • ${ex.reps ? ex.reps + ' ' : ''}<b>${ex.name}</b> ${ex.weight ? '(' + ex.weight + ')' : ''}
+              • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
             </div>
           `).join('');
           contentHtml = `
-            <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${item.title} (${item.type})</div>
+            <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${escapeHtml(item.title || '')} (${escapeHtml(item.type || '')})</div>
             <div style="margin-top: 6px;">${exercisesHtml}</div>
-            ${item.result ? `<div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${item.result}</div>` : ''}
+            ${item.result ? `<div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${escapeHtml(item.result)}</div>` : ''}
           `;
         }
 
@@ -939,10 +953,10 @@
           <div class="history-item">
             <div class="history-item-header">
               <div>
-                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${item.mode}</span>
-                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${item.date}</span>
+                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(item.date || '')}</span>
               </div>
-              <button class="btn-delete-history" onclick="deleteWod('${item.id}')">✕ Elimina</button>
+              <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
             </div>
             ${contentHtml}
           </div>
