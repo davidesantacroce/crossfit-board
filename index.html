@@ -24,56 +24,24 @@
       margin: 0;
       padding: 16px;
     }
-    
     .header { 
-      margin-bottom: 20px; 
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
     }
-    .header-logo {
-      max-height: 50px;
-      max-width: 50px;
-      object-fit: cover;
-      border-radius: 50%;
-      mix-blend-mode: lighten;
-      display: none;
-    }
-    .header-title-box {
-      flex: 1;
-      text-align: center;
-    }
-    .header-title-box h1 { 
-      font-size: 20px; 
-      font-weight: 900; 
-      letter-spacing: 1px; 
-      margin: 0; 
-      text-transform: uppercase; 
-      color: var(--text);
-      line-height: 1.2;
-    }
-    .header-title-box p { 
-      color: var(--text-muted); 
-      margin: 4px 0 0 0; 
-      font-size: 12px; 
-    }
+    .header-logo { max-height: 50px; max-width: 50px; object-fit: cover; border-radius: 50%; mix-blend-mode: lighten; display: none; }
+    .header-title-box { flex: 1; text-align: center; }
+    .header-title-box h1 { font-size: 18px; font-weight: 900; letter-spacing: 1px; margin: 0; text-transform: uppercase; color: var(--text); line-height: 1.2; }
+    .header-title-box p { color: var(--text-muted); margin: 4px 0 0 0; font-size: 11px; }
 
-    .nav { display: flex; gap: 8px; margin-bottom: 20px; }
+    .nav { display: flex; gap: 6px; margin-bottom: 20px; overflow-x: auto; }
     .nav button {
-      flex: 1;
-      background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted);
-      padding: 10px 8px; border-radius: 8px; font-weight: 700; font-size: 11px;
-      text-transform: uppercase; cursor: pointer; text-align: center;
+      flex: 1; background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted);
+      padding: 10px 6px; border-radius: 8px; font-weight: 700; font-size: 10px;
+      text-transform: uppercase; cursor: pointer; text-align: center; white-space: nowrap;
     }
     .nav button.active { background: var(--accent); color: var(--text); border-color: var(--accent); }
 
-    .card {
-      background: var(--card-bg); border-radius: 14px; padding: 20px;
-      border: 1px solid var(--border); margin-bottom: 20px;
-    }
+    .card { background: var(--card-bg); border-radius: 14px; padding: 18px; border: 1px solid var(--border); margin-bottom: 20px; }
     .card-title { font-size: 13px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 16px; }
 
     .form-group { margin-bottom: 16px; }
@@ -88,31 +56,13 @@
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
     .logo-preview-box {
-      width: 100%;
-      height: 90px;
-      background: var(--input-bg);
-      border: 1px dashed var(--border);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 8px;
-      overflow: hidden;
+      width: 100%; height: 90px; background: var(--input-bg); border: 1px dashed var(--border);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-top: 8px; overflow: hidden;
     }
-    .logo-preview-box img {
-      max-height: 100%;
-      max-width: 100%;
-      object-fit: contain;
-      border-radius: 50%;
-    }
+    .logo-preview-box img { max-height: 100%; max-width: 100%; object-fit: contain; border-radius: 50%; }
 
-    .gallery-container {
-      display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-top: 12px;
-    }
-    .gallery-thumb {
-      width: 70px; height: 90px; border-radius: 6px; object-fit: cover;
-      border: 2px solid var(--border); cursor: pointer; opacity: 0.6; transition: all 0.2s;
-    }
+    .gallery-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-top: 12px; }
+    .gallery-thumb { width: 70px; height: 90px; border-radius: 6px; object-fit: cover; border: 2px solid var(--border); cursor: pointer; opacity: 0.6; }
     .gallery-thumb.active { border-color: var(--accent); opacity: 1; }
 
     .crop-modal {
@@ -123,25 +73,17 @@
     .crop-container { flex: 1; max-height: 80vh; background: #000; border-radius: 8px; overflow: hidden; }
     .crop-actions { display: flex; gap: 12px; margin-top: 16px; }
 
-    .wod-explanation-box {
-      background-color: #23272f; border: 2px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 16px;
-    }
-    .wod-explanation-box label { color: var(--accent); font-size: 12px; font-weight: 900; letter-spacing: 0.5px; }
-    .wod-explanation-box textarea {
-      background: #17191d; color: #f0f0f0; font-family: monospace; font-size: 13px; line-height: 1.5; min-height: 120px; border: 1px solid #3a3f4d;
-    }
+    .wod-explanation-box { background-color: #23272f; border: 2px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
+    .wod-explanation-box label { color: var(--accent); font-size: 12px; font-weight: 900; }
+    .wod-explanation-box textarea { background: #17191d; color: #f0f0f0; font-family: monospace; font-size: 13px; line-height: 1.5; min-height: 100px; border: 1px solid #3a3f4d; }
 
     .rx-scaled-toggle { display: flex; gap: 10px; margin-top: 10px; }
-    .rx-btn {
-      flex: 1; padding: 12px; background: var(--input-bg); border: 1px solid var(--border);
-      color: var(--text-muted); font-weight: 800; border-radius: 8px; cursor: pointer; text-align: center;
-    }
+    .rx-btn { flex: 1; padding: 12px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); font-weight: 800; border-radius: 8px; cursor: pointer; text-align: center; }
     .rx-btn.active { background: #2e7d32; color: #fff; border-color: #2e7d32; }
 
     .set-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .set-number { font-weight: 800; color: var(--text-muted); width: 20px; text-align: right; }
-    .set-label { color: var(--text-muted); font-size: 12px; font-weight: 700; width: 60px; }
-
+    
     .exercise-row { display: grid; grid-template-columns: 80px 1fr 35px; gap: 8px; align-items: center; margin-bottom: 10px; }
     .exercise-row.has-weight { grid-template-columns: 80px 1fr 120px 35px; }
     .btn-remove { background: #c62828; color: white; border: none; border-radius: 6px; height: 42px; font-weight: bold; cursor: pointer; }
@@ -153,10 +95,9 @@
     .btn-secondary { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; flex: 1; }
     .btn-import { background: var(--input-bg); border: 1px dashed var(--accent); color: var(--accent); text-align: center; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; display: block; }
     
-    .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; position: relative; }
+    .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
-    .btn-delete { background: #c62828; border: 1px solid #c62828; color: #ffffff; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer; text-transform: uppercase; }
-
+    
     #imageInput { display: none; }
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
     .tab-content { display: none; }
@@ -165,37 +106,44 @@
 </head>
 <body>
 
-  <!-- HEADER CON LOGHI -->
   <div class="header">
-    <img id="headerLogoGym" class="header-logo" alt="Logo Palestra">
+    <img id="headerLogoGym" class="header-logo" alt="Logo">
     <div class="header-title-box">
-      <h1>GLI SCAPPATI DI BICOCCA CON MAYHEM</h1>
-      <p>i tuoi numeri, solo tuoi</p>
+      <h1>GLI SCAPPATI DI BICOCCA</h1>
+      <p id="activeAthleteDisplay">Atleta: Nessuno Selezionato</p>
     </div>
-    <img id="headerLogoProg" class="header-logo" alt="Logo Programmazione">
+    <img id="headerLogoProg" class="header-logo" alt="Logo">
   </div>
 
   <div class="nav">
     <button class="active" onclick="switchTab('registra')">REGISTRA</button>
     <button onclick="switchTab('storico')">STORICO</button>
+    <button onclick="switchTab('atleti')">ATLETA & 1RM</button>
     <button onclick="switchTab('impostazioni')">IMPOSTAZIONI</button>
   </div>
 
   <!-- TAB REGISTRA -->
   <div id="tab-registra" class="tab-content active">
     <div class="card">
-      <div class="card-title">IMPORTA DA FOTO</div>
-      <label for="imageInput" class="btn-import">📷 Carica uno o più Screenshot</label>
+      <div class="card-title">SELEZIONA ATLETA E WOD</div>
+      <div class="form-group">
+        <label>ATLETA</label>
+        <select id="currentAthleteSelect" onchange="updateActiveAthlete()">
+          <option value="">-- Seleziona il tuo nome --</option>
+        </select>
+      </div>
+
+      <label for="imageInput" class="btn-import">📷 Carica Screenshot WOD</label>
       <input type="file" id="imageInput" accept="image/*" multiple>
       <div id="galleryContainer" class="gallery-container"></div>
       <div id="status"></div>
     </div>
 
     <div class="card">
-      <div class="card-title">NUOVO RISULTATO</div>
+      <div class="card-title">DETTAGLI RISULTATO</div>
       <div class="wod-explanation-box">
-        <label>📋 SPIEGAZIONE / PROGRAMMA WOD (ESTRATTO)</label>
-        <textarea id="wodNotes" placeholder="Seleziona e ritaglia un WOD per estrarre il testo..."></textarea>
+        <label>📋 SPIEGAZIONE WOD</label>
+        <textarea id="wodNotes" placeholder="Seleziona e ritaglia un WOD..."></textarea>
       </div>
 
       <div class="form-row">
@@ -215,12 +163,12 @@
       </div>
 
       <div class="form-group">
-        <label>TITOLO O WOD</label>
-        <input type="text" id="wodTitle" placeholder="Es. Go Vols o Power Snatch + Snatch">
+        <label>TITOLO WOD</label>
+        <input type="text" id="wodTitle" placeholder="Es. Go Vols">
       </div>
 
       <div class="form-group">
-        <label>MOVIMENTI ESERCIZIO</label>
+        <label>MOVIMENTI</label>
         <div id="exercisesContainer"></div>
         <button type="button" class="btn-add" onclick="addExerciseRow()">+ Aggiungi Movimento</button>
       </div>
@@ -238,117 +186,205 @@
         </div>
       </div>
 
-      <button class="btn-main" onclick="saveWod()">SALVA</button>
+      <button class="btn-main" onclick="saveWod()">SALVA NEL CLOUD</button>
     </div>
   </div>
 
   <!-- TAB STORICO -->
   <div id="tab-storico" class="tab-content">
     <div class="card">
-      <div class="card-title">I TUOI ALLENAMENTI</div>
+      <div class="card-title">STORICO CONDIVISO WOD</div>
       <div class="form-group">
-        <input type="text" id="searchWod" placeholder="🔍 Cerca WOD per nome o esercizio..." oninput="renderHistory()">
+        <input type="text" id="searchWod" placeholder="🔍 Cerca WOD o atleta..." oninput="renderHistory()">
       </div>
-      <div id="historyList">Nessun allenamento salvato.</div>
+      <div id="historyList">Caricamento in corso...</div>
+    </div>
+  </div>
+
+  <!-- TAB ATLETI & MASSIMALI -->
+  <div id="tab-atleti" class="tab-content">
+    <div class="card">
+      <div class="card-title">PROFILO ATLETA</div>
+      <div class="form-group">
+        <label>IL TUO NOME E COGNOME</label>
+        <input type="text" id="profileName" placeholder="Es. Mario Rossi">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ETÀ</label>
+          <input type="number" id="profileAge" placeholder="Anni">
+        </div>
+        <div class="form-group">
+          <label>PESO (KG)</label>
+          <input type="number" step="0.1" id="profileWeight" placeholder="Kg">
+        </div>
+      </div>
+      <button class="btn-main" onclick="saveProfile()">SALVA PROFILO</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">MASSIMALI (1RM)</div>
+      <div id="rmContainer"></div>
+      <button type="button" class="btn-add" onclick="addRmRow()">+ Aggiungi Massimale</button>
+      <button class="btn-main" style="margin-top: 12px;" onclick="saveMassimaliCloud()">SALVA MASSIMALI</button>
     </div>
   </div>
 
   <!-- TAB IMPOSTAZIONI -->
   <div id="tab-impostazioni" class="tab-content">
-    
-    <!-- SEZIONE MASSIMALI / PERCENTUALI -->
     <div class="card">
-      <div class="card-title">I TUOI MASSIMALI (1RM)</div>
-      <p style="font-size: 12px; color: var(--text-muted); margin-top: -10px; margin-bottom: 16px;">
-        Inserisci i tuoi 1RM in Kg. L'app li userà per calcolare in automatico i carichi quando nello screenshot viene rilevata una percentuale (es. @55% 1RM Snatch).
-      </p>
-      <div id="rmContainer"></div>
-      <button type="button" class="btn-add" onclick="addRmRow()">+ Aggiungi Massimale</button>
-      <button class="btn-main" style="margin-top: 12px;" onclick="saveRmList()">SALVA MASSIMALI</button>
+      <div class="card-title">URL GOOGLE APPS SCRIPT</div>
+      <div class="form-group">
+        <label>INSERISCI URL WEB APP</label>
+        <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <button class="btn-main" onclick="saveScriptUrl()">SALVA URL</button>
     </div>
 
-    <!-- SEZIONE PERSONALIZZAZIONE LOGHI -->
     <div class="card">
-      <div class="card-title">PERSONALIZZAZIONE LOGHI</div>
-      
+      <div class="card-title">LOGHI</div>
       <div class="form-group">
-        <label>LOGO PALESTRA (SINISTRA)</label>
-        <input type="file" id="gymLogoInput" accept="image/*" onchange="uploadLogo(this, 'gymLogo')">
-        <div class="logo-preview-box">
-          <img id="previewGymLogo" alt="Nessun logo palestra">
-        </div>
-        <button class="btn-secondary" style="margin-top:8px; width:100%;" onclick="removeLogo('gymLogo')">Rimuovi Logo Palestra</button>
+        <label>LOGO PALESTRA</label>
+        <input type="file" accept="image/*" onchange="uploadLogo(this, 'gymLogo')">
+        <div class="logo-preview-box"><img id="previewGymLogo"></div>
       </div>
-
-      <div class="form-group" style="margin-top: 24px;">
-        <label>LOGO PROGRAMMAZIONE (DESTRA)</label>
-        <input type="file" id="progLogoInput" accept="image/*" onchange="uploadLogo(this, 'progLogo')">
-        <div class="logo-preview-box">
-          <img id="previewProgLogo" alt="Nessun logo programmazione">
-        </div>
-        <button class="btn-secondary" style="margin-top:8px; width:100%;" onclick="removeLogo('progLogo')">Rimuovi Logo Programmazione</button>
+      <div class="form-group" style="margin-top: 16px;">
+        <label>LOGO PROGRAMMAZIONE</label>
+        <input type="file" accept="image/*" onchange="uploadLogo(this, 'progLogo')">
+        <div class="logo-preview-box"><img id="previewProgLogo"></div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL RITAGLIO FOTO -->
+  <!-- MODAL CROP -->
   <div id="cropModal" class="crop-modal">
-    <div style="text-align: center; color: #fff; font-weight: bold; margin-bottom: 8px;">RITAGLIA IL WOD DA ANALIZZARE</div>
-    <div class="crop-container">
-      <img id="cropImage" src="" style="max-width: 100%;">
-    </div>
+    <div style="text-align: center; color: #fff; font-weight: bold; margin-bottom: 8px;">RITAGLIA IL WOD</div>
+    <div class="crop-container"><img id="cropImage" style="max-width: 100%;"></div>
     <div class="crop-actions">
       <button class="btn-secondary" onclick="closeCropModal()">ANNULLA</button>
-      <button class="btn-main" style="flex:1;" onclick="confirmCropAndScan()">ESTRAI WOD</button>
+      <button class="btn-main" style="flex:1;" onclick="confirmCropAndScan()">ESTRAI</button>
     </div>
   </div>
 
   <script>
     let currentMode = 'RX';
-    let detectedSetsCount = 0;
     let cropper = null;
-
-    const DEFAULT_MOVEMENTS = [
-      "Snatch", "Power Snatch", "Hang Snatch", "Clean", "Power Clean", "Clean and Jerk",
-      "Back Squat", "Front Squat", "Overhead Squat", "Deadlift", "Strict Press", "Push Press", "Bench Press"
-    ];
-
-    const BODYWEIGHT_MOVEMENTS = [
-      "Pull Ups", "Chest to Bar", "C2B", "Bar Muscle Up", "BMU", "Ring Muscle Up", "RMU", 
-      "Toes to Bar", "T2B", "Knees to Elbows", "Ring Dips", "Dips", "Strict Pull Ups",
-      "Handstand Push Ups", "HSPU", "Strict HSPU", "Handstand Walk", "Push Ups", "Burpees", 
-      "Burpee Box Jump Over", "Pistols", "Single Leg Squat", "Sit Ups", "AbMat Sit Ups", 
-      "V-Ups", "L-Sit", "Air Squat", "Double Unders", "DU", "Single Unders", 
-      "Box Jumps", "Box Step Ups", "Tall Box Jumps", "Row", "Run", "Shuttle Run", 
-      "Echo Bike", "Assault Bike", "BikeErg", "SkiErg", "Ski", "Rope Climb", "Legless Rope Climb", "Pegboard"
-    ];
-
-    const ALL_MOVEMENTS = [
-      ...BODYWEIGHT_MOVEMENTS,
-      "Power Snatch + Snatch", "Power Snatch", "Hang Power Snatch", "Squat Snatch", "Hang Squat Snatch", "Snatch Balance", "Muscle Snatch", "Snatch Shrugs", "High Hang Snatch Shrugs", "Snatch",
-      "Power Clean + Clean", "Power Clean", "Hang Power Clean", "Squat Clean", "Hang Squat Clean", "Clean and Jerk", "Push Jerk", "Split Jerk", "Push Press", "Strict Press", "Shoulder Press", "Clean",
-      "Back Squat", "Front Squat", "Overhead Squat", "OHS", "Deadlift", "Sumo Deadlift High Pull", "SDHP", "Thruster", "Cluster", "Bench Press",
-      "DB Snatch", "DB Clean", "DB Thruster", "DB Devil Press", "Devil Press", "DB Lunge", "KB Swing", "American KB Swing", "Russian KB Swing", "Goblet Squat", "Farmer Carry", "Turkish Get-Up", "Wall Balls", "Walking Lunge", "Overhead Lunge"
-    ];
+    let globalData = { wods: [], athletes: [], massimali: [] };
+    
+    const DEFAULT_MOVEMENTS = ["Snatch", "Power Snatch", "Clean", "Clean and Jerk", "Back Squat", "Front Squat", "Deadlift", "Bench Press"];
 
     document.getElementById('wodDate').valueAsDate = new Date();
 
     window.onload = function() {
       loadSavedLogos();
-      renderRmList();
+      const savedUrl = localStorage.getItem('scriptUrl');
+      if (savedUrl) {
+        document.getElementById('scriptUrlInput').value = savedUrl;
+        fetchCloudData();
+      }
+      loadActiveAthlete();
       renderResultFields();
     };
 
-    function renderRmList() {
+    function getScriptUrl() {
+      return document.getElementById('scriptUrlInput').value.trim();
+    }
+
+    function saveScriptUrl() {
+      localStorage.setItem('scriptUrl', getScriptUrl());
+      alert('URL salvato! Sincronizzazione in corso...');
+      fetchCloudData();
+    }
+
+    async function fetchCloudData() {
+      const url = getScriptUrl();
+      if (!url) return;
+      try {
+        const res = await fetch(url + "?action=getData");
+        globalData = await res.json();
+        updateAthleteDropdown();
+        renderHistory();
+        loadLocalMassimaliAndProfile();
+      } catch (err) {
+        console.error("Errore sincronizzazione cloud:", err);
+      }
+    }
+
+    function updateAthleteDropdown() {
+      const select = document.getElementById('currentAthleteSelect');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">-- Seleziona il tuo nome --</option>';
+      
+      globalData.athletes.forEach(ath => {
+        const opt = document.createElement('option');
+        opt.value = ath.name;
+        opt.innerText = `${ath.name} (${ath.weight || '?'} kg)`;
+        select.appendChild(opt);
+      });
+      if (currentVal) select.value = currentVal;
+    }
+
+    function updateActiveAthlete() {
+      const name = document.getElementById('currentAthleteSelect').value;
+      localStorage.setItem('activeAthlete', name);
+      loadActiveAthlete();
+      loadLocalMassimaliAndProfile();
+    }
+
+    function loadActiveAthlete() {
+      const name = localStorage.getItem('activeAthlete') || '';
+      if (name) {
+        document.getElementById('currentAthleteSelect').value = name;
+        document.getElementById('activeAthleteDisplay').innerText = `Atleta: ${name}`;
+      } else {
+        document.getElementById('activeAthleteDisplay').innerText = `Atleta: Nessuno Selezionato`;
+      }
+    }
+
+    function loadLocalMassimaliAndProfile() {
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) return;
+
+      const ath = globalData.athletes.find(a => a.name.toLowerCase() === athleteName.toLowerCase());
+      if (ath) {
+        document.getElementById('profileName').value = ath.name;
+        document.getElementById('profileAge').value = ath.age;
+        document.getElementById('profileWeight').value = ath.weight;
+      }
+
       const container = document.getElementById('rmContainer');
       container.innerHTML = '';
-      const savedRm = JSON.parse(localStorage.getItem('rm_list') || 'null');
+      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
+      
+      if (athleteMaxs.length > 0) {
+        athleteMaxs.forEach(m => addRmRow(m.movement, m.weight));
+      } else {
+        DEFAULT_MOVEMENTS.forEach(m => addRmRow(m, ''));
+      }
+    }
 
-      const rmData = savedRm || DEFAULT_MOVEMENTS.map(m => ({ name: m, weight: '' }));
+    async function saveProfile() {
+      const url = getScriptUrl();
+      const name = document.getElementById('profileName').value.trim();
+      if (!name) { alert('Inserisci un nome valido'); return; }
 
-      rmData.forEach(item => {
-        addRmRow(item.name, item.weight);
-      });
+      const payload = {
+        action: 'saveAthlete',
+        name: name,
+        age: document.getElementById('profileAge').value,
+        weight: document.getElementById('profileWeight').value,
+        height: ''
+      };
+
+      localStorage.setItem('activeAthlete', name);
+      
+      if (url) {
+        await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
+        alert('Profilo salvato sul cloud!');
+        fetchCloudData();
+      } else {
+        alert('Inserisci prima l\'URL di Apps Script nelle impostazioni!');
+      }
     }
 
     function addRmRow(name = '', weight = '') {
@@ -363,106 +399,120 @@
       container.appendChild(row);
     }
 
-    function saveRmList() {
+    async function saveMassimaliCloud() {
+      const url = getScriptUrl();
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) { alert('Seleziona o salva prima il tuo profilo atleta!'); return; }
+
       const rows = document.querySelectorAll('.rm-row');
-      const rmData = [];
-      rows.forEach(row => {
-        const name = row.querySelector('.rm-name').value.trim();
+      for (let row of rows) {
+        const movement = row.querySelector('.rm-name').value.trim();
         const weight = row.querySelector('.rm-weight').value.trim();
-        if (name !== '') {
-          rmData.push({ name, weight: weight ? parseFloat(weight) : '' });
+        if (movement && weight && url) {
+          await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveMassimale', athlete: athleteName, movement, weight })
+          });
+        }
+      }
+      alert('Massimali salvati con successo!');
+      fetchCloudData();
+    }
+
+    async function saveWod() {
+      const url = getScriptUrl();
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) { alert('Seleziona prima l\'atleta attivo nella tab Registra!'); return; }
+
+      const exerciseRows = document.querySelectorAll('.exercise-row');
+      let exercisesList = [];
+      exerciseRows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        if(inputs[1] && inputs[1].value.trim() !== '') {
+          exercisesList.push({ reps: inputs[0].value, name: inputs[1].value, weight: inputs[2] ? inputs[2].value : '' });
         }
       });
-      localStorage.setItem('rm_list', JSON.stringify(rmData));
-      alert('Massimali salvati con successo!');
-    }
 
-    function getCalculatedWeight(movementName, percentage, targetRmName = '') {
-      const savedRm = JSON.parse(localStorage.getItem('rm_list') || '[]');
-      if (!savedRm || savedRm.length === 0) return `@${percentage}%`;
-
-      let found = null;
-      if (targetRmName) {
-        found = savedRm.find(item => item.name.toLowerCase() === targetRmName.toLowerCase());
-      }
-
-      if (!found) {
-        found = savedRm.find(item => {
-          const regex = new RegExp(`\\b${item.name}\\b`, 'i');
-          return regex.test(movementName) || movementName.toLowerCase().includes(item.name.toLowerCase());
-        });
-      }
-
-      if (found && found.weight) {
-        const calculated = Math.round((found.weight * percentage) / 100);
-        return `${calculated} kg (@${percentage}%)`;
-      }
-
-      return `@${percentage}%`;
-    }
-
-    function loadSavedLogos() {
-      const gymLogo = localStorage.getItem('gymLogo');
-      const progLogo = localStorage.getItem('progLogo');
-
-      if (gymLogo) {
-        document.getElementById('headerLogoGym').src = gymLogo;
-        document.getElementById('headerLogoGym').style.display = 'block';
-        document.getElementById('previewGymLogo').src = gymLogo;
-      } else {
-        document.getElementById('headerLogoGym').style.display = 'none';
-        document.getElementById('previewGymLogo').removeAttribute('src');
-      }
-
-      if (progLogo) {
-        document.getElementById('headerLogoProg').src = progLogo;
-        document.getElementById('headerLogoProg').style.display = 'block';
-        document.getElementById('previewProgLogo').src = progLogo;
-      } else {
-        document.getElementById('headerLogoProg').style.display = 'none';
-        document.getElementById('previewProgLogo').removeAttribute('src');
-      }
-    }
-
-    function uploadLogo(input, key) {
-      const file = input.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64Image = e.target.result;
-        localStorage.setItem(key, base64Image);
-        loadSavedLogos();
+      const entry = {
+        action: 'saveWod',
+        id: String(Date.now()),
+        date: document.getElementById('wodDate').value,
+        athlete: athleteName,
+        type: document.getElementById('wodType').value,
+        mode: currentMode,
+        title: document.getElementById('wodTitle').value || 'WOD',
+        exercises: exercisesList,
+        result: getFormattedResult(),
+        notes: document.getElementById('wodNotes').value
       };
-      reader.readAsDataURL(file);
+
+      if (url) {
+        await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
+        alert('WOD salvato sul Foglio Google!');
+        fetchCloudData();
+        switchTab('storico');
+      } else {
+        alert('Configura l\'URL di Apps Script nelle impostazioni.');
+      }
     }
 
-    function removeLogo(key) {
-      localStorage.removeItem(key);
-      loadSavedLogos();
-    }
+    function renderHistory() {
+      const historyList = document.getElementById('historyList');
+      const searchQuery = (document.getElementById('searchWod')?.value || '').toLowerCase().trim();
+      let history = globalData.wods;
 
-    function setMode(mode) {
-      currentMode = mode;
-      document.getElementById('btnRx').classList.toggle('active', mode === 'RX');
-      document.getElementById('btnScaled').classList.toggle('active', mode === 'SCALED');
+      if (searchQuery !== '') {
+        history = history.filter(item => 
+          item.title.toLowerCase().includes(searchQuery) || 
+          item.athlete.toLowerCase().includes(searchQuery) ||
+          item.type.toLowerCase().includes(searchQuery)
+        );
+      }
+
+      if (history.length === 0) {
+        historyList.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento trovato.</p>';
+        return;
+      }
+
+      let html = '';
+      history.slice().reverse().forEach(item => {
+        let exercisesHtml = item.exercises.map(ex => `
+          <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
+            • ${ex.reps ? ex.reps + ' ' : ''}<b>${ex.name}</b> ${ex.weight ? '(' + ex.weight + ')' : ''}
+          </div>
+        `).join('');
+
+        html += `
+          <div class="history-item">
+            <div class="history-item-header">
+              <div>
+                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${item.mode}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${item.date} — <b>${item.athlete}</b></span>
+                <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${item.title} (${item.type})</div>
+              </div>
+            </div>
+            <div style="margin-top: 6px;">${exercisesHtml}</div>
+            ${item.result ? `<div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${item.result}</div>` : ''}
+          </div>
+        `;
+      });
+      historyList.innerHTML = html;
     }
 
     function switchTab(tab) {
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       
-      if(tab === 'registra') {
-        document.querySelector('.nav button:nth-child(1)').classList.add('active');
-        document.getElementById('tab-registra').classList.add('active');
-      } else if(tab === 'storico') {
-        document.querySelector('.nav button:nth-child(2)').classList.add('active');
-        document.getElementById('tab-storico').classList.add('active');
-        renderHistory();
-      } else if(tab === 'impostazioni') {
-        document.querySelector('.nav button:nth-child(3)').classList.add('active');
-        document.getElementById('tab-impostazioni').classList.add('active');
-      }
+      const map = { 'registra': 0, 'storico': 1, 'atleti': 2, 'impostazioni': 3 };
+      document.querySelectorAll('.nav button')[map[tab]].classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+      if (tab === 'storico') renderHistory();
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('btnRx').classList.toggle('active', mode === 'RX');
+      document.getElementById('btnScaled').classList.toggle('active', mode === 'SCALED');
     }
 
     function renderResultFields() {
@@ -472,119 +522,69 @@
 
       if (type === 'For Time') {
         label.innerText = 'SCORE (TIME)';
-        container.innerHTML = `
-          <div class="form-row">
-            <input type="number" id="resMin" placeholder="mins">
-            <input type="number" id="resSec" placeholder="secs">
-          </div>
-        `;
+        container.innerHTML = `<div class="form-row"><input type="number" id="resMin" placeholder="mins"><input type="number" id="resSec" placeholder="secs"></div>`;
       } else if (type === 'AMRAP') {
         label.innerText = 'SCORE (ROUNDS + REPS)';
-        container.innerHTML = `
-          <div class="form-row">
-            <input type="number" id="resRounds" placeholder="Rounds">
-            <input type="number" id="resReps" placeholder="Reps">
-          </div>
-        `;
+        container.innerHTML = `<div class="form-row"><input type="number" id="resRounds" placeholder="Rounds"><input type="number" id="resReps" placeholder="Reps"></div>`;
       } else if (type === 'Sets') {
-        label.innerText = 'SCORE PER SET (KG / REPS)';
-        let count = detectedSetsCount > 0 ? detectedSetsCount : 5;
+        label.innerText = 'SCORE SETS';
         let html = '';
-        for (let i = 1; i <= count; i++) {
-          html += `
-            <div class="set-row">
-              <span class="set-number">${i}</span>
-              <input type="text" class="set-input" placeholder="Carico o esito set ${i}">
-              <span class="set-label">reps</span>
-            </div>
-          `;
+        for (let i = 1; i <= 5; i++) {
+          html += `<div class="set-row"><span class="set-number">${i}</span><input type="text" class="set-input" placeholder="Carico set ${i}"></div>`;
         }
         container.innerHTML = html;
       } else if (type === 'EMOM') {
-        label.innerText = 'SCORE (EMOM)';
-        container.innerHTML = `
-          <div class="form-row">
-            <select id="resEmomStatus">
-              <option value="Completato">Completato</option>
-              <option value="Fallito">Fallito</option>
-            </select>
-            <input type="number" id="resEmomMin" placeholder="Minuto stop">
-          </div>
-        `;
+        label.innerText = 'SCORE EMOM';
+        container.innerHTML = `<div class="form-row"><select id="resEmomStatus"><option value="Completato">Completato</option><option value="Fallito">Fallito</option></select><input type="number" id="resEmomMin" placeholder="Minuto"></div>`;
       }
     }
 
     function addExerciseRow(reps = '', name = '', weight = '') {
       const container = document.getElementById('exercisesContainer');
       const row = document.createElement('div');
-      const isBodyweight = BODYWEIGHT_MOVEMENTS.some(b => new RegExp(`\\b${b}\\b`, 'i').test(name));
-      const showWeight = weight !== '' || (!isBodyweight && name !== '');
-
-      row.className = `exercise-row ${showWeight ? 'has-weight' : ''}`;
-      let html = `
-        <input type="text" placeholder="Reps/Dist" value="${reps}">
-        <input type="text" placeholder="Movimento" value="${name}" oninput="checkWeightVisibility(this)">
+      row.className = `exercise-row ${weight ? 'has-weight' : ''}`;
+      row.innerHTML = `
+        <input type="text" placeholder="Reps" value="${reps}">
+        <input type="text" placeholder="Movimento" value="${name}">
+        <input type="text" placeholder="Kg/%" value="${weight}">
+        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
       `;
-      if (showWeight) html += `<input type="text" placeholder="Kg / lbs / %" value="${weight}">`;
-      html += `<button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>`;
-      
-      row.innerHTML = html;
       container.appendChild(row);
     }
 
-    function checkWeightVisibility(input) {
-      const row = input.parentElement;
-      const name = input.value;
-      const isBodyweight = BODYWEIGHT_MOVEMENTS.some(b => new RegExp(`\\b${b}\\b`, 'i').test(name));
-      const hasWeightInput = row.querySelectorAll('input').length === 3;
-
-      if (isBodyweight && hasWeightInput) {
-        row.querySelectorAll('input')[2].remove();
-        row.classList.remove('has-weight');
-      } else if (!isBodyweight && name.length > 2 && !hasWeightInput) {
-        const weightInput = document.createElement('input');
-        weightInput.type = 'text';
-        weightInput.placeholder = 'Kg / lbs / %';
-        row.insertBefore(weightInput, row.children[2]);
-        row.classList.add('has-weight');
+    function getFormattedResult() {
+      const type = document.getElementById('wodType').value;
+      if (type === 'For Time') return `${document.getElementById('resMin')?.value || '0'}:${(document.getElementById('resSec')?.value || '0').padStart(2, '0')}`;
+      if (type === 'AMRAP') return `${document.getElementById('resRounds')?.value || '0'} rds + ${document.getElementById('resReps')?.value || '0'} reps`;
+      if (type === 'Sets') {
+        let res = [];
+        document.querySelectorAll('.set-input').forEach((inp, i) => { if(inp.value) res.push(`Set ${i+1}: ${inp.value}`); });
+        return res.join(', ');
       }
+      return document.getElementById('resEmomStatus')?.value || '';
     }
 
-    const imageInput = document.getElementById('imageInput');
-    const galleryContainer = document.getElementById('galleryContainer');
-    const status = document.getElementById('status');
-
-    imageInput.addEventListener('change', (e) => {
-      const files = Array.from(e.target.files);
-      if (files.length === 0) return;
-
-      galleryContainer.innerHTML = '';
-      files.forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = document.createElement('img');
-          img.src = event.target.result;
-          img.className = 'gallery-thumb' + (index === 0 ? ' active' : '');
-          img.onclick = () => openCropModal(event.target.result, img);
-          galleryContainer.appendChild(img);
-          if (index === 0) openCropModal(event.target.result, img);
-        };
-        reader.readAsDataURL(file);
-      });
+    document.getElementById('imageInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = document.createElement('img');
+        img.src = event.target.result;
+        img.className = 'gallery-thumb active';
+        document.getElementById('galleryContainer').innerHTML = '';
+        document.getElementById('galleryContainer').appendChild(img);
+        openCropModal(event.target.result);
+      };
+      reader.readAsDataURL(file);
     });
 
-    function openCropModal(imageSrc, thumbElement) {
-      document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
-      if(thumbElement) thumbElement.classList.add('active');
-
+    function openCropModal(src) {
       const cropImg = document.getElementById('cropImage');
-      cropImg.src = imageSrc;
-
-      const modal = document.getElementById('cropModal');
-      modal.classList.add('active');
-
+      cropImg.src = src;
+      document.getElementById('cropModal').classList.add('active');
       if (cropper) cropper.destroy();
-      cropper = new Cropper(cropImg, { viewMode: 1, autoCropArea: 0.8, background: false, zoomable: true });
+      cropper = new Cropper(cropImg, { viewMode: 1 });
     }
 
     function closeCropModal() {
@@ -596,212 +596,40 @@
       if (!cropper) return;
       const canvas = cropper.getCroppedCanvas();
       closeCropModal();
-
-      status.innerText = 'Analisi selezione in corso...';
-      document.getElementById('exercisesContainer').innerHTML = '';
-      detectedSetsCount = 0;
-
+      document.getElementById('status').innerText = 'Analisi OCR...';
       try {
         const worker = await Tesseract.createWorker('eng');
         const ret = await worker.recognize(canvas);
-        const text = ret.data.text;
         await worker.terminate();
-
-        status.innerText = 'WOD estratto con successo!';
-        document.getElementById('wodNotes').value = text.trim();
-
-        const numberListMatches = text.match(/^\s*([1-9])\s+(?=\w|\d)/gm);
-        const selectType = document.getElementById('wodType');
-
-        if (/For Time/i.test(text)) {
-          selectType.value = 'For Time';
-        } else if (/AMRAP/i.test(text)) {
-          selectType.value = 'AMRAP';
-        } else if (numberListMatches && numberListMatches.length > 3) {
-          selectType.value = 'Sets';
-          detectedSetsCount = numberListMatches.length;
-        } else if (/1RM|@\d+%|sets|rest/i.test(text)) {
-          selectType.value = 'Sets';
-          const lineSets = text.split('\n').filter(l => /@?\d+%/i.test(l));
-          if (lineSets.length > 0) detectedSetsCount = lineSets.length;
-        }
-
-        renderResultFields();
-
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        if (lines.length > 0) {
-          let rawTitle = lines[0]
-            .replace(/^[\s\.\*\-\–\—\•\(o\)]+/gi, '')
-            .replace(/^[O0]\s+/i, '')
-            .replace(/Score|Log Result/gi, '')
-            .trim();
-          
-          document.getElementById('wodTitle').value = rawTitle.substring(0, 35).trim();
-        }
-
-        lines.forEach(line => {
-          if (/workout overview|look for|http|deload|options|public notes|private notes|rest/i.test(line)) return;
-
-          let matchedMovement = ALL_MOVEMENTS.find(m => new RegExp(`\\b${m.replace('+', '\\+')}\\b`, 'i').test(line));
-          if (matchedMovement) {
-            let reps = '', weight = '';
-            
-            const percentMatch = line.match(/@?\s*(\d+)\s*%\s*(?:1RM\s*([a-zA-Z\s]+))?/i);
-            const weightMatch = line.match(/(@?\d+[-%]*\d*%\s*\w*|\(\d+\/\d+\)|\d+\s*kg|\d+\s*lbs)/i);
-
-            if (percentMatch) {
-              const pct = parseFloat(percentMatch[1]);
-              const targetRmName = percentMatch[2] ? percentMatch[2].trim() : '';
-              weight = getCalculatedWeight(matchedMovement, pct, targetRmName);
-            } else if (weightMatch) {
-              weight = weightMatch[0].trim();
-            }
-
-            const repsMatch = line.match(/^(\d+\s*(?:Power Snatch|Snatch|Clean|Jerk|Reps|Sets)?)/i);
-            if (repsMatch) reps = repsMatch[0].trim();
-
-            addExerciseRow(reps, matchedMovement, weight);
-          }
-        });
-
-        if (document.getElementById('exercisesContainer').children.length === 0) {
-          addExerciseRow('', '', '');
-        }
+        document.getElementById('wodNotes').value = ret.data.text.trim();
+        document.getElementById('status').innerText = 'WOD estratto!';
       } catch (err) {
-        status.innerText = 'Errore durante la lettura dell\'immagine.';
-        console.error(err);
+        document.getElementById('status').innerText = 'Errore OCR';
       }
     }
 
-    function getFormattedResult() {
-      const type = document.getElementById('wodType').value;
-      if (type === 'For Time') {
-        const min = document.getElementById('resMin')?.value || '00';
-        const sec = document.getElementById('resSec')?.value || '00';
-        return `${min}:${sec.padStart(2, '0')}`;
-      } else if (type === 'AMRAP') {
-        const rounds = document.getElementById('resRounds')?.value || '0';
-        const reps = document.getElementById('resReps')?.value || '0';
-        return `${rounds} rounds + ${reps} reps`;
-      } else if (type === 'Sets') {
-        const inputs = document.querySelectorAll('.set-input');
-        let results = [];
-        inputs.forEach((input, index) => {
-          if (input.value.trim() !== '') results.push(`Set ${index + 1}: ${input.value}`);
-        });
-        return results.join(', ');
-      } else if (type === 'EMOM') {
-        const status = document.getElementById('resEmomStatus')?.value;
-        const min = document.getElementById('resEmomMin')?.value;
-        return min ? `${status} (min ${min})` : status;
-      }
-      return '';
-    }
-
-    function saveWod() {
-      const exerciseRows = document.querySelectorAll('.exercise-row');
-      let exercisesList = [];
-
-      exerciseRows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        if(inputs[1] && inputs[1].value.trim() !== '') {
-          exercisesList.push({
-            reps: inputs[0].value,
-            name: inputs[1].value,
-            weight: inputs[2] ? inputs[2].value : ''
-          });
-        }
-      });
-
-      const entry = {
-        id: String(Date.now()),
-        type: document.getElementById('wodType').value,
-        mode: currentMode,
-        date: document.getElementById('wodDate').value,
-        title: document.getElementById('wodTitle').value || 'Allenamento Senza Nome',
-        exercises: exercisesList,
-        result: getFormattedResult(),
-        notes: document.getElementById('wodNotes').value
+    function uploadLogo(input, key) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        localStorage.setItem(key, e.target.result);
+        loadSavedLogos();
       };
-
-      let history = JSON.parse(localStorage.getItem('board_history') || '[]');
-      history.unshift(entry);
-      localStorage.setItem('board_history', JSON.stringify(history));
-
-      alert('Allenamento salvato con successo!');
-      
-      document.getElementById('wodType').value = 'For Time';
-      document.getElementById('wodDate').valueAsDate = new Date();
-      document.getElementById('wodTitle').value = '';
-      document.getElementById('wodNotes').value = '';
-      document.getElementById('imageInput').value = '';
-      document.getElementById('galleryContainer').innerHTML = '';
-      document.getElementById('status').innerText = '';
-      document.getElementById('exercisesContainer').innerHTML = '';
-      
-      detectedSetsCount = 0;
-      setMode('RX');
-      renderResultFields();
+      reader.readAsDataURL(file);
     }
 
-    function deleteWod(id) {
-      if (confirm('Sei sicuro di voler eliminare questo allenamento?')) {
-        let history = JSON.parse(localStorage.getItem('board_history') || '[]');
-        history = history.filter(item => String(item.id) !== String(id));
-        localStorage.setItem('board_history', JSON.stringify(history));
-        renderHistory();
-      }
-    }
-
-    function renderHistory() {
-      const historyList = document.getElementById('historyList');
-      const searchQuery = (document.getElementById('searchWod')?.value || '').toLowerCase().trim();
-      let history = JSON.parse(localStorage.getItem('board_history') || '[]');
-
-      if (searchQuery !== '') {
-        history = history.filter(item => {
-          const titleMatch = item.title.toLowerCase().includes(searchQuery);
-          const typeMatch = item.type.toLowerCase().includes(searchQuery);
-          const notesMatch = item.notes ? item.notes.toLowerCase().includes(searchQuery) : false;
-          const exerciseMatch = item.exercises.some(ex => ex.name.toLowerCase().includes(searchQuery));
-          return titleMatch || typeMatch || notesMatch || exerciseMatch;
-        });
-      }
-
-      if (history.length === 0) {
-        historyList.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento trovato.</p>';
-        return;
-      }
-
-      let html = '';
-      history.forEach(item => {
-        let exercisesHtml = '';
-        if (item.exercises && item.exercises.length > 0) {
-          exercisesHtml = item.exercises.map(ex => `
-            <div style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">
-              • ${ex.reps ? ex.reps + ' ' : ''}<b>${ex.name}</b> ${ex.weight ? '(' + ex.weight + ')' : ''}
-            </div>
-          `).join('');
+    function loadSavedLogos() {
+      ['gymLogo', 'progLogo'].forEach(key => {
+        const val = localStorage.getItem(key);
+        if (val) {
+          const id = key === 'gymLogo' ? 'headerLogoGym' : 'headerLogoProg';
+          const prev = key === 'gymLogo' ? 'previewGymLogo' : 'previewProgLogo';
+          document.getElementById(id).src = val;
+          document.getElementById(id).style.display = 'block';
+          document.getElementById(prev).src = val;
         }
-
-        html += `
-          <div class="history-item">
-            <div class="history-item-header">
-              <div>
-                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${item.mode}</span>
-                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${item.date}</span>
-                <div style="font-size: 15px; font-weight: 800; margin-top: 4px; color: var(--text);">${item.title} (${item.type})</div>
-              </div>
-              <button class="btn-delete" onclick="deleteWod('${item.id}')">Elimina</button>
-            </div>
-            <div style="margin-top: 8px;">${exercisesHtml}</div>
-            ${item.result ? `<div style="margin-top: 8px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${item.result}</div>` : ''}
-            ${item.notes ? `<div style="margin-top: 8px; font-size: 12px; color: var(--text-muted); background: var(--input-bg); padding: 8px; border-radius: 6px; white-space: pre-line;">${item.notes}</div>` : ''}
-          </div>
-        `;
       });
-
-      historyList.innerHTML = html;
     }
   </script>
 </body>
