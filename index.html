@@ -52,7 +52,9 @@
     input, select, textarea {
       width: 100%; background: var(--input-bg); border: 1px solid var(--border);
       border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; box-sizing: border-box; outline: none;
+      font-family: inherit;
     }
+    textarea { resize: vertical; min-height: 90px; }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
     .logo-preview-box {
@@ -548,34 +550,13 @@
       }
     }
 
-    function addWorkoutBlock(prefillType = "For Time", prefillTitle = "", prefillNotes = "", prefillExercises = []) {
+    function addWorkoutBlock(prefillType = "For Time", prefillTitle = "", prefillExplanation = "") {
       blockCounter++;
       const container = document.getElementById('workoutBlocksContainer');
       
       const blockDiv = document.createElement('div');
       blockDiv.className = 'wod-explanation-box';
       blockDiv.id = `workout-block-${blockCounter}`;
-      
-      let exercisesHtml = '';
-      if (prefillExercises && prefillExercises.length > 0) {
-        exercisesHtml = prefillExercises.map(ex => `
-          <div class="exercise-row">
-            <input type="text" placeholder="Reps" value="${escapeHtml(ex.reps || '')}">
-            <input type="text" placeholder="Movimento" value="${escapeHtml(ex.name || '')}">
-            <input type="text" placeholder="Kg/%" value="${escapeHtml(ex.weight || '')}">
-            <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-          </div>
-        `).join('');
-      } else {
-        exercisesHtml = `
-          <div class="exercise-row">
-            <input type="text" placeholder="Reps" value="">
-            <input type="text" placeholder="Movimento" value="">
-            <input type="text" placeholder="Kg/%" value="">
-            <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-          </div>
-        `;
-      }
 
       let currentId = blockCounter;
       blockDiv.innerHTML = `
@@ -604,17 +585,14 @@
         </div>
 
         <div class="form-group">
-          <label>MOVIMENTI</label>
-          <div class="block-exercises-container">
-            ${exercisesHtml}
-          </div>
-          <button type="button" class="btn-add" onclick="addExerciseToBlock(${currentId})">+ Aggiungi Movimento</button>
+          <label>SPIEGAZIONE WOD</label>
+          <textarea class="block-explanation" rows="4" placeholder="Es. 21-15-9 Thrusters 40kg / Pull-ups">${escapeHtml(prefillExplanation)}</textarea>
         </div>
 
         <div class="form-group">
           <label class="block-score-label">SCORE / RISULTATO PARZIALE</label>
           <div class="block-score-inputs-container">
-            <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="${escapeHtml(prefillNotes)}">
+            <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="">
           </div>
         </div>
       `;
@@ -679,21 +657,6 @@
       }
     }
 
-    function addExerciseToBlock(blockId, prefillReps = "", prefillName = "", prefillWeight = "") {
-      const block = document.getElementById(`workout-block-${blockId}`);
-      if (!block) return;
-      const container = block.querySelector('.block-exercises-container');
-      const row = document.createElement('div');
-      row.className = 'exercise-row';
-      row.innerHTML = `
-        <input type="text" placeholder="Reps" value="${escapeHtml(prefillReps)}">
-        <input type="text" placeholder="Movimento" value="${escapeHtml(prefillName)}">
-        <input type="text" placeholder="Kg/%" value="${escapeHtml(prefillWeight)}">
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-      `;
-      container.appendChild(row);
-    }
-
     function parseAndFillBlock(blockId, text) {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
@@ -709,19 +672,16 @@
 
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-      // --- Individua un titolo dalla prima riga utile ---
+      // Titolo: prima riga utile (o la seconda se la prima è solo una keyword tipo "AMRAP")
       let titleLineIndex = -1;
       let titleCandidate = '';
       if (lines.length > 0) {
         titleLineIndex = 0;
         titleCandidate = lines[0];
-        // Se la prima riga è solo una parola chiave di tipo (es. "AMRAP" da sola),
-        // usa la riga successiva come titolo
         if (/^(AMRAP|FOR TIME|EMOM|WOD|METCON)\s*[:\-]?\s*$/i.test(titleCandidate) && lines.length > 1) {
           titleLineIndex = 1;
           titleCandidate = lines[1];
         }
-        // Limita la lunghezza per evitare di infilare una riga di esercizio come titolo
         if (titleCandidate.length > 40) {
           titleCandidate = titleCandidate.substring(0, 40).trim();
         }
@@ -730,93 +690,17 @@
       if (titleInput && titleCandidate) {
         titleInput.value = titleCandidate; // .value non passa per innerHTML, non serve escaping
       }
-      // --- fine parte titolo ---
 
-      let exercises = [];
-      let scoreRows = [];
-      const athleteName = localStorage.getItem('activeAthlete') || '';
-      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
-      const STOPWORDS = new Set(['di', 'e', 'a', 'the', 'of']);
-
-      lines.forEach((line, idx) => {
-        // Salta la riga già usata come titolo
-        if (idx === titleLineIndex) return;
-
-        let cleanLine = line;
-        
-        if (/^(AMRAP|FOR TIME|EMOM|ROUND|WOD|REST|-)/i.test(cleanLine) && cleanLine.length < 15 && !cleanLine.includes('%')) {
-          return;
-        }
-
-        let repsMatch = cleanLine.match(/^([\d\/\-+x]+)\s*(?:reps?)?\s*(.*)/i);
-        let reps = '';
-        let restOfLine = cleanLine;
-
-        if (repsMatch && repsMatch[2].trim().length > 0) {
-          reps = repsMatch[1].trim();
-          restOfLine = repsMatch[2].trim();
-        }
-
-        let weightStr = '';
-        let percentMatch = restOfLine.match(/(\d{2,3})\s*%/);
-        
-        if (percentMatch) {
-          let percentage = parseInt(percentMatch[1]);
-          let matchedRm = athleteMaxs.find(m => {
-            const words = m.movement.toLowerCase().split(' ')
-              .filter(w => w.length > 2 && !STOPWORDS.has(w));
-            return words.some(word => restOfLine.toLowerCase().includes(word));
-          });
-          
-          if (matchedRm && !isNaN(matchedRm.weight)) {
-            let calculatedWeight = Math.round((parseFloat(matchedRm.weight) * percentage) / 100);
-            weightStr = `${calculatedWeight} kg (${percentage}%)`;
-          } else {
-            weightStr = `${percentage}%`;
-          }
-        } else {
-          let kgMatch = restOfLine.match(/(\d+)\s*(?:kg|lbs)/i);
-          if (kgMatch) weightStr = kgMatch[0];
-        }
-
-        let movementName = restOfLine.replace(/@?\s*\d{2,3}\s*%.*/g, '').trim();
-        if (!movementName) movementName = restOfLine;
-
-        if (movementName.length > 1) {
-          exercises.push({ reps, name: movementName, weight: weightStr });
-          if (type === 'Sets') {
-            scoreRows.push({ reps: reps || '1', name: movementName, weight: weightStr });
-          }
-        }
-      });
-
-      const container = block.querySelector('.block-exercises-container');
-      container.innerHTML = '';
-      
-      if (exercises.length === 0) {
-        addExerciseToBlock(blockId);
-        return;
+      // Spiegazione WOD: tutto il testo OCR, esclusa l'eventuale riga già usata come titolo
+      const explanationLines = lines.filter((_, idx) => idx !== titleLineIndex);
+      const explanationText = explanationLines.length > 0 ? explanationLines.join('\n') : text.trim();
+      const explanationEl = block.querySelector('.block-explanation');
+      if (explanationEl) {
+        explanationEl.value = explanationText; // .value, non serve escaping
       }
 
-      exercises.forEach(ex => {
-        addExerciseToBlock(blockId, ex.reps, ex.name, ex.weight);
-      });
-
-      if (type === 'Sets' && scoreRows.length > 0) {
-        const scoreContainerEl = block.querySelector('.block-score-inputs-container');
-        if (scoreContainerEl) {
-          scoreContainerEl.innerHTML = '';
-          scoreRows.forEach(sr => {
-            addScoreRow(blockId, sr.reps, sr.name, sr.weight);
-          });
-          const addBtn = document.createElement('button');
-          addBtn.type = 'button';
-          addBtn.className = 'btn-add';
-          addBtn.innerText = '+ Aggiungi Serie/Carico';
-          addBtn.onclick = () => addScoreRow(blockId);
-          scoreContainerEl.appendChild(addBtn);
-        }
-      }
+      // Lo score resta vuoto/editabile a mano: updateBlockScoreLabel(blockId) sopra
+      // ha già predisposto i campi giusti in base al tipo rilevato.
     }
 
     async function saveWodSession() {
@@ -831,6 +715,8 @@
       blockElements.forEach(block => {
         const type = block.querySelector('.block-type').value;
         const title = block.querySelector('.block-title').value || 'WOD';
+        const explanationEl = block.querySelector('.block-explanation');
+        const explanation = explanationEl ? explanationEl.value : '';
         
         let result = '';
         if (type === 'Sets') {
@@ -845,16 +731,8 @@
         } else {
           result = block.querySelector('.block-result') ? block.querySelector('.block-result').value : '';
         }
-        
-        let exercises = [];
-        block.querySelectorAll('.block-exercises-container .exercise-row').forEach(row => {
-          const inputs = row.querySelectorAll('input');
-          if(inputs[1] && inputs[1].value.trim() !== '') {
-            exercises.push({ reps: inputs[0].value, name: inputs[1].value, weight: inputs[2] ? inputs[2].value : '' });
-          }
-        });
 
-        blocksData.push({ type, title, result, exercises });
+        blocksData.push({ type, title, explanation, result });
       });
 
       const entry = {
@@ -937,11 +815,17 @@
         
         if (item.blocks && Array.isArray(item.blocks)) {
           contentHtml = item.blocks.map(b => {
-            let exHtml = (b.exercises || []).map(ex => `
-              <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
-                • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
-              </div>
-            `).join('');
+            let bodyHtml = '';
+            if (b.explanation) {
+              bodyHtml = `<div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin-top: 4px;">${escapeHtml(b.explanation)}</div>`;
+            } else if (b.exercises && b.exercises.length > 0) {
+              // Compatibilità con sessioni salvate col vecchio formato (righe esercizio)
+              bodyHtml = (b.exercises || []).map(ex => `
+                <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
+                  • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
+                </div>
+              `).join('');
+            }
 
             let scoreHtml = '';
             if (b.type === 'Sets' && Array.isArray(b.result)) {
@@ -958,7 +842,7 @@
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
                 <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
-                <div style="margin-top: 4px;">${exHtml}</div>
+                ${bodyHtml}
                 ${scoreHtml}
               </div>
             `;
