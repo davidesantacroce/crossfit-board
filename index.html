@@ -216,9 +216,9 @@
   <!-- TAB STORICO -->
   <div id="tab-storico" class="tab-content">
     <div class="card">
-      <div class="card-title">STORICO CONDIVISO WOD</div>
+      <div class="card-title">STORICO WOD PERSONALE</div>
       <div class="form-group">
-        <input type="text" id="searchWod" placeholder="🔍 Cerca WOD o atleta..." oninput="renderHistory()">
+        <input type="text" id="searchWod" placeholder="🔍 Cerca WOD..." oninput="renderHistory()">
       </div>
       <div id="historyList">Caricamento in corso...</div>
     </div>
@@ -300,44 +300,16 @@
     let globalData = { wods: [], athletes: [], massimali: [] };
     
     const CROSSFIT_STANDARD_RMS = [
-      // Sollevamenti / Bilanciere (Kg)
-      "Snatch (Strappo)",
-      "Power Snatch",
-      "Clean (Slancio)",
-      "Power Clean",
-      "Clean and Jerk",
-      "Hang Clean",
-      "Back Squat",
-      "Front Squat",
-      "Overhead Squat",
-      "Deadlift (Stacco)",
-      "Bench Press (Panca Piana)",
-      "Push Press",
-      "Push Jerk",
-      "Split Jerk",
-      "Thruster",
-      "Overhead Lunge",
-      
-      // Ginnastica / Corpo Libero (Max Reps o Secondi)
-      "Strict Pull-ups (Trazioni Stricte)",
-      "Kipping Pull-ups",
-      "Chest-to-Bar Pull-ups",
-      "Bar Muscle-Ups",
-      "Ring Muscle-Ups",
-      "Handstand Push-Ups (HSPU Stricte)",
-      "Kipping HSPU",
-      "Toes-to-Bar (T2B)",
-      "Unbroken Double-Unders (Salti Corda)",
-      "Handstand Walk (Camminata Storta - metri)",
-      "Max L-Sit Hold (Secondi)",
-      "Max Plank (Secondi)",
-
-      // Endurance / Motore (Cardio, Vogatore, Ski Erg, Bici)
-      "Row 500m (Tempo mm:ss)",
-      "Row 2000m (Tempo mm:ss)",
-      "Assault/Echo Bike 1000m (Tempo mm:ss)",
-      "SkiErg 500m (Tempo mm:ss)",
-      "Mile Run (1.6 km - Tempo mm:ss)"
+      "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",
+      "Clean and Jerk", "Hang Clean", "Back Squat", "Front Squat",
+      "Overhead Squat", "Deadlift (Stacco)", "Bench Press (Panca Piana)",
+      "Push Press", "Push Jerk", "Split Jerk", "Thruster", "Overhead Lunge",
+      "Strict Pull-ups (Trazioni Stricte)", "Kipping Pull-ups", "Chest-to-Bar Pull-ups",
+      "Bar Muscle-Ups", "Ring Muscle-Ups", "Handstand Push-Ups (HSPU Stricte)",
+      "Kipping HSPU", "Toes-to-Bar (T2B)", "Unbroken Double-Unders (Salti Corda)",
+      "Handstand Walk (Camminata Storta - metri)", "Max L-Sit Hold (Secondi)", "Max Plank (Secondi)",
+      "Row 500m (Tempo mm:ss)", "Row 2000m (Tempo mm:ss)", "Assault/Echo Bike 1000m (Tempo mm:ss)",
+      "SkiErg 500m (Tempo mm:ss)", "Mile Run (1.6 km - Tempo mm:ss)"
     ];
 
     document.getElementById('wodDate').valueAsDate = new Date();
@@ -449,6 +421,7 @@
       localStorage.setItem('activeAthlete', name);
       loadActiveAthlete();
       loadLocalMassimaliAndProfile();
+      renderHistory();
     }
 
     function loadActiveAthlete() {
@@ -519,6 +492,7 @@
         fetchCloudData().then(() => {
           document.getElementById('loginOverlay').style.display = 'none';
           loadActiveAthlete();
+          renderHistory();
         });
       }
     }
@@ -581,18 +555,22 @@
     function renderHistory() {
       const historyList = document.getElementById('historyList');
       const searchQuery = (document.getElementById('searchWod')?.value || '').toLowerCase().trim();
-      let history = globalData.wods;
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      
+      // Filtra i WOD solo per l'atleta attivo[cite: 1]
+      let history = globalData.wods.filter(item => 
+        item.athlete && item.athlete.toLowerCase() === (activeAthlete || '').toLowerCase()
+      );
 
       if (searchQuery !== '') {
         history = history.filter(item => 
           item.title.toLowerCase().includes(searchQuery) || 
-          item.athlete.toLowerCase().includes(searchQuery) ||
           item.type.toLowerCase().includes(searchQuery)
         );
       }
 
       if (history.length === 0) {
-        historyList.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento trovato.</p>';
+        historyList.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento registrato per il tuo profilo.</p>';
         return;
       }
 
@@ -609,7 +587,7 @@
             <div class="history-item-header">
               <div>
                 <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${item.mode}</span>
-                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${item.date} — <b>${item.athlete}</b></span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${item.date}</span>
                 <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${item.title} (${item.type})</div>
               </div>
             </div>
@@ -746,12 +724,21 @@
         const val = localStorage.getItem(key);
         if (val) {
           const id = key === 'gymLogo' ? 'headerLogoGym' : 'headerLogoProg';
-          const prev = key === 'gymLogo' ? 'previewGymLogo' : 'previewProgLogo';
-          document.getElementById(id).src = val;
-          document.getElementById(id).style.display = 'block';
-          document.getElementById(prev).src = val;
+          const imgEl = document.getElementById(id);
+          const previewEl = document.getElementById(key === 'gymLogo' ? 'previewGymLogo' : 'previewProgLogo');
+          if (imgEl) { imgEl.src = val; imgEl.style.display = 'block'; }
+          if (previewEl) { previewEl.src = val; }
         }
       });
+    }
+
+    function removeLogo(key) {
+      localStorage.removeItem(key);
+      const id = key === 'gymLogo' ? 'headerLogoGym' : 'headerLogoProg';
+      const previewEl = document.getElementById(key === 'gymLogo' ? 'previewGymLogo' : 'previewProgLogo');
+      const imgEl = document.getElementById(id);
+      if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
+      if (previewEl) { previewEl.src = ''; }
     }
   </script>
 </body>
