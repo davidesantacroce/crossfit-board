@@ -141,7 +141,7 @@
   <div class="nav">
     <button class="active" onclick="switchTab('registra')">REGISTRA</button>
     <button onclick="switchTab('storico')">STORICO</button>
-    <button onclick="switchTab('atleti')">ATLETA & 1RM</button>
+    <button onclick="switchTab('atleta')">ATLETA</button>
     <button onclick="switchTab('impostazioni')">IMPOSTAZIONI</button>
   </div>
 
@@ -224,8 +224,8 @@
     </div>
   </div>
 
-  <!-- TAB ATLETI & MASSIMALI -->
-  <div id="tab-atleti" class="tab-content">
+  <!-- TAB ATLETA -->
+  <div id="tab-atleta" class="tab-content">
     <div class="card">
       <div class="card-title">PROFILO ATLETA</div>
       <div class="form-group">
@@ -246,7 +246,8 @@
     </div>
 
     <div class="card">
-      <div class="card-title">MASSIMALI STANDARD CROSSFIT (1RM)</div>
+      <div class="card-title">MASSIMALI E PARAMETRI CROSSFIT</div>
+      <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 14px;">Inserisci i tuoi massimali di sollevamento (Kg), ginnastica (max reps o secondi), e benchmark cardiovascolari (passo/tempo).</p>
       <div id="rmContainer"></div>
       <button class="btn-main" style="margin-top: 12px;" onclick="saveMassimaliCloud()">SALVA MASSIMALI</button>
     </div>
@@ -299,18 +300,44 @@
     let globalData = { wods: [], athletes: [], massimali: [] };
     
     const CROSSFIT_STANDARD_RMS = [
-      "Snatch",
+      // Sollevamenti / Bilanciere (Kg)
+      "Snatch (Strappo)",
       "Power Snatch",
-      "Clean",
+      "Clean (Slancio)",
       "Power Clean",
       "Clean and Jerk",
+      "Hang Clean",
       "Back Squat",
       "Front Squat",
       "Overhead Squat",
-      "Deadlift",
-      "Bench Press",
+      "Deadlift (Stacco)",
+      "Bench Press (Panca Piana)",
       "Push Press",
-      "Thruster"
+      "Push Jerk",
+      "Split Jerk",
+      "Thruster",
+      "Overhead Lunge",
+      
+      // Ginnastica / Corpo Libero (Max Reps o Secondi)
+      "Strict Pull-ups (Trazioni Stricte)",
+      "Kipping Pull-ups",
+      "Chest-to-Bar Pull-ups",
+      "Bar Muscle-Ups",
+      "Ring Muscle-Ups",
+      "Handstand Push-Ups (HSPU Stricte)",
+      "Kipping HSPU",
+      "Toes-to-Bar (T2B)",
+      "Unbroken Double-Unders (Salti Corda)",
+      "Handstand Walk (Camminata Storta - metri)",
+      "Max L-Sit Hold (Secondi)",
+      "Max Plank (Secondi)",
+
+      // Endurance / Motore (Cardio, Vogatore, Ski Erg, Bici)
+      "Row 500m (Tempo mm:ss)",
+      "Row 2000m (Tempo mm:ss)",
+      "Assault/Echo Bike 1000m (Tempo mm:ss)",
+      "SkiErg 500m (Tempo mm:ss)",
+      "Mile Run (1.6 km - Tempo mm:ss)"
     ];
 
     document.getElementById('wodDate').valueAsDate = new Date();
@@ -342,11 +369,11 @@
           renderHistory();
           loadLocalMassimaliAndProfile();
         } else {
-          updateConnectionIndicator(true); // Mantiene confermato lo stato di scrittura attivo
+          updateConnectionIndicator(true);
         }
       } catch (err) {
         console.error("Errore sincronizzazione cloud:", err);
-        updateConnectionIndicator(true); // Mantiene confermato lo stato di scrittura attivo
+        updateConnectionIndicator(true);
       }
     }
 
@@ -354,7 +381,7 @@
       const dot = document.getElementById('connectionDot');
       const text = document.getElementById('connectionStatusText');
       if (dot && text) {
-        dot.style.backgroundColor = '#2e7d32'; // Sempre Verde per confermare la scrittura attiva su Google Sheet
+        dot.style.backgroundColor = '#2e7d32';
         text.innerText = 'Connesso al database di Google Sheet';
       }
     }
@@ -395,7 +422,7 @@
 
     function switchToAthleteTab() {
       document.getElementById('loginOverlay').style.display = 'none';
-      switchTab('atleti');
+      switchTab('atleta');
     }
 
     function logoutUser() {
@@ -465,7 +492,7 @@
         row.className = 'rm-row';
         row.innerHTML = `
           <span>${movement}</span>
-          <input type="number" step="0.5" class="rm-weight" data-movement="${movement}" placeholder="Kg" value="${val}">
+          <input type="text" class="rm-weight" data-movement="${movement}" placeholder="Kg / Reps / Tempo" value="${val}">
         `;
         container.appendChild(row);
       });
@@ -512,7 +539,7 @@
           });
         }
       }
-      alert('Massimali standard salvati con successo!');
+      alert('Massimali e parametri CrossFit salvati con successo!');
       fetchCloudData();
     }
 
@@ -598,7 +625,7 @@
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       
-      const map = { 'registra': 0, 'storico': 1, 'atleti': 2, 'impostazioni': 3 };
+      const map = { 'registra': 0, 'storico': 1, 'atleta': 2, 'impostazioni': 3 };
       document.querySelectorAll('.nav button')[map[tab]].classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'storico') renderHistory();
