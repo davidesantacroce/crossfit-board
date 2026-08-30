@@ -81,8 +81,8 @@
     .rx-btn { flex: 1; padding: 12px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); font-weight: 800; border-radius: 8px; cursor: pointer; text-align: center; }
     .rx-btn.active { background: #2e7d32; color: #fff; border-color: #2e7d32; }
 
-    .set-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .set-number { font-weight: 800; color: var(--text-muted); width: 30px; text-align: right; }
+    .set-row { display: grid; grid-template-columns: 45px 1fr 35px; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .set-number { font-weight: 800; color: var(--text-muted); text-align: right; font-size: 12px; }
     
     .exercise-row { display: grid; grid-template-columns: 80px 1fr 35px; gap: 8px; align-items: center; margin-bottom: 10px; }
     .exercise-row.has-weight { grid-template-columns: 80px 1fr 120px 35px; }
@@ -319,7 +319,6 @@
       return "https://script.google.com/macros/s/AKfycbw_YgOOas-ZHpliLQE0n7Tvs6vfoW0MMY1Qhn_9LqoRsAmr8S4EDjxJCu1T8j-Up5kl4Q/exec";
     }
 
-    // Gestione loghi salvati in localStorage
     function loadSavedLogos() {
       const gymLogo = localStorage.getItem('gymLogo');
       const progLogo = localStorage.getItem('progLogo');
@@ -674,8 +673,7 @@
       document.getElementById('btnScaled').classList.toggle('active', mode === 'SCALED');
     }
 
-    // Funzione aggiornata per la gestione dinamica e la modifica manuale dei set/alzate
-    function renderResultFields(forcedCount = null) {
+    function renderResultFields(initialBuild = true) {
       const type = document.getElementById('wodType').value;
       const container = document.getElementById('dynamicResultContainer');
       const label = document.getElementById('resultLabel');
@@ -698,38 +696,36 @@
             <input type="number" id="resReps" placeholder="Reps">
           </div>`;
       } else if (type === 'Sets') {
-        let detectedSets = 5; // Default
-
-        if (forcedCount !== null) {
-          detectedSets = parseInt(forcedCount, 10);
+        label.innerText = 'SCORE SETS / CARICHI';
+        
+        let existingValues = [];
+        if (!initialBuild) {
+          document.querySelectorAll('.set-input').forEach(inp => existingValues.push(inp.value));
         } else {
           const lines = wodNotesText.split('\n').filter(l => l.trim() !== '');
           if (lines.length > 1) {
-            detectedSets = lines.length;
+            existingValues = lines.map(() => '');
           } else {
             const matchSets = wodNotesText.match(/(\d+)\s*(?:sets?|rounds?|alzate)/i);
-            if (matchSets && matchSets[1]) {
-              let parsed = parseInt(matchSets[1], 10);
-              if (parsed > 0 && parsed <= 25) detectedSets = parsed;
-            }
+            let count = (matchSets && matchSets[1]) ? parseInt(matchSets[1], 10) : 5;
+            if (count > 25) count = 25;
+            existingValues = new Array(Math.max(count, 1)).fill('');
           }
         }
 
-        label.innerText = `SCORE SETS / CARICHI (${detectedSets} ALZATE)`;
-        
-        let html = `
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-            <span style="font-size: 11px; color: var(--text-muted); font-weight: 800;">Modifica num. set:</span>
-            <input type="number" id="manualSetCount" value="${detectedSets}" min="1" max="25" style="width: 80px; padding: 6px;" onchange="renderResultFields(this.value)">
-          </div>`;
+        if (existingValues.length === 0) existingValues = [''];
 
-        for (let i = 1; i <= detectedSets; i++) {
+        let html = '<div id="setsListContainer">';
+        existingValues.forEach((val, i) => {
           html += `
-            <div class="set-row">
-              <span class="set-number">${i}°</span>
-              <input type="text" class="set-input" placeholder="Carico set ${i}">
+            <div class="set-row" data-index="${i}">
+              <span class="set-number">${i+1}°</span>
+              <input type="text" class="set-input" placeholder="Carico set ${i+1}" value="${val}">
+              <button type="button" class="btn-remove" onclick="removeSetRow(this)">✕</button>
             </div>`;
-        }
+        });
+        html += '</div>';
+        html += `<button type="button" class="btn-add" onclick="addSetRow()">+ Aggiungi Set</button>`;
         container.innerHTML = html;
       } else if (type === 'EMOM') {
         label.innerText = 'SCORE EMOM';
@@ -742,6 +738,39 @@
             <input type="number" id="resEmomMin" placeholder="Minuto completato">
           </div>`;
       }
+    }
+
+    function addSetRow(value = '') {
+      const listContainer = document.getElementById('setsListContainer');
+      if (!listContainer) return;
+      const count = listContainer.children.length + 1;
+      const row = document.createElement('div');
+      row.className = 'set-row';
+      row.innerHTML = `
+        <span class="set-number">${count}°</span>
+        <input type="text" class="set-input" placeholder="Carico set ${count}" value="${value}">
+        <button type="button" class="btn-remove" onclick="removeSetRow(this)">✕</button>
+      `;
+      listContainer.appendChild(row);
+      updateSetNumbers();
+    }
+
+    function removeSetRow(btn) {
+      const row = btn.parentElement;
+      row.remove();
+      updateSetNumbers();
+    }
+
+    function updateSetNumbers() {
+      const rows = document.querySelectorAll('.set-row');
+      rows.forEach((row, index) => {
+        const numSpan = row.querySelector('.set-number');
+        const input = row.querySelector('.set-input');
+        if (numSpan) numSpan.innerText = `${index + 1}°`;
+        if (input && !input.placeholder.includes(index + 1)) {
+          input.placeholder = `Carico set ${index + 1}`;
+        }
+      });
     }
 
     function addExerciseRow(reps = '', name = '', weight = '') {
