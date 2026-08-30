@@ -148,14 +148,7 @@
   <!-- TAB REGISTRA -->
   <div id="tab-registra" class="tab-content active">
     <div class="card">
-      <div class="card-title">SELEZIONA ATLETA E WOD</div>
-      <div class="form-group">
-        <label>ATLETA ATTIVO</label>
-        <select id="currentAthleteSelect" onchange="updateActiveAthlete()">
-          <option value="">-- Seleziona il tuo nome --</option>
-        </select>
-      </div>
-
+      <div class="card-title">CARICA WOD</div>
       <label for="imageInput" class="btn-import">📷 Carica Screenshot WOD</label>
       <input type="file" id="imageInput" accept="image/*" multiple>
       <div id="galleryContainer" class="gallery-container"></div>
@@ -365,7 +358,6 @@
         if (res.ok) {
           globalData = await res.json();
           updateConnectionIndicator(true);
-          updateAthleteDropdown();
           renderHistory();
           loadLocalMassimaliAndProfile();
         } else {
@@ -430,31 +422,9 @@
       location.reload();
     }
 
-    function updateAthleteDropdown() {
-      const select = document.getElementById('currentAthleteSelect');
-      const currentVal = select.value;
-      select.innerHTML = '<option value="">-- Seleziona il tuo nome --</option>';
-      
-      globalData.athletes.forEach(ath => {
-        const opt = document.createElement('option');
-        opt.value = ath.name;
-        opt.innerText = `${ath.name} (${ath.weight || '?'} kg)`;
-        select.appendChild(opt);
-      });
-      if (currentVal) select.value = currentVal;
-    }
-
-    function updateActiveAthlete() {
-      const name = document.getElementById('currentAthleteSelect').value;
-      localStorage.setItem('activeAthlete', name);
-      loadActiveAthlete();
-      loadLocalMassimaliAndProfile();
-    }
-
     function loadActiveAthlete() {
       const name = localStorage.getItem('activeAthlete') || '';
       if (name) {
-        document.getElementById('currentAthleteSelect').value = name;
         document.getElementById('activeAthleteDisplay').innerText = `Atleta: ${name}`;
       } else {
         document.getElementById('activeAthleteDisplay').innerText = `Atleta: Nessuno Selezionato`;
@@ -546,7 +516,7 @@
     async function saveWod() {
       const url = getScriptUrl();
       const athleteName = localStorage.getItem('activeAthlete');
-      if (!athleteName) { alert('Seleziona prima l\'atleta attivo!'); return; }
+      if (!athleteName) { alert('Nessun atleta attivo associato. Esegui il login!'); return; }
 
       const exerciseRows = document.querySelectorAll('.exercise-row');
       let exercisesList = [];
