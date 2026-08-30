@@ -107,6 +107,28 @@
 </head>
 <body>
 
+  <!-- SCHERMATA DI LOGIN BLOCCANTE -->
+  <div id="loginOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-color); z-index: 2000; padding: 24px; box-sizing: border-box; flex-direction: column; justify-content: center; align-items: center;">
+    <div class="card" style="width: 100%; max-width: 400px; text-align: center;">
+      <div class="card-title" style="font-size: 16px; margin-bottom: 20px;">Scappati di Bicocca</div>
+      <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">Seleziona il tuo profilo per accedere ai tuoi dati.</p>
+      
+      <div class="form-group" style="text-align: left;">
+        <label>IL TUO NOME</label>
+        <select id="loginAthleteSelect" style="margin-bottom: 16px;">
+          <option value="">-- Seleziona Atleta --</option>
+        </select>
+      </div>
+      
+      <button class="btn-main" onclick="performLogin()">ACCEDI</button>
+      
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">Non sei in elenco?</p>
+        <button type="button" class="btn-secondary" style="width: 100%; font-size: 12px; padding: 10px;" onclick="switchToAthleteTab()">Registrati nella Tab Atleta</button>
+      </div>
+    </div>
+  </div>
+
   <div class="header">
     <img id="headerLogoGym" class="header-logo" alt="Logo">
     <div class="header-title-box">
@@ -128,7 +150,7 @@
     <div class="card">
       <div class="card-title">SELEZIONA ATLETA E WOD</div>
       <div class="form-group">
-        <label>ATLETA</label>
+        <label>ATLETA ATTIVO</label>
         <select id="currentAthleteSelect" onchange="updateActiveAthlete()">
           <option value="">-- Seleziona il tuo nome --</option>
         </select>
@@ -233,7 +255,14 @@
   <!-- TAB IMPOSTAZIONI -->
   <div id="tab-impostazioni" class="tab-content">
     <div class="card">
-      <div class="card-title">STATO CONNESSIONE CLOUD</div>
+      <div class="card-title">ACCOUNT</div>
+      <button class="btn-secondary" style="width: 100%; color: #c62828; border-color: #c62828; margin-bottom: 16px;" onclick="logoutUser()">CAMBIA UTENTE (LOGOUT)</button>
+      
+      <div class="card-title" style="margin-top: 10px;">STATO CONNESSIONE CLOUD</div>
+      <div style="background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <div id="connectionDot" style="width: 12px; height: 12px; border-radius: 50%; background-color: #f0ad4e;"></div>
+        <div style="font-size: 13px; font-weight: 700;" id="connectionStatusText">Verifica connessione Google Sheet...</div>
+      </div>
       <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
         Il collegamento al Foglio Google è integrato e configurato globalmente per tutti gli utenti dell'applicazione.
       </p>
@@ -269,7 +298,6 @@
     let cropper = null;
     let globalData = { wods: [], athletes: [], massimali: [] };
     
-    // Massimali Standard CrossFit predefiniti
     const CROSSFIT_STANDARD_RMS = [
       "Snatch",
       "Power Snatch",
@@ -289,28 +317,89 @@
 
     window.onload = function() {
       loadSavedLogos();
-      fetchCloudData();
-      loadActiveAthlete();
+      fetchCloudData().then(() => {
+        checkUserLogin();
+      });
       renderResultFields();
     };
 
-    // URL di Google Apps Script hardcoded nel codice
     function getScriptUrl() {
       return "https://script.google.com/macros/s/AKfycbw_YgOOas-ZHpliLQE0n7Tvs6vfoW0MMY1Qhn_9LqoRsAmr8S4EDjxJCu1T8j-Up5kl4Q/exec";
     }
 
     async function fetchCloudData() {
       const url = getScriptUrl();
-      if (!url) return;
+      if (!url) {
+        updateConnectionIndicator(false);
+        return;
+      }
       try {
         const res = await fetch(url + "?action=getData");
         globalData = await res.json();
+        updateConnectionIndicator(true);
         updateAthleteDropdown();
         renderHistory();
         loadLocalMassimaliAndProfile();
       } catch (err) {
         console.error("Errore sincronizzazione cloud:", err);
+        updateConnectionIndicator(false);
       }
+    }
+
+    function updateConnectionIndicator(isConnected) {
+      const dot = document.getElementById('connectionDot');
+      const text = document.getElementById('connectionStatusText');
+      if (isConnected) {
+        dot.style.backgroundColor = '#2e7d32'; // Verde
+        text.innerText = 'Connesso al database di Google Sheet';
+      } else {
+        dot.style.backgroundColor = '#c62828'; // Rosso
+        text.innerText = 'Disconnesso dal database Google Sheet';
+      }
+    }
+
+    function checkUserLogin() {
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      const overlay = document.getElementById('loginOverlay');
+      
+      if (!activeAthlete) {
+        const loginSelect = document.getElementById('loginAthleteSelect');
+        loginSelect.innerHTML = '<option value="">-- Seleziona Atleta --</option>';
+        globalData.athletes.forEach(ath => {
+          const opt = document.createElement('option');
+          opt.value = ath.name;
+          opt.innerText = ath.name;
+          loginSelect.appendChild(opt);
+        });
+        overlay.style.display = 'flex';
+      } else {
+        overlay.style.display = 'none';
+        loadActiveAthlete();
+        loadLocalMassimaliAndProfile();
+      }
+    }
+
+    function performLogin() {
+      const selectedName = document.getElementById('loginAthleteSelect').value;
+      if (!selectedName) {
+        alert('Seleziona un nome dalla lista.');
+        return;
+      }
+      localStorage.setItem('activeAthlete', selectedName);
+      document.getElementById('loginOverlay').style.display = 'none';
+      loadActiveAthlete();
+      loadLocalMassimaliAndProfile();
+      fetchCloudData();
+    }
+
+    function switchToAthleteTab() {
+      document.getElementById('loginOverlay').style.display = 'none';
+      switchTab('atleti');
+    }
+
+    function logoutUser() {
+      localStorage.removeItem('activeAthlete');
+      location.reload();
     }
 
     function updateAthleteDropdown() {
@@ -399,7 +488,10 @@
       if (url) {
         await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
         alert('Atleta registrato e salvato sul cloud!');
-        fetchCloudData();
+        fetchCloudData().then(() => {
+          document.getElementById('loginOverlay').style.display = 'none';
+          loadActiveAthlete();
+        });
       }
     }
 
@@ -426,7 +518,7 @@
     async function saveWod() {
       const url = getScriptUrl();
       const athleteName = localStorage.getItem('activeAthlete');
-      if (!athleteName) { alert('Seleziona prima l\'atleta attivo nella tab Registra!'); return; }
+      if (!athleteName) { alert('Seleziona prima l\'atleta attivo!'); return; }
 
       const exerciseRows = document.querySelectorAll('.exercise-row');
       let exercisesList = [];
