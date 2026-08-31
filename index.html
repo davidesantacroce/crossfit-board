@@ -1018,7 +1018,23 @@
         }
       }
 
-      // 4) Fallback: conta le righe tipo "Set 1", "1)", "1." (una per set)
+      // 4) Fallback: righe ripetute con percentuale di carico, tipiche di
+      //    prescrizioni tipo "1 Power Snatch + 1 Snatch @55% 1RM Snatch"
+      //    (una riga per set; i reps sono la somma dei numeri prima di "@")
+      if (!numSets) {
+        const pctLineMatches = text.match(/(?:^|\n)[^\n@]*@\s*\d{1,3}\s*%[^\n]*/gim);
+        if (pctLineMatches && pctLineMatches.length >= 2 && pctLineMatches.length <= 30) {
+          numSets = pctLineMatches.length;
+          const beforePct = pctLineMatches[0].split('@')[0];
+          const segmentNums = beforePct.match(/\d{1,3}(?=\s*[A-Za-z\u00C0-\u017F])/g);
+          if (segmentNums && segmentNums.length) {
+            const sum = segmentNums.reduce((a, b) => a + parseInt(b, 10), 0);
+            if (sum > 0 && sum <= 999) reps = sum;
+          }
+        }
+      }
+
+      // 5) Fallback: conta le righe tipo "Set 1", "1)", "1." (una per set)
       if (!numSets) {
         const setLineMatches = text.match(/(?:^|\n)\s*(?:set\s*\d{1,2}\b|\d{1,2}[.)]\s)/gim);
         if (setLineMatches && setLineMatches.length >= 2 && setLineMatches.length <= 30) {
