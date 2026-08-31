@@ -57,6 +57,12 @@
     textarea { resize: vertical; min-height: 90px; }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
+    .time-score-row { display: flex; align-items: center; gap: 8px; }
+    .time-score-row input { text-align: center; }
+    .time-score-sep { font-weight: 800; color: var(--text-muted); font-size: 16px; }
+    .time-score-unit { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 4px; text-transform: uppercase; font-weight: 700; }
+    .time-score-col { flex: 1; }
+
     .logo-preview-box {
       width: 100%; height: 90px; background: var(--input-bg); border: 1px dashed var(--border);
       border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-top: 8px; overflow: hidden;
@@ -92,6 +98,7 @@
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
+    .history-explanation-label { font-size: 10px; color: var(--accent); font-weight: 800; text-transform: uppercase; margin-top: 6px; }
     
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
     .tab-content { display: none; }
@@ -265,6 +272,21 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/'/g, '&#39;');
+    }
+
+    // Sanitizza un input numerico in tempo reale: rimuove qualsiasi carattere non numerico
+    // e opzionalmente limita il valore a un massimo (es. 59 per i secondi).
+    function sanitizeIntInput(el, max) {
+      let digitsOnly = el.value.replace(/[^\d]/g, '');
+      if (digitsOnly.length > 1) {
+        digitsOnly = digitsOnly.replace(/^0+(?=\d)/, ''); // rimuove zeri iniziali superflui
+      }
+      if (digitsOnly !== '') {
+        let num = parseInt(digitsOnly, 10);
+        if (max !== undefined && num > max) num = max;
+        digitsOnly = String(num);
+      }
+      el.value = digitsOnly;
     }
     
     const CROSSFIT_STANDARD_RMS = [
@@ -591,9 +613,7 @@
 
         <div class="form-group">
           <label class="block-score-label">SCORE / RISULTATO PARZIALE</label>
-          <div class="block-score-inputs-container">
-            <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="">
-          </div>
+          <div class="block-score-inputs-container"></div>
         </div>
       `;
       container.appendChild(blockDiv);
@@ -620,10 +640,27 @@
           </div>
           <button type="button" class="btn-add" onclick="addScoreRow(${blockId})">+ Aggiungi Serie/Carico</button>
         `;
+      } else if (selectedType === 'For Time') {
+        labelEl.innerText = "SCORE / TEMPO IMPIEGATO";
+        containerEl.innerHTML = `
+          <div class="time-score-row">
+            <div class="time-score-col">
+              <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
+                     class="block-time-min" placeholder="0"
+                     oninput="sanitizeIntInput(this)">
+              <div class="time-score-unit">Minuti</div>
+            </div>
+            <div class="time-score-sep">:</div>
+            <div class="time-score-col">
+              <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2"
+                     class="block-time-sec" placeholder="00"
+                     oninput="sanitizeIntInput(this, 59)">
+              <div class="time-score-unit">Secondi</div>
+            </div>
+          </div>
+        `;
       } else {
-        if (selectedType === 'For Time') {
-          labelEl.innerText = "SCORE / TEMPO IMPIEGATO";
-        } else if (selectedType === 'AMRAP') {
+        if (selectedType === 'AMRAP') {
           labelEl.innerText = "SCORE / ROUNDS & REPS";
         } else if (selectedType === 'EMOM') {
           labelEl.innerText = "SCORE / COMPLETATO O NOTE";
@@ -631,7 +668,7 @@
           labelEl.innerText = "SCORE / RISULTATO PARZIALE";
         }
         containerEl.innerHTML = `
-          <input type="text" class="block-result" placeholder="Es. 8:45 o 5 rounds + 3 reps" value="">
+          <input type="text" class="block-result" placeholder="Es. 5 rounds + 3 reps" value="">
         `;
       }
     }
@@ -700,7 +737,7 @@
       }
 
       // Lo score resta vuoto/editabile a mano: updateBlockScoreLabel(blockId) sopra
-      // ha già predisposto i campi giusti in base al tipo rilevato.
+      // ha già predisposto i campi giusti in base al tipo rilevato (min/sec per For Time).
     }
 
     async function saveWodSession() {
@@ -728,6 +765,18 @@
             }
           });
           result = scoreRowsData;
+        } else if (type === 'For Time') {
+          const minEl = block.querySelector('.block-time-min');
+          const secEl = block.querySelector('.block-time-sec');
+          const minVal = minEl && minEl.value !== '' ? parseInt(minEl.value, 10) : null;
+          const secVal = secEl && secEl.value !== '' ? parseInt(secEl.value, 10) : null;
+          if (minVal !== null || secVal !== null) {
+            const m = minVal !== null && !isNaN(minVal) ? minVal : 0;
+            const s = secVal !== null && !isNaN(secVal) ? secVal : 0;
+            result = `${m}:${String(s).padStart(2, '0')}`;
+          } else {
+            result = '';
+          }
         } else {
           result = block.querySelector('.block-result') ? block.querySelector('.block-result').value : '';
         }
@@ -817,7 +866,10 @@
           contentHtml = item.blocks.map(b => {
             let bodyHtml = '';
             if (b.explanation) {
-              bodyHtml = `<div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin-top: 4px;">${escapeHtml(b.explanation)}</div>`;
+              bodyHtml = `
+                <div class="history-explanation-label">WOD:</div>
+                <div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin-top: 2px;">${escapeHtml(b.explanation)}</div>
+              `;
             } else if (b.exercises && b.exercises.length > 0) {
               // Compatibilità con sessioni salvate col vecchio formato (righe esercizio)
               bodyHtml = (b.exercises || []).map(ex => `
