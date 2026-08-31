@@ -1005,10 +1005,17 @@
       );
 
       if (searchQuery !== '') {
-        history = history.filter(item => 
-          (item.title && item.title.toLowerCase().includes(searchQuery)) || 
-          (item.type && item.type.toLowerCase().includes(searchQuery))
-        );
+        history = history.filter(item => {
+          const matchesTop =
+            (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+            (item.type && item.type.toLowerCase().includes(searchQuery));
+          const matchesBlocks = Array.isArray(item.blocks) && item.blocks.some(b =>
+            (b.title && b.title.toLowerCase().includes(searchQuery)) ||
+            (b.type && b.type.toLowerCase().includes(searchQuery)) ||
+            (b.explanation && b.explanation.toLowerCase().includes(searchQuery))
+          );
+          return matchesTop || matchesBlocks;
+        });
       }
 
       if (history.length === 0) {
