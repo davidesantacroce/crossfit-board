@@ -268,6 +268,32 @@
         .replace(/'/g, '&#39;');
     }
 
+    // Aggiungi questa funzione vicino a escapeHtml/getTodayDateString
+function formatDateForDisplay(dateStr) {
+  if (!dateStr) return '';
+
+  // Caso semplice: già in formato YYYY-MM-DD puro (nessuna T/ora)
+  const simpleMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (simpleMatch) {
+    const [, y, m, d] = simpleMatch;
+    return `${d}/${m}/${y}`;
+  }
+
+  // Caso timestamp ISO completo (es. 2026-08-30T22:00:00.000Z):
+  // lo interpretiamo come istante UTC e lo convertiamo nell'ora locale del dispositivo,
+  // così il giorno torna quello corretto per chi lo visualizza in Italia.
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    const d = String(parsed.getDate()).padStart(2, '0');
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const y = parsed.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+
+  // Fallback: mostra il valore così com'è
+  return String(dateStr);
+}
+    
     // Sanitizza un input numerico in tempo reale: rimuove qualsiasi carattere non numerico
     // e opzionalmente limita il valore a un massimo (es. 59 per i secondi).
     function sanitizeIntInput(el, max) {
@@ -917,7 +943,7 @@
             <div class="history-item-header">
               <div>
                 <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
-                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(item.date || '')}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(item.date))}</span>
               </div>
               <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
             </div>
