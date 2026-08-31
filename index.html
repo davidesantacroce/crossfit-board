@@ -300,6 +300,7 @@
           <option value="Distance">Distance</option>
           <option value="Calories">Calories</option>
         </select>
+        <div class="detected-sets-hint" id="lrDetectedSetsHint" style="margin-top: 8px; margin-bottom: 0;"></div>
       </div>
 
       <div class="form-group" id="lrScoreFields"></div>
@@ -968,11 +969,13 @@
     // "N sets x M reps" / "N serie x M" / "NxM" e restituisce { numSets, reps } se trovato.
     function detectSetsInfo(text) {
       if (!text) return null;
-      const patterns = [
+
+      // 1) Pattern combinato: "N sets x M reps" / "N serie di M" / "NxM"
+      const combinedPatterns = [
         /(\d{1,2})\s*(?:sets?|serie)\s*(?:x|di|of)\s*(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)?/i,
         /(\d{1,2})\s*x\s*(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)?/i
       ];
-      for (const p of patterns) {
+      for (const p of combinedPatterns) {
         const m = text.match(p);
         if (m) {
           const numSets = parseInt(m[1], 10);
@@ -982,7 +985,65 @@
           }
         }
       }
-      return null;
+
+      let numSets = null;
+      let reps = null;
+
+      // 2) Numero di set esplicito ma senza reps abbinati nello stesso punto
+      //    (es. "5 sets", "Sets: 5", "5 serie @ 70%, 75%, 80%...")
+      const numSetsOnlyPatterns = [
+        /(\d{1,2})\s*(?:sets?|serie)\b/i,
+        /(?:sets?|serie)\s*[:\-]?\s*(\d{1,2})\b/i
+      ];
+      for (const p of numSetsOnlyPatterns) {
+        const m = text.match(p);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n > 0 && n <= 30) { numSets = n; break; }
+        }
+      }
+
+      // 3) Fallback: sequenza di numeri separati da trattino, tipica della
+      //    notazione a set di forza (es. "5-5-5-5-5" o "10-8-6-4-2").
+      //    Evitato se il testo sembra descrivere un WOD For Time/AMRAP/EMOM
+      //    (dove una sequenza tipo "21-15-9" indica reps a scalare, non set).
+      if (!numSets && !/for time|amrap|emom|chipper/i.test(text)) {
+        const dashMatch = text.match(/\b(\d{1,3}(?:\s*-\s*\d{1,3}){1,29})\b/);
+        if (dashMatch) {
+          const parts = dashMatch[1].split('-').map(s => parseInt(s.trim(), 10));
+          if (parts.length >= 2 && parts.length <= 30 && parts.every(n => n > 0 && n <= 999)) {
+            numSets = parts.length;
+            if (parts.every(n => n === parts[0])) reps = parts[0];
+          }
+        }
+      }
+
+      // 4) Fallback: conta le righe tipo "Set 1", "1)", "1." (una per set)
+      if (!numSets) {
+        const setLineMatches = text.match(/(?:^|\n)\s*(?:set\s*\d{1,2}\b|\d{1,2}[.)]\s)/gim);
+        if (setLineMatches && setLineMatches.length >= 2 && setLineMatches.length <= 30) {
+          numSets = setLineMatches.length;
+        }
+      }
+
+      if (!numSets) return null;
+
+      // Se non già determinati dai passi precedenti, cerca separatamente i reps per set
+      if (reps === null) {
+        const repsPatterns = [
+          /x\s*(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)?/i,
+          /(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)\b/i
+        ];
+        for (const p of repsPatterns) {
+          const m = text.match(p);
+          if (m) {
+            const r = parseInt(m[1], 10);
+            if (r > 0 && r <= 999) { reps = r; break; }
+          }
+        }
+      }
+
+      return { numSets, reps };
     }
 
     // Per i blocchi EMOM rileva la durata (es. "8 minute EMOM" -> 8 round) e,
@@ -1074,8 +1135,22 @@
       const block = document.getElementById(`workout-block-${blockId}`);
       const blockType = block ? block.querySelector('.block-type').value : 'For Time';
 
+      const titleElForHint = block ? block.querySelector('.block-title') : null;
+      const explElForHint = block ? block.querySelector('.block-explanation') : null;
+      const blockTextForHint = (titleElForHint ? titleElForHint.value : '') + '\n' + (explElForHint ? explElForHint.value : '');
+      const detectedSetsInfo = (blockType === 'Sets' || blockType === 'EMOM') ? getBlockSetsInfo(blockType, blockTextForHint) : null;
+
       const defaultTypeMap = { 'For Time': 'Time', 'AMRAP': 'AMRAP', 'Sets': 'Weight', 'EMOM': 'Time' };
-      document.getElementById('lrScoreType').value = existing ? existing.scoreType : (defaultTypeMap[blockType] || 'Time');
+      let defaultType = defaultTypeMap[blockType] || 'Time';
+      if (!existing && detectedSetsInfo && detectedSetsInfo.numSets > 1) { defaultType = 'Weight'; }
+      document.getElementById('lrScoreType').value = existing ? existing.scoreType : defaultType;
+
+      const detectedHintEl = document.getElementById('lrDetectedSetsHint');
+      if (detectedHintEl) {
+        detectedHintEl.innerHTML = detectedSetsInfo
+          ? (detectedSetsInfo.reps ? `🔢 Rilevati: ${detectedSetsInfo.numSets} set x ${detectedSetsInfo.reps} reps` : `🔢 Rilevati: ${detectedSetsInfo.numSets} set`)
+          : '';
+      }
 
       lrMovements = existing ? existing.movements.slice() : guessMovementsFromBlock(blockId);
       renderLrMovementsTags();
