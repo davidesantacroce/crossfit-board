@@ -123,6 +123,16 @@
 
     .detected-sets-hint { font-size: 12px; color: var(--accent); font-weight: 700; margin-top: -8px; margin-bottom: 16px; }
     .detected-sets-hint:empty { display: none; margin: 0; }
+
+    .lr-perset-list { display: flex; flex-direction: column; gap: 8px; }
+    .lr-perset-row { display: flex; align-items: center; gap: 8px; }
+    .lr-perset-label { width: 52px; flex-shrink: 0; font-size: 12px; font-weight: 800; color: var(--text-muted); }
+    .lr-perset-input-wrap { flex: 1; display: flex; align-items: center; gap: 8px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; }
+    .lr-perset-input-wrap input { flex: 1; border: none; background: none; padding: 10px 0; color: var(--text); font-size: 14px; }
+    .lr-perset-input-wrap input:focus { outline: none; }
+    .lr-perset-reps-hint { font-size: 11px; color: var(--text-muted); white-space: nowrap; font-weight: 700; }
+    .lr-perset-done-toggle { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text-muted); font-size: 14px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .lr-perset-done-toggle.done { border-color: var(--accent); background: var(--accent); color: #fff; }
   </style>
 </head>
 <body>
@@ -332,6 +342,7 @@
     let lrActiveBlockId = null;
     let lrCategory = 'RX';
     let lrMovements = [];
+    let lrPerSetScores = [];
 
     // Movimenti CrossFit comuni usati per suggerire automaticamente i "movimenti coinvolti"
     // leggendo titolo e spiegazione del blocco quando si apre il Log Result.
@@ -974,8 +985,50 @@
       return null;
     }
 
+    // Per i blocchi EMOM rileva la durata (es. "8 minute EMOM" -> 8 round) e,
+    // se presenti, i reps per round (es. "x2" o "2 reps").
+    function detectEmomSetsInfo(text) {
+      if (!text) return null;
+      const durationPatterns = [
+        /(\d{1,2})\s*(?:min(?:uti)?|minute)s?\s*emom/i,
+        /emom\s*(?:di|per)?\s*(\d{1,2})\s*min/i
+      ];
+      let numSets = null;
+      for (const p of durationPatterns) {
+        const m = text.match(p);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n > 0 && n <= 60) { numSets = n; break; }
+        }
+      }
+      if (!numSets) return null;
+
+      let reps = null;
+      const remaining = text.replace(/(\d{1,2})\s*(?:min(?:uti)?|minute)s?\s*emom/i, ' ').replace(/emom\s*(?:di|per)?\s*(\d{1,2})\s*min/i, ' ');
+      const repsPatterns = [
+        /x\s*(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)?/i,
+        /(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)\b/i,
+        /(\d{1,3})\s+[a-zà-ù]/i
+      ];
+      for (const p of repsPatterns) {
+        const m = remaining.match(p);
+        if (m) {
+          const r = parseInt(m[1], 10);
+          if (r > 0 && r <= 999) { reps = r; break; }
+        }
+      }
+      return { numSets, reps };
+    }
+
+    // Rileva il numero di set/round previsti per un blocco, in base al tipo (Sets o EMOM).
+    function getBlockSetsInfo(blockType, text) {
+      if (blockType === 'Sets') return detectSetsInfo(text);
+      if (blockType === 'EMOM') return detectEmomSetsInfo(text);
+      return null;
+    }
+
     // Mostra un'indicazione informativa (non editabile) col numero di set rilevati
-    // automaticamente dal testo del blocco, solo per i blocchi di tipo Sets/Strength.
+    // automaticamente dal testo del blocco, per i blocchi di tipo Sets/Strength o EMOM.
     function renderDetectedSetsHint(blockId) {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
@@ -984,7 +1037,7 @@
 
       const typeSelect = block.querySelector('.block-type');
       const type = typeSelect ? typeSelect.value : '';
-      if (type !== 'Sets') {
+      if (type !== 'Sets' && type !== 'EMOM') {
         hintEl.innerHTML = '';
         return;
       }
@@ -992,8 +1045,10 @@
       const titleEl = block.querySelector('.block-title');
       const explEl = block.querySelector('.block-explanation');
       const text = (titleEl ? titleEl.value : '') + '\n' + (explEl ? explEl.value : '');
-      const info = detectSetsInfo(text);
-      hintEl.innerHTML = info ? `🔢 Rilevati: ${info.numSets} set x ${info.reps} reps` : '';
+      const info = getBlockSetsInfo(type, text);
+      hintEl.innerHTML = info
+        ? (info.reps ? `🔢 Rilevati: ${info.numSets} set x ${info.reps} reps` : `🔢 Rilevati: ${info.numSets} set`)
+        : '';
     }
 
     // Scandisce titolo e spiegazione del blocco per suggerire automaticamente i movimenti coinvolti.
@@ -1044,6 +1099,19 @@
       prefill = prefill || {};
       const type = document.getElementById('lrScoreType').value;
       const container = document.getElementById('lrScoreFields');
+
+      const activeBlock = lrActiveBlockId !== null ? document.getElementById(`workout-block-${lrActiveBlockId}`) : null;
+      const activeBlockType = activeBlock ? activeBlock.querySelector('.block-type').value : '';
+      if (type === 'Weight' && (activeBlockType === 'Sets' || activeBlockType === 'EMOM')) {
+        const titleEl = activeBlock.querySelector('.block-title');
+        const explEl = activeBlock.querySelector('.block-explanation');
+        const blockText = (titleEl ? titleEl.value : '') + '\n' + (explEl ? explEl.value : '');
+        const setsInfo = getBlockSetsInfo(activeBlockType, blockText);
+        if (setsInfo && setsInfo.numSets > 1) {
+          renderLrPerSetFields(setsInfo, prefill);
+          return;
+        }
+      }
 
       if (type === 'Time') {
         container.innerHTML = `
@@ -1107,6 +1175,63 @@
       }
     }
 
+    function renderLrPerSetFields(setsInfo, prefill) {
+      prefill = prefill || {};
+      const container = document.getElementById('lrScoreFields');
+      const unit = prefill.unit || 'kg';
+      const existingSets = (prefill.perSet && Array.isArray(prefill.sets)) ? prefill.sets : null;
+
+      lrPerSetScores = [];
+      for (let i = 0; i < setsInfo.numSets; i++) {
+        const existing = existingSets ? existingSets[i] : null;
+        lrPerSetScores.push({
+          weight: existing ? (existing.weight || '') : '',
+          done: existing ? (existing.done !== false) : true
+        });
+      }
+
+      const repsHint = setsInfo.reps ? `x${setsInfo.reps} reps` : '';
+
+      container.innerHTML = `
+        <label>CARICO PER SET${repsHint ? ' (' + repsHint + ')' : ''}</label>
+        <div class="form-row" style="margin-bottom: 8px;">
+          <div class="form-group" style="max-width: 110px;">
+            <select id="lrPerSetUnit">
+              <option value="kg" ${unit === 'kg' ? 'selected' : ''}>Kg</option>
+              <option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>Lbs</option>
+            </select>
+          </div>
+        </div>
+        <div class="lr-perset-list" id="lrPerSetList">
+          ${lrPerSetScores.map((s, i) => `
+            <div class="lr-perset-row">
+              <div class="lr-perset-label">Set ${i + 1}</div>
+              <div class="lr-perset-input-wrap">
+                <input type="text" inputmode="decimal" placeholder="Es. 80" value="${escapeHtml(s.weight)}" oninput="updateLrPerSetWeight(${i}, this.value)">
+                ${repsHint ? `<span class="lr-perset-reps-hint">${repsHint}</span>` : ''}
+              </div>
+              <button type="button" class="lr-perset-done-toggle ${s.done ? 'done' : ''}" onclick="toggleLrPerSetDone(${i})" title="Set completato">${s.done ? '✓' : '✕'}</button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function updateLrPerSetWeight(idx, value) {
+      if (lrPerSetScores[idx]) lrPerSetScores[idx].weight = value;
+    }
+
+    function toggleLrPerSetDone(idx) {
+      if (!lrPerSetScores[idx]) return;
+      lrPerSetScores[idx].done = !lrPerSetScores[idx].done;
+      const rows = document.querySelectorAll('#lrPerSetList .lr-perset-done-toggle');
+      const btn = rows[idx];
+      if (btn) {
+        btn.classList.toggle('done', lrPerSetScores[idx].done);
+        btn.textContent = lrPerSetScores[idx].done ? '✓' : '✕';
+      }
+    }
+
     function setLrCategory(cat) {
       lrCategory = cat;
       document.getElementById('lrBtnRx').classList.toggle('active', cat === 'RX');
@@ -1142,6 +1267,16 @@
       const type = document.getElementById('lrScoreType').value;
       let scoreDetail = {};
       let scoreDisplay = '';
+
+      const perSetList = document.getElementById('lrPerSetList');
+      if (type === 'Weight' && perSetList) {
+        const unit = document.getElementById('lrPerSetUnit').value;
+        const sets = lrPerSetScores.map((s, i) => ({ set: i + 1, weight: s.weight || '', done: s.done }));
+        scoreDetail = { perSet: true, unit, sets };
+        const filledWeights = sets.filter(s => s.weight).map(s => s.weight);
+        scoreDisplay = filledWeights.length ? `${filledWeights.join('/')} ${unit}` : `${sets.length} set`;
+        return { scoreType: type, scoreDetail, scoreDisplay };
+      }
 
       if (type === 'Time') {
         const min = document.getElementById('lrTimeMin').value || '0';
