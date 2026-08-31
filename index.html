@@ -55,6 +55,7 @@
       font-family: inherit;
     }
     textarea { resize: vertical; min-height: 90px; }
+    textarea.block-explanation { min-height: 160px; }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 
     .time-score-row { display: flex; align-items: center; gap: 8px; }
@@ -150,13 +151,6 @@
     <div class="card">
       <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
         <button type="button" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
-      </div>
-      
-      <div class="form-row" style="margin-bottom: 16px; justify-content: center;">
-        <div class="form-group" style="max-width: 250px; width: 100%; text-align: center;">
-          <label style="text-align: center;">DATA SESSIONE</label>
-          <input type="date" id="wodDate" style="text-align: center;">
-        </div>
       </div>
 
       <!-- Contenitore Dinamico Blocchi Multipli -->
@@ -288,6 +282,15 @@
       }
       el.value = digitsOnly;
     }
+
+    // Restituisce la data odierna in formato YYYY-MM-DD (fuso locale del dispositivo)
+    function getTodayDateString() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
     
     const CROSSFIT_STANDARD_RMS = [
       "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",
@@ -301,8 +304,6 @@
       "Row 500m (Tempo mm:ss)", "Row 2000m (Tempo mm:ss)", "Assault/Echo Bike 1000m (Tempo mm:ss)",
       "SkiErg 500m (Tempo mm:ss)", "Mile Run (1.6 km - Tempo mm:ss)"
     ];
-
-    document.getElementById('wodDate').valueAsDate = new Date();
 
     window.onload = function() {
       loadSavedLogos();
@@ -608,7 +609,7 @@
 
         <div class="form-group">
           <label>SPIEGAZIONE WOD</label>
-          <textarea class="block-explanation" rows="4" placeholder="Es. 21-15-9 Thrusters 40kg / Pull-ups">${escapeHtml(prefillExplanation)}</textarea>
+          <textarea class="block-explanation" rows="8" placeholder="Es. 21-15-9 Thrusters 40kg / Pull-ups">${escapeHtml(prefillExplanation)}</textarea>
         </div>
 
         <div class="form-group">
@@ -787,7 +788,7 @@
       const entry = {
         action: 'saveWodSession',
         id: String(Date.now()),
-        date: document.getElementById('wodDate').value,
+        date: getTodayDateString(),
         athlete: athleteName,
         mode: currentMode,
         blocks: blocksData
@@ -802,7 +803,6 @@
             
             document.getElementById('workoutBlocksContainer').innerHTML = '';
             blockCounter = 0;
-            document.getElementById('wodDate').valueAsDate = new Date();
             addWorkoutBlock();
             
             switchTab('storico');
