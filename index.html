@@ -104,6 +104,22 @@
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+
+    .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
+    .result-summary-box { background: rgba(46, 125, 50, 0.12); border: 1px solid #2e7d32; border-radius: 10px; padding: 12px; }
+    .result-summary-score { font-size: 15px; font-weight: 900; color: #4caf50; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .result-summary-cat { font-size: 10px; font-weight: 800; background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+    .result-summary-movements { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+    .result-summary-notes { font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px; }
+
+    .log-result-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 1000; padding: 16px; box-sizing: border-box; align-items: flex-start; justify-content: center; overflow-y: auto; }
+    .log-result-modal.active { display: flex; }
+    .log-result-card { background: var(--card-bg); border-radius: 14px; padding: 18px; border: 1px solid var(--border); width: 100%; max-width: 480px; margin-top: 24px; margin-bottom: 24px; }
+    .log-result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+
+    .tag-input-box { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .tag-chip { background: var(--input-bg); border: 1px solid var(--border); border-radius: 20px; padding: 4px 6px 4px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+    .tag-chip button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 2px 4px; }
   </style>
 </head>
 <body>
@@ -170,6 +186,10 @@
 
   <!-- TAB STORICO -->
   <div id="tab-storico" class="tab-content">
+    <div class="card">
+      <div class="card-title">🏆 RISULTATI LOGGATI</div>
+      <div id="resultsList">Caricamento in corso...</div>
+    </div>
     <div class="card">
       <div class="card-title">STORICO WOD PERSONALE</div>
       <div class="form-group">
@@ -249,15 +269,76 @@
     </div>
   </div>
 
+  <!-- MODAL LOG RESULT -->
+  <div id="logResultModal" class="log-result-modal">
+    <div class="log-result-card">
+      <div class="log-result-header">
+        <div class="card-title" style="margin-bottom: 0;">LOG RESULT</div>
+        <button type="button" class="btn-remove" style="height: 28px; padding: 0 10px;" onclick="closeLogResultModal()">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label>TIPO DI SCORE</label>
+        <select id="lrScoreType" onchange="renderLrScoreFields()">
+          <option value="Time">Time</option>
+          <option value="AMRAP">AMRAP (Rounds + Reps)</option>
+          <option value="Reps">Reps</option>
+          <option value="Weight">Weight</option>
+          <option value="Distance">Distance</option>
+          <option value="Calories">Calories</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="lrScoreFields"></div>
+
+      <div class="form-group">
+        <label>CATEGORIA</label>
+        <div class="rx-scaled-toggle">
+          <div id="lrBtnRx" class="rx-btn active" onclick="setLrCategory('RX')">✓ RX</div>
+          <div id="lrBtnScaled" class="rx-btn" onclick="setLrCategory('SCALED')">SCALED</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>MOVIMENTI COINVOLTI</label>
+        <div id="lrMovementsTags" class="tag-input-box"></div>
+        <input type="text" id="lrMovementInput" placeholder="Scrivi un movimento e premi Invio" onkeydown="handleMovementInputKeydown(event)">
+      </div>
+
+      <div class="form-group">
+        <label>NOTE (facoltativo)</label>
+        <textarea id="lrNotes" rows="3" placeholder="Es. Ottime sensazioni, ridotto il peso alla terza serie..."></textarea>
+      </div>
+
+      <button class="btn-main" onclick="saveLogResult()">SALVA RISULTATO</button>
+    </div>
+  </div>
+
   <input type="file" id="globalImageInput" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
 
   <script>
     let currentMode = 'RX';
     let cropper = null;
-    let globalData = { wods: [], athletes: [], massimali: [] };
+    let globalData = { wods: [], athletes: [], massimali: [], results: [] };
     let blockCounter = 0;
     let activeBlockIdForScan = null;
     let pendingCropFile = null;
+
+    // Risultati (Log Result) associati ai blocchi della sessione corrente, indicizzati per blockId.
+    let blockResults = {};
+    let lrActiveBlockId = null;
+    let lrCategory = 'RX';
+    let lrMovements = [];
+
+    // Movimenti CrossFit comuni usati per suggerire automaticamente i "movimenti coinvolti"
+    // leggendo titolo e spiegazione del blocco quando si apre il Log Result.
+    const COMMON_MOVEMENTS = [
+      'Thruster', 'Pull-up', 'Chest-to-Bar', 'Push-up', 'Burpee', 'Box Jump', 'Wall Ball',
+      'Kettlebell Swing', 'Row', 'Run', 'Double Under', 'Air Squat', 'Front Squat', 'Back Squat',
+      'Overhead Squat', 'Deadlift', 'Snatch', 'Clean', 'Jerk', 'Push Press', 'Push Jerk',
+      'Split Jerk', 'Lunge', 'Sit-up', 'Toes to Bar', 'Muscle-up', 'Handstand Push-up',
+      'Handstand Walk', 'Rope Climb', 'Bike', 'Ski Erg', 'Plank', 'Devil Press', 'Farmer Carry'
+    ];
 
     function escapeHtml(str) {
       return String(str)
@@ -312,129 +393,6 @@
       return `${y}-${m}-${d}`;
     }
 
-    // Cerca nel testo OCR un pattern aggregato tipo "N sets x M reps" / "N serie x M" / "NxM"
-    // e restituisce { numSets, reps } se trovato, altrimenti null.
-    function parseSetsInfo(text) {
-      if (!text) return null;
-      const patterns = [
-        /(\d{1,2})\s*(?:sets?|serie)\s*(?:x|di|of)\s*(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)?/i,
-        /(\d{1,2})\s*x\s*(\d{1,3})\s*(?:reps?|rip\.?|ripetizioni)?/i
-      ];
-      for (const p of patterns) {
-        const m = text.match(p);
-        if (m) {
-          const numSets = parseInt(m[1], 10);
-          const reps = parseInt(m[2], 10);
-          if (numSets > 0 && numSets <= 30 && reps > 0 && reps <= 999) {
-            return { numSets, reps };
-          }
-        }
-      }
-      return null;
-    }
-
-    // Genera automaticamente N righe di score numerate per un blocco di tipo Sets,
-    // precompilate con le reps rilevate e il nome del movimento (dal titolo).
-    function populateSetsScoreRows(blockId, numSets, reps, movementName) {
-      const block = document.getElementById(`workout-block-${blockId}`);
-      if (!block) return;
-      const containerEl = block.querySelector('.block-score-inputs-container');
-      if (!containerEl) return;
-
-      containerEl.innerHTML = '';
-      for (let i = 1; i <= numSets; i++) {
-        const setLabel = reps ? `Set ${i} x${reps}` : `Set ${i}`;
-        const row = document.createElement('div');
-        row.className = 'exercise-row block-score-row';
-        row.innerHTML = `
-          <input type="text" placeholder="Set/Reps" value="${escapeHtml(setLabel)}">
-          <input type="text" placeholder="Esercizio" value="${escapeHtml(movementName || '')}">
-          <input type="text" placeholder="Kg / Carico" value="">
-          <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-        `;
-        containerEl.appendChild(row);
-      }
-
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'btn-add';
-      addBtn.innerText = '+ Aggiungi Serie/Carico';
-      addBtn.onclick = () => addScoreRow(blockId);
-      containerEl.appendChild(addBtn);
-    }
-
-    // Individua righe "a set singolo" nel testo OCR (una riga = un set), tipico dei WOD
-    // di forza dove ogni set ha reps/percentuale scritte esplicitamente riga per riga.
-    function detectSetLines(lines, titleLineIndex) {
-      const setLines = [];
-      lines.forEach((line, idx) => {
-        if (idx === titleLineIndex) return;
-        // Salta righe tipo "REST 2 MINUTES BETWEEN SETS"
-        if (/rest\s+\d+\s*(minute|min|second|sec)/i.test(line)) return;
-        // Salta intestazioni tipo/keyword brevi
-        if (/^(AMRAP|FOR TIME|EMOM|ROUND|WOD|-)/i.test(line) && line.length < 15 && !line.includes('%')) return;
-        // Una riga è "un set" se contiene una percentuale o inizia con un numero (es. reps)
-        if (/%/.test(line) || /^\d+/.test(line)) {
-          setLines.push(line);
-        }
-      });
-      return setLines;
-    }
-
-    // Genera una riga di score per ciascuna riga-set individuata, calcolando il peso
-    // dalla percentuale specifica di quella riga (se un massimale corrispondente esiste).
-    function populateSetLinesScoreRows(blockId, setLines, fallbackMovementName) {
-      const block = document.getElementById(`workout-block-${blockId}`);
-      if (!block) return;
-      const containerEl = block.querySelector('.block-score-inputs-container');
-      if (!containerEl) return;
-
-      const athleteName = localStorage.getItem('activeAthlete') || '';
-      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
-      const STOPWORDS = new Set(['di', 'e', 'a', 'the', 'of']);
-
-      containerEl.innerHTML = '';
-
-      setLines.forEach((line, i) => {
-        let weightStr = '';
-        const percentMatch = line.match(/(\d{2,3})\s*%/);
-        if (percentMatch) {
-          const percentage = parseInt(percentMatch[1], 10);
-          const matchedRm = athleteMaxs.find(m => {
-            const words = m.movement.toLowerCase().split(' ')
-              .filter(w => w.length > 2 && !STOPWORDS.has(w));
-            return words.some(word => line.toLowerCase().includes(word));
-          });
-          if (matchedRm && !isNaN(matchedRm.weight)) {
-            const calculatedWeight = Math.round((parseFloat(matchedRm.weight) * percentage) / 100);
-            weightStr = `${calculatedWeight} kg (${percentage}%)`;
-          } else {
-            weightStr = `${percentage}%`;
-          }
-        } else {
-          const kgMatch = line.match(/(\d+)\s*(?:kg|lbs)/i);
-          if (kgMatch) weightStr = kgMatch[0];
-        }
-
-        const row = document.createElement('div');
-        row.className = 'exercise-row block-score-row';
-        row.innerHTML = `
-          <input type="text" placeholder="Set/Reps" value="${escapeHtml('Set ' + (i + 1))}">
-          <input type="text" placeholder="Esercizio" value="${escapeHtml(fallbackMovementName || '')}">
-          <input type="text" placeholder="Kg / Carico" value="${escapeHtml(weightStr)}">
-          <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-        `;
-        containerEl.appendChild(row);
-      });
-
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'btn-add';
-      addBtn.innerText = '+ Aggiungi Serie/Carico';
-      addBtn.onclick = () => addScoreRow(blockId);
-      containerEl.appendChild(addBtn);
-    }
-    
     const CROSSFIT_STANDARD_RMS = [
       "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",
       "Clean and Jerk", "Hang Clean", "Back Squat", "Front Squat",
@@ -500,8 +458,10 @@
         const res = await fetch(url + "?action=getData");
         if (res.ok) {
           globalData = await res.json();
+          globalData.results = globalData.results || [];
           updateConnectionIndicator(true);
           renderHistory();
+          renderResultsList();
           loadLocalMassimaliAndProfile();
         }
       } catch (err) {
@@ -737,7 +697,7 @@
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
             <label>TIPO</label>
-            <select class="block-type" onchange="updateBlockScoreLabel(${currentId})">
+            <select class="block-type">
               <option value="For Time" ${prefillType === 'For Time' ? 'selected' : ''}>For Time</option>
               <option value="AMRAP" ${prefillType === 'AMRAP' ? 'selected' : ''}>AMRAP</option>
               <option value="Sets" ${prefillType === 'Sets' ? 'selected' : ''}>Sets / Strength</option>
@@ -756,86 +716,12 @@
         </div>
 
         <div class="form-group">
-          <label class="block-score-label">SCORE / RISULTATO PARZIALE</label>
-          <div class="block-score-inputs-container"></div>
+          <label>RISULTATO</label>
+          <div class="result-summary" id="result-summary-${currentId}"></div>
         </div>
       `;
       container.appendChild(blockDiv);
-      updateBlockScoreLabel(currentId);
-    }
-
-    function updateBlockScoreLabel(blockId) {
-      const block = document.getElementById(`workout-block-${blockId}`);
-      if (!block) return;
-      const typeSelect = block.querySelector('.block-type');
-      const labelEl = block.querySelector('.block-score-label');
-      const containerEl = block.querySelector('.block-score-inputs-container');
-      
-      const selectedType = typeSelect.value;
-      
-      if (selectedType === 'Sets') {
-        labelEl.innerText = "RISULTATO (SERIE E CARICHI)";
-        containerEl.innerHTML = `
-          <div class="exercise-row block-score-row">
-            <input type="text" placeholder="Set/Reps" value="">
-            <input type="text" placeholder="Esercizio" value="">
-            <input type="text" placeholder="Kg / Carico" value="">
-            <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-          </div>
-          <button type="button" class="btn-add" onclick="addScoreRow(${blockId})">+ Aggiungi Serie/Carico</button>
-        `;
-      } else if (selectedType === 'For Time') {
-        labelEl.innerText = "SCORE / TEMPO IMPIEGATO";
-        containerEl.innerHTML = `
-          <div class="time-score-row">
-            <div class="time-score-col">
-              <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
-                     class="block-time-min" placeholder="0"
-                     oninput="sanitizeIntInput(this)">
-              <div class="time-score-unit">Minuti</div>
-            </div>
-            <div class="time-score-sep">:</div>
-            <div class="time-score-col">
-              <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2"
-                     class="block-time-sec" placeholder="00"
-                     oninput="sanitizeIntInput(this, 59)">
-              <div class="time-score-unit">Secondi</div>
-            </div>
-          </div>
-        `;
-      } else {
-        if (selectedType === 'AMRAP') {
-          labelEl.innerText = "SCORE / ROUNDS & REPS";
-        } else if (selectedType === 'EMOM') {
-          labelEl.innerText = "SCORE / COMPLETATO O NOTE";
-        } else {
-          labelEl.innerText = "SCORE / RISULTATO PARZIALE";
-        }
-        containerEl.innerHTML = `
-          <input type="text" class="block-result" placeholder="Es. 5 rounds + 3 reps" value="">
-        `;
-      }
-    }
-
-    function addScoreRow(blockId, prefillReps = "", prefillName = "", prefillWeight = "") {
-      const block = document.getElementById(`workout-block-${blockId}`);
-      if (!block) return;
-      const containerEl = block.querySelector('.block-score-inputs-container');
-      const addBtn = containerEl.querySelector('.btn-add');
-      
-      const row = document.createElement('div');
-      row.className = 'exercise-row block-score-row';
-      row.innerHTML = `
-        <input type="text" placeholder="Set/Reps" value="${escapeHtml(prefillReps)}">
-        <input type="text" placeholder="Esercizio" value="${escapeHtml(prefillName)}">
-        <input type="text" placeholder="Kg / Carico" value="${escapeHtml(prefillWeight)}">
-        <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
-      `;
-      if (addBtn) {
-        containerEl.insertBefore(row, addBtn);
-      } else {
-        containerEl.appendChild(row);
-      }
+      renderBlockResultSummary(currentId);
     }
 
     function parseAndFillBlock(blockId, text) {
@@ -849,7 +735,6 @@
       else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY') || upperText.includes('1 RM')) type = 'Sets';
 
       block.querySelector('.block-type').value = type;
-      updateBlockScoreLabel(blockId);
 
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
@@ -880,23 +765,8 @@
         explanationEl.value = explanationText; // .value, non serve escaping
       }
 
-      // Per i blocchi di tipo Sets/Strength, prova prima a riconoscere righe-set individuali
-      // (una riga = un set, tipico dei WOD di forza con % diverse per ogni set, es. Power Snatch + Snatch).
-      if (type === 'Sets') {
-        const setLines = detectSetLines(lines, titleLineIndex);
-        if (setLines.length >= 2) {
-          populateSetLinesScoreRows(blockId, setLines, titleCandidate);
-        } else {
-          // Fallback: prova il pattern aggregato "N sets x M reps"
-          const setsInfo = parseSetsInfo(text);
-          if (setsInfo) {
-            populateSetsScoreRows(blockId, setsInfo.numSets, setsInfo.reps, titleCandidate);
-          }
-          // Se nessuno dei due matcha, resta la riga singola vuota già predisposta
-          // da updateBlockScoreLabel(blockId) sopra.
-        }
-      }
-      // Per gli altri tipi lo score resta vuoto/editabile a mano (min/sec per For Time).
+      // Il risultato ora si registra tramite il pulsante "Log Result" del blocco,
+      // non viene più precompilato riga per riga dall'OCR.
     }
 
     async function saveWodSession() {
@@ -909,36 +779,16 @@
 
       let blocksData = [];
       blockElements.forEach(block => {
+        const blockIdAttr = block.id.replace('workout-block-', '');
         const type = block.querySelector('.block-type').value;
         const title = block.querySelector('.block-title').value || 'WOD';
         const explanationEl = block.querySelector('.block-explanation');
         const explanation = explanationEl ? explanationEl.value : '';
-        
-        let result = '';
-        if (type === 'Sets') {
-          let scoreRowsData = [];
-          block.querySelectorAll('.block-score-row').forEach(row => {
-            const inputs = row.querySelectorAll('input');
-            if(inputs[1] && inputs[1].value.trim() !== '') {
-              scoreRowsData.push({ reps: inputs[0].value, name: inputs[1].value, weight: inputs[2] ? inputs[2].value : '' });
-            }
-          });
-          result = scoreRowsData;
-        } else if (type === 'For Time') {
-          const minEl = block.querySelector('.block-time-min');
-          const secEl = block.querySelector('.block-time-sec');
-          const minVal = minEl && minEl.value !== '' ? parseInt(minEl.value, 10) : null;
-          const secVal = secEl && secEl.value !== '' ? parseInt(secEl.value, 10) : null;
-          if (minVal !== null || secVal !== null) {
-            const m = minVal !== null && !isNaN(minVal) ? minVal : 0;
-            const s = secVal !== null && !isNaN(secVal) ? secVal : 0;
-            result = `${m}:${String(s).padStart(2, '0')}`;
-          } else {
-            result = '';
-          }
-        } else {
-          result = block.querySelector('.block-result') ? block.querySelector('.block-result').value : '';
-        }
+
+        // Il risultato del blocco viene ora registrato tramite "Log Result" (vedi blockResults).
+        // Qui manteniamo solo il valore testuale sintetico per compatibilità con lo storico esistente.
+        const loggedResult = blockResults[blockIdAttr];
+        const result = loggedResult ? loggedResult.scoreDisplay : '';
 
         blocksData.push({ type, title, explanation, result });
       });
@@ -961,8 +811,9 @@
             
             document.getElementById('workoutBlocksContainer').innerHTML = '';
             blockCounter = 0;
+            blockResults = {};
             addWorkoutBlock();
-            
+
             switchTab('storico');
           } else {
             alert('Errore durante il salvataggio sul cloud.');
@@ -1092,14 +943,326 @@
       historyList.innerHTML = html;
     }
 
+    // ===================== LOG RESULT (risultato per singolo workout) =====================
+
+    // Scandisce titolo e spiegazione del blocco per suggerire automaticamente i movimenti coinvolti.
+    function guessMovementsFromBlock(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return [];
+      const titleEl = block.querySelector('.block-title');
+      const explEl = block.querySelector('.block-explanation');
+      const text = ((titleEl ? titleEl.value : '') + ' ' + (explEl ? explEl.value : '')).toLowerCase();
+      const found = [];
+      COMMON_MOVEMENTS.forEach(mv => {
+        if (text.includes(mv.toLowerCase()) && !found.includes(mv)) found.push(mv);
+      });
+      return found;
+    }
+
+    function openLogResultModal(blockId) {
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) { alert('Effettua prima il login con il tuo profilo atleta!'); return; }
+
+      lrActiveBlockId = blockId;
+      const existing = blockResults[blockId];
+      const block = document.getElementById(`workout-block-${blockId}`);
+      const blockType = block ? block.querySelector('.block-type').value : 'For Time';
+
+      const defaultTypeMap = { 'For Time': 'Time', 'AMRAP': 'AMRAP', 'Sets': 'Weight', 'EMOM': 'Time' };
+      document.getElementById('lrScoreType').value = existing ? existing.scoreType : (defaultTypeMap[blockType] || 'Time');
+
+      lrMovements = existing ? existing.movements.slice() : guessMovementsFromBlock(blockId);
+      renderLrMovementsTags();
+      document.getElementById('lrMovementInput').value = '';
+
+      setLrCategory(existing ? existing.category : currentMode);
+
+      document.getElementById('lrNotes').value = existing ? (existing.notes || '') : '';
+
+      renderLrScoreFields(existing ? existing.scoreDetail : null);
+
+      document.getElementById('logResultModal').classList.add('active');
+    }
+
+    function closeLogResultModal() {
+      document.getElementById('logResultModal').classList.remove('active');
+      lrActiveBlockId = null;
+    }
+
+    function renderLrScoreFields(prefill) {
+      prefill = prefill || {};
+      const type = document.getElementById('lrScoreType').value;
+      const container = document.getElementById('lrScoreFields');
+
+      if (type === 'Time') {
+        container.innerHTML = `
+          <label>TEMPO IMPIEGATO</label>
+          <div class="time-score-row">
+            <div class="time-score-col">
+              <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" id="lrTimeMin" placeholder="0" value="${escapeHtml(prefill.minutes || '')}" oninput="sanitizeIntInput(this)">
+              <div class="time-score-unit">Minuti</div>
+            </div>
+            <div class="time-score-sep">:</div>
+            <div class="time-score-col">
+              <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" id="lrTimeSec" placeholder="00" value="${escapeHtml(prefill.seconds || '')}" oninput="sanitizeIntInput(this, 59)">
+              <div class="time-score-unit">Secondi</div>
+            </div>
+          </div>
+        `;
+      } else if (type === 'AMRAP') {
+        container.innerHTML = `
+          <label>ROUNDS + REPS</label>
+          <div class="form-row">
+            <div class="form-group"><input type="text" inputmode="numeric" pattern="[0-9]*" id="lrRounds" placeholder="Rounds" value="${escapeHtml(prefill.rounds || '')}" oninput="sanitizeIntInput(this)"></div>
+            <div class="form-group"><input type="text" inputmode="numeric" pattern="[0-9]*" id="lrExtraReps" placeholder="Reps extra" value="${escapeHtml(prefill.reps || '')}" oninput="sanitizeIntInput(this)"></div>
+          </div>
+        `;
+      } else if (type === 'Reps') {
+        container.innerHTML = `
+          <label>REPS TOTALI</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="lrReps" placeholder="Es. 120" value="${escapeHtml(prefill.reps || '')}" oninput="sanitizeIntInput(this)">
+        `;
+      } else if (type === 'Weight') {
+        container.innerHTML = `
+          <label>CARICO</label>
+          <div class="form-row">
+            <div class="form-group"><input type="text" id="lrWeight" placeholder="Es. 80" value="${escapeHtml(prefill.weight || '')}"></div>
+            <div class="form-group" style="max-width: 110px;">
+              <select id="lrWeightUnit">
+                <option value="kg" ${(!prefill.unit || prefill.unit === 'kg') ? 'selected' : ''}>Kg</option>
+                <option value="lbs" ${prefill.unit === 'lbs' ? 'selected' : ''}>Lbs</option>
+              </select>
+            </div>
+          </div>
+        `;
+      } else if (type === 'Distance') {
+        container.innerHTML = `
+          <label>DISTANZA</label>
+          <div class="form-row">
+            <div class="form-group"><input type="text" id="lrDistance" placeholder="Es. 5" value="${escapeHtml(prefill.distance || '')}"></div>
+            <div class="form-group" style="max-width: 110px;">
+              <select id="lrDistanceUnit">
+                <option value="m" ${(!prefill.unit || prefill.unit === 'm') ? 'selected' : ''}>Metri</option>
+                <option value="km" ${prefill.unit === 'km' ? 'selected' : ''}>Km</option>
+              </select>
+            </div>
+          </div>
+        `;
+      } else if (type === 'Calories') {
+        container.innerHTML = `
+          <label>CALORIE</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="lrCalories" placeholder="Es. 250" value="${escapeHtml(prefill.calories || '')}" oninput="sanitizeIntInput(this)">
+        `;
+      }
+    }
+
+    function setLrCategory(cat) {
+      lrCategory = cat;
+      document.getElementById('lrBtnRx').classList.toggle('active', cat === 'RX');
+      document.getElementById('lrBtnScaled').classList.toggle('active', cat === 'SCALED');
+    }
+
+    function renderLrMovementsTags() {
+      const box = document.getElementById('lrMovementsTags');
+      box.innerHTML = lrMovements.map((m, i) => `
+        <span class="tag-chip">${escapeHtml(m)} <button type="button" onclick="removeLrMovement(${i})">✕</button></span>
+      `).join('');
+    }
+
+    function removeLrMovement(idx) {
+      lrMovements.splice(idx, 1);
+      renderLrMovementsTags();
+    }
+
+    function handleMovementInputKeydown(evt) {
+      if (evt.key === 'Enter' || evt.key === ',') {
+        evt.preventDefault();
+        const input = evt.target;
+        const val = input.value.trim().replace(/,$/, '');
+        if (val && !lrMovements.includes(val)) {
+          lrMovements.push(val);
+          renderLrMovementsTags();
+        }
+        input.value = '';
+      }
+    }
+
+    function buildLrScoreResult() {
+      const type = document.getElementById('lrScoreType').value;
+      let scoreDetail = {};
+      let scoreDisplay = '';
+
+      if (type === 'Time') {
+        const min = document.getElementById('lrTimeMin').value || '0';
+        const sec = (document.getElementById('lrTimeSec').value || '0').padStart(2, '0');
+        scoreDetail = { minutes: min, seconds: sec };
+        scoreDisplay = `${min}:${sec}`;
+      } else if (type === 'AMRAP') {
+        const rounds = document.getElementById('lrRounds').value || '0';
+        const reps = document.getElementById('lrExtraReps').value || '0';
+        scoreDetail = { rounds, reps };
+        scoreDisplay = `${rounds} rounds${reps && reps !== '0' ? ' + ' + reps + ' reps' : ''}`;
+      } else if (type === 'Reps') {
+        const reps = document.getElementById('lrReps').value || '';
+        scoreDetail = { reps };
+        scoreDisplay = `${reps} reps`;
+      } else if (type === 'Weight') {
+        const weight = document.getElementById('lrWeight').value || '';
+        const unit = document.getElementById('lrWeightUnit').value;
+        scoreDetail = { weight, unit };
+        scoreDisplay = `${weight} ${unit}`;
+      } else if (type === 'Distance') {
+        const distance = document.getElementById('lrDistance').value || '';
+        const unit = document.getElementById('lrDistanceUnit').value;
+        scoreDetail = { distance, unit };
+        scoreDisplay = `${distance} ${unit}`;
+      } else if (type === 'Calories') {
+        const calories = document.getElementById('lrCalories').value || '';
+        scoreDetail = { calories };
+        scoreDisplay = `${calories} cal`;
+      }
+
+      return { scoreType: type, scoreDetail, scoreDisplay };
+    }
+
+    async function saveLogResult() {
+      if (lrActiveBlockId === null) return;
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) { alert('Effettua prima il login con il tuo profilo atleta!'); return; }
+
+      const block = document.getElementById(`workout-block-${lrActiveBlockId}`);
+      const blockType = block ? block.querySelector('.block-type').value : '';
+      const blockTitle = block ? (block.querySelector('.block-title').value || 'WOD') : 'WOD';
+
+      const { scoreType, scoreDetail, scoreDisplay } = buildLrScoreResult();
+      const existing = blockResults[lrActiveBlockId];
+      const resultId = existing ? existing.id : `${Date.now()}-${lrActiveBlockId}`;
+
+      const result = {
+        id: resultId,
+        athlete: athleteName,
+        date: getTodayDateString(),
+        workout: blockTitle,
+        workoutType: blockType,
+        scoreType,
+        scoreDetail,
+        scoreDisplay,
+        category: lrCategory,
+        movements: lrMovements.slice(),
+        notes: document.getElementById('lrNotes').value.trim()
+      };
+
+      blockResults[lrActiveBlockId] = result;
+      renderBlockResultSummary(lrActiveBlockId);
+      closeLogResultModal();
+
+      const url = getScriptUrl();
+      if (url) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({
+              action: 'logResult',
+              id: result.id,
+              athlete: result.athlete,
+              date: result.date,
+              workout: result.workout,
+              workoutType: result.workoutType,
+              scoreType: result.scoreType,
+              score: result.scoreDisplay,
+              category: result.category,
+              movements: result.movements.join(', '),
+              notes: result.notes
+            })
+          });
+        } catch (err) {
+          console.error('Errore salvataggio Log Result sul cloud:', err);
+        }
+      }
+
+      globalData.results = globalData.results || [];
+      const idx = globalData.results.findIndex(r => String(r.id) === String(result.id));
+      if (idx >= 0) { globalData.results[idx] = result; } else { globalData.results.unshift(result); }
+      renderResultsList();
+    }
+
+    function renderBlockResultSummary(blockId) {
+      const box = document.getElementById(`result-summary-${blockId}`);
+      if (!box) return;
+      const r = blockResults[blockId];
+      if (!r) {
+        box.innerHTML = `<button type="button" class="btn-log-result" onclick="openLogResultModal(${blockId})">🏆 Log Result</button>`;
+        return;
+      }
+      box.innerHTML = `
+        <div class="result-summary-box">
+          <div class="result-summary-score">🏆 ${escapeHtml(r.scoreDisplay)} <span class="result-summary-cat">${escapeHtml(r.category)}</span></div>
+          ${r.movements && r.movements.length ? `<div class="result-summary-movements">${escapeHtml(r.movements.join(', '))}</div>` : ''}
+          ${r.notes ? `<div class="result-summary-notes">"${escapeHtml(r.notes)}"</div>` : ''}
+          <button type="button" class="btn-secondary" style="margin-top: 8px; padding: 6px 10px; font-size: 11px;" onclick="openLogResultModal(${blockId})">Modifica Risultato</button>
+        </div>
+      `;
+    }
+
+    function renderResultsList() {
+      const container = document.getElementById('resultsList');
+      if (!container) return;
+
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      const results = (globalData.results || []).filter(r =>
+        r.athlete && r.athlete.toLowerCase() === (activeAthlete || '').toLowerCase()
+      );
+
+      if (results.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun risultato loggato.</p>';
+        return;
+      }
+
+      const sorted = results.slice().sort((a, b) => (String(b.id) > String(a.id) ? 1 : -1));
+      container.innerHTML = sorted.map(r => {
+        const movementsArr = Array.isArray(r.movements) ? r.movements : (r.movements ? String(r.movements).split(',').map(s => s.trim()).filter(Boolean) : []);
+        return `
+          <div class="history-item">
+            <div class="history-item-header">
+              <div>
+                <span style="background: ${r.category === 'SCALED' ? 'var(--input-bg)' : 'var(--accent)'}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(r.category || '')}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(r.date))}</span>
+              </div>
+              <button class="btn-delete-history" onclick="deleteResult('${String(r.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+            </div>
+            <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${escapeHtml(r.workout || '')} ${r.workoutType ? '(' + escapeHtml(r.workoutType) + ')' : ''}</div>
+            <div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">🏆 ${escapeHtml(r.scoreDisplay || '')} <span style="color: var(--text-muted); font-weight: 600; font-size: 11px;">(${escapeHtml(r.scoreType || '')})</span></div>
+            ${movementsArr.length ? `<div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">${escapeHtml(movementsArr.join(', '))}</div>` : ''}
+            ${r.notes ? `<div style="margin-top: 4px; font-size: 12px; color: var(--text-muted); font-style: italic;">"${escapeHtml(r.notes)}"</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function deleteResult(id) {
+      if (!confirm('Vuoi davvero eliminare questo risultato?')) return;
+
+      const url = getScriptUrl();
+      if (url) {
+        try {
+          await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'deleteResult', id: String(id) }) });
+        } catch (err) {
+          console.error('Errore eliminazione risultato dal cloud:', err);
+        }
+      }
+
+      globalData.results = (globalData.results || []).filter(r => String(r.id) !== String(id));
+      renderResultsList();
+    }
+
     function switchTab(tab) {
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      
+
       const map = { 'registra': 0, 'storico': 1, 'atleta': 2, 'impostazioni': 3 };
       document.querySelectorAll('.nav button')[map[tab]].classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
-      if (tab === 'storico') renderHistory();
+      if (tab === 'storico') { renderHistory(); renderResultsList(); }
     }
 
     function setMode(mode) {
