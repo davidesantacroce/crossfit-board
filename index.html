@@ -271,15 +271,12 @@
     function formatDateForDisplay(dateStr) {
       if (!dateStr) return '';
 
-      // Caso semplice: già in formato YYYY-MM-DD puro (nessuna T/ora)
       const simpleMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (simpleMatch) {
         const [, y, m, d] = simpleMatch;
         return `${d}/${m}/${y}`;
       }
 
-      // Caso timestamp ISO completo: lo interpretiamo come istante UTC e lo
-      // convertiamo nell'ora locale del dispositivo.
       const parsed = new Date(dateStr);
       if (!isNaN(parsed.getTime())) {
         const d = String(parsed.getDate()).padStart(2, '0');
@@ -296,7 +293,7 @@
     function sanitizeIntInput(el, max) {
       let digitsOnly = el.value.replace(/[^\d]/g, '');
       if (digitsOnly.length > 1) {
-        digitsOnly = digitsOnly.replace(/^0+(?=\d)/, ''); // rimuove zeri iniziali superflui
+        digitsOnly = digitsOnly.replace(/^0+(?=\d)/, '');
       }
       if (digitsOnly !== '') {
         let num = parseInt(digitsOnly, 10);
@@ -315,7 +312,7 @@
       return `${y}-${m}-${d}`;
     }
 
-    // Cerca nel testo OCR un pattern tipo "N sets x M reps" / "N serie x M" / "NxM"
+    // Cerca nel testo OCR un pattern aggregato tipo "N sets x M reps" / "N serie x M" / "NxM"
     // e restituisce { numSets, reps } se trovato, altrimenti null.
     function parseSetsInfo(text) {
       if (!text) return null;
@@ -357,6 +354,78 @@
         `;
         containerEl.appendChild(row);
       }
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'btn-add';
+      addBtn.innerText = '+ Aggiungi Serie/Carico';
+      addBtn.onclick = () => addScoreRow(blockId);
+      containerEl.appendChild(addBtn);
+    }
+
+    // Individua righe "a set singolo" nel testo OCR (una riga = un set), tipico dei WOD
+    // di forza dove ogni set ha reps/percentuale scritte esplicitamente riga per riga.
+    function detectSetLines(lines, titleLineIndex) {
+      const setLines = [];
+      lines.forEach((line, idx) => {
+        if (idx === titleLineIndex) return;
+        // Salta righe tipo "REST 2 MINUTES BETWEEN SETS"
+        if (/rest\s+\d+\s*(minute|min|second|sec)/i.test(line)) return;
+        // Salta intestazioni tipo/keyword brevi
+        if (/^(AMRAP|FOR TIME|EMOM|ROUND|WOD|-)/i.test(line) && line.length < 15 && !line.includes('%')) return;
+        // Una riga è "un set" se contiene una percentuale o inizia con un numero (es. reps)
+        if (/%/.test(line) || /^\d+/.test(line)) {
+          setLines.push(line);
+        }
+      });
+      return setLines;
+    }
+
+    // Genera una riga di score per ciascuna riga-set individuata, calcolando il peso
+    // dalla percentuale specifica di quella riga (se un massimale corrispondente esiste).
+    function populateSetLinesScoreRows(blockId, setLines, fallbackMovementName) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
+      const containerEl = block.querySelector('.block-score-inputs-container');
+      if (!containerEl) return;
+
+      const athleteName = localStorage.getItem('activeAthlete') || '';
+      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
+      const STOPWORDS = new Set(['di', 'e', 'a', 'the', 'of']);
+
+      containerEl.innerHTML = '';
+
+      setLines.forEach((line, i) => {
+        let weightStr = '';
+        const percentMatch = line.match(/(\d{2,3})\s*%/);
+        if (percentMatch) {
+          const percentage = parseInt(percentMatch[1], 10);
+          const matchedRm = athleteMaxs.find(m => {
+            const words = m.movement.toLowerCase().split(' ')
+              .filter(w => w.length > 2 && !STOPWORDS.has(w));
+            return words.some(word => line.toLowerCase().includes(word));
+          });
+          if (matchedRm && !isNaN(matchedRm.weight)) {
+            const calculatedWeight = Math.round((parseFloat(matchedRm.weight) * percentage) / 100);
+            weightStr = `${calculatedWeight} kg (${percentage}%)`;
+          } else {
+            weightStr = `${percentage}%`;
+          }
+        } else {
+          const kgMatch = line.match(/(\d+)\s*(?:kg|lbs)/i);
+          if (kgMatch) weightStr = kgMatch[0];
+        }
+
+        const row = document.createElement('div');
+        row.className = 'exercise-row block-score-row';
+        row.innerHTML = `
+          <input type="text" placeholder="Set/Reps" value="${escapeHtml('Set ' + (i + 1))}">
+          <input type="text" placeholder="Esercizio" value="${escapeHtml(fallbackMovementName || '')}">
+          <input type="text" placeholder="Kg / Carico" value="${escapeHtml(weightStr)}">
+          <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+        `;
+        containerEl.appendChild(row);
+      });
 
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
@@ -811,15 +880,21 @@
         explanationEl.value = explanationText; // .value, non serve escaping
       }
 
-      // Per i blocchi di tipo Sets/Strength, prova a riconoscere "N sets x M reps"
-      // nel testo OCR e genera automaticamente le righe di score da compilare.
+      // Per i blocchi di tipo Sets/Strength, prova prima a riconoscere righe-set individuali
+      // (una riga = un set, tipico dei WOD di forza con % diverse per ogni set, es. Power Snatch + Snatch).
       if (type === 'Sets') {
-        const setsInfo = parseSetsInfo(text);
-        if (setsInfo) {
-          populateSetsScoreRows(blockId, setsInfo.numSets, setsInfo.reps, titleCandidate);
+        const setLines = detectSetLines(lines, titleLineIndex);
+        if (setLines.length >= 2) {
+          populateSetLinesScoreRows(blockId, setLines, titleCandidate);
+        } else {
+          // Fallback: prova il pattern aggregato "N sets x M reps"
+          const setsInfo = parseSetsInfo(text);
+          if (setsInfo) {
+            populateSetsScoreRows(blockId, setsInfo.numSets, setsInfo.reps, titleCandidate);
+          }
+          // Se nessuno dei due matcha, resta la riga singola vuota già predisposta
+          // da updateBlockScoreLabel(blockId) sopra.
         }
-        // Se non trovato nessun pattern, resta la riga singola vuota già predisposta
-        // da updateBlockScoreLabel(blockId) sopra.
       }
       // Per gli altri tipi lo score resta vuoto/editabile a mano (min/sec per For Time).
     }
