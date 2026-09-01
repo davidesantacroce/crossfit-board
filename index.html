@@ -282,10 +282,6 @@
   <!-- TAB STORICO -->
   <div id="tab-storico" class="tab-content">
     <div class="card">
-      <div class="card-title">🏆 RISULTATI LOGGATI</div>
-      <div id="resultsList">Caricamento in corso...</div>
-    </div>
-    <div class="card">
       <div class="card-title">STORICO WOD PERSONALE</div>
       <div class="form-group">
         <input type="text" id="searchWod" placeholder="🔍 Cerca WOD..." oninput="renderHistory()">
@@ -477,7 +473,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v16";
+    const APP_VERSION = "v17";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -793,7 +789,6 @@
           globalData.results = globalData.results || [];
           updateConnectionIndicator(true);
           renderHistory();
-          renderResultsList();
           renderActiveDaysChart();
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
@@ -2500,7 +2495,6 @@
       globalData.results = globalData.results || [];
       const idx = globalData.results.findIndex(r => String(r.id) === String(result.id));
       if (idx >= 0) { globalData.results[idx] = result; } else { globalData.results.unshift(result); }
-      renderResultsList();
     }
 
     function renderBlockResultSummary(blockId) {
@@ -2677,57 +2671,6 @@
       document.getElementById('communityResultsModal').classList.remove('active');
     }
 
-    function renderResultsList() {
-      const container = document.getElementById('resultsList');
-      if (!container) return;
-
-      const activeAthlete = localStorage.getItem('activeAthlete');
-      const results = (globalData.results || []).filter(r =>
-        r.athlete && r.athlete.toLowerCase() === (activeAthlete || '').toLowerCase()
-      );
-
-      if (results.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun risultato loggato.</p>';
-        return;
-      }
-
-      const sorted = results.slice().sort((a, b) => (String(b.id) > String(a.id) ? 1 : -1));
-      container.innerHTML = sorted.map(r => {
-        const movementsArr = Array.isArray(r.movements) ? r.movements : (r.movements ? String(r.movements).split(',').map(s => s.trim()).filter(Boolean) : []);
-        return `
-          <div class="history-item">
-            <div class="history-item-header">
-              <div>
-                <span style="background: ${r.category === 'SCALED' ? 'var(--input-bg)' : 'var(--accent)'}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(r.category || '')}</span>
-                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(r.date))}</span>
-              </div>
-              <button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteResult('${String(r.id).replace(/'/g, "\\'")}'))">✕ Elimina</button>
-            </div>
-            <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${escapeHtml(r.workout || '')} ${r.workoutType ? '(' + escapeHtml(r.workoutType) + ')' : ''}</div>
-            <div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">🏆 ${escapeHtml(r.scoreDisplay || '')} <span style="color: var(--text-muted); font-weight: 600; font-size: 11px;">(${escapeHtml(r.scoreType || '')})</span></div>
-            ${movementsArr.length ? `<div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">${escapeHtml(movementsArr.join(', '))}</div>` : ''}
-            ${r.notes ? `<div style="margin-top: 4px; font-size: 12px; color: var(--text-muted); font-style: italic;">"${escapeHtml(r.notes)}"</div>` : ''}
-          </div>
-        `;
-      }).join('');
-    }
-
-    async function deleteResult(id) {
-      if (!confirm('Vuoi davvero eliminare questo risultato?')) return;
-
-      const url = getScriptUrl();
-      if (url) {
-        try {
-          await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'deleteResult', id: String(id) }) });
-        } catch (err) {
-          console.error('Errore eliminazione risultato dal cloud:', err);
-        }
-      }
-
-      globalData.results = (globalData.results || []).filter(r => String(r.id) !== String(id));
-      renderResultsList();
-    }
-
     function switchTab(tab) {
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -2735,7 +2678,7 @@
       const map = { 'registra': 0, 'storico': 1, 'atleta': 2, 'impostazioni': 3 };
       document.querySelectorAll('.nav button')[map[tab]].classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
-      if (tab === 'storico') { renderHistory(); renderResultsList(); }
+      if (tab === 'storico') { renderHistory(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
       if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); }
     }
