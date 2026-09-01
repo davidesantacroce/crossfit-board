@@ -32,6 +32,7 @@
     .header-title-box { flex: 1; text-align: center; }
     .header-title-box h1 { font-size: 18px; font-weight: 900; letter-spacing: 1px; margin: 0; text-transform: uppercase; color: var(--text); line-height: 1.2; }
     .header-title-box p { color: var(--text-muted); margin: 4px 0 0 0; font-size: 11px; }
+    .app-version-tag { opacity: 0.5; font-size: 9px !important; margin-top: 2px !important; }
 
     .nav { display: flex; gap: 6px; margin-bottom: 20px; overflow-x: auto; }
     .nav button {
@@ -177,6 +178,7 @@
     <div class="header-title-box">
       <h1>CROSSFIT BICOCCA</h1>
       <p id="activeAthleteDisplay">Atleta: Nessuno Selezionato</p>
+      <p id="appVersionTag" class="app-version-tag"></p>
     </div>
     <img id="headerLogoProg" class="header-logo" alt="Logo Prog">
   </div>
@@ -306,6 +308,17 @@
         Il collegamento al Foglio Google è integrato e configurato globalmente per tutti gli utenti dell'applicazione.
       </p>
     </div>
+
+    <div class="card">
+      <div class="card-title">VERSIONE APP</div>
+      <div style="background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+        <div id="appVersionInfo" style="font-size: 15px; font-weight: 800;"></div>
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 12px;">
+        Se pensi che il tuo telefono stia mostrando una versione vecchia dell'app (funzioni mancanti rispetto a quanto descritto), prova a ricaricare forzando l'aggiornamento della cache.
+      </p>
+      <button class="btn-secondary" style="width: 100%;" onclick="location.reload(true)">🔄 RICARICA APP</button>
+    </div>
   </div>
 
   <!-- MODAL CROP -->
@@ -409,6 +422,11 @@
     // WOD già caricato oggi da un altro atleta, proposto come base da adattare.
     let proposedWodDismissed = false;
     let proposedWodBlocks = null;
+
+    // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
+    // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
+    const APP_VERSION = "v8";
+    const APP_VERSION_DATE = "01/09/2026";
 
     // Risultati (Log Result) associati ai blocchi della sessione corrente, indicizzati per blockId.
     let blockResults = {};
@@ -653,6 +671,7 @@
 
     window.onload = function() {
       applyDefaultLogos();
+      applyAppVersion();
       renderRegistraCalendar();
       updateRegistraDateView();
       fetchCloudData().then(() => {
@@ -674,6 +693,15 @@
 
       if (headerGym) { headerGym.src = GYM_LOGO_DATA_URI; headerGym.style.display = 'block'; }
       if (headerProg) { headerProg.src = PROG_LOGO_DATA_URI; headerProg.style.display = 'block'; }
+    }
+
+    // Mostra la versione dell'app nell'header (discreta) e nella tab Impostazioni (in chiaro).
+    function applyAppVersion() {
+      const tag = document.getElementById('appVersionTag');
+      if (tag) tag.innerText = APP_VERSION;
+
+      const info = document.getElementById('appVersionInfo');
+      if (info) info.innerText = `${APP_VERSION} · aggiornata il ${APP_VERSION_DATE}`;
     }
 
     async function fetchCloudData() {
