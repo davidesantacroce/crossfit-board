@@ -629,11 +629,13 @@
             ` : `
               <div style="font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px;">Nessun risultato loggato.</div>
             `;
+            const communityBtn = `<button type="button" class="btn-secondary" style="width: 100%; margin-top: 6px; padding: 6px 10px; font-size: 11px;" onclick="openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')">👥 Risultati Altri Atleti</button>`;
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
                 <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
                 ${bodyHtml}
                 ${scoreHtml}
+                ${communityBtn}
               </div>
             `;
           }).join('');
@@ -1380,11 +1382,14 @@
               scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${escapeHtml(b.result)}</div>`;
             }
 
+            const communityBtn = `<button type="button" class="btn-secondary" style="width: 100%; margin-top: 6px; padding: 6px 10px; font-size: 11px;" onclick="openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')">👥 Risultati Altri Atleti</button>`;
+
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
                 <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
                 ${bodyHtml}
                 ${scoreHtml}
+                ${communityBtn}
               </div>
             `;
           }).join('');
@@ -2265,12 +2270,18 @@
       return results.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
     }
 
+    // Wrapper usato dal form di Registra: legge titolo/tipo dal blocco live nel DOM.
     function openCommunityResultsModal(blockId) {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
-
       const title = (block.querySelector('.block-title').value || '').trim();
       const type = block.querySelector('.block-type').value;
+      openCommunityResultsModalFor(title, type);
+    }
+
+    // Versione principale, usata anche dalle viste di sola lettura (Storico, giorno passato nel
+    // calendario di Registra) dove non esiste un blocco form da cui leggere titolo/tipo.
+    function openCommunityResultsModalFor(title, type) {
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
 
       document.getElementById('communityResultsTitle').innerText = title ? `RISULTATI: ${title.toUpperCase()}` : 'RISULTATI ALTRI ATLETI';
