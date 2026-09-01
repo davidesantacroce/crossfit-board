@@ -443,7 +443,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v12";
+    const APP_VERSION = "v13";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1310,7 +1310,13 @@
         }
 
         if (matchingResult) {
-          blockResults[newBlockId] = matchingResult;
+          // I risultati caricati dal cloud hanno "movements" come testo (es. "Squat, Deadlift"),
+          // non come array: lo normalizziamo qui, altrimenti renderBlockResultSummary e il modal
+          // Log Result (che si aspettano un array) andrebbero in errore aprendo questo blocco.
+          const movementsArr = Array.isArray(matchingResult.movements)
+            ? matchingResult.movements
+            : (matchingResult.movements ? String(matchingResult.movements).split(',').map(s => s.trim()).filter(Boolean) : []);
+          blockResults[newBlockId] = Object.assign({}, matchingResult, { movements: movementsArr });
         } else if (b.result) {
           blockResults[newBlockId] = {
             id: `${session.id}-${newBlockId}`, scoreDisplay: b.result,
