@@ -2198,39 +2198,66 @@
 
     // Converte un risultato loggato in un valore numerico ordinabile, per costruire una
     // classifica quando tutti gli atleti confrontati hanno usato lo stesso tipo di punteggio.
+    // Se manca il dettaglio strutturato (es. risultato salvato senza mai aprire "Log Result"),
+    // prova a leggere un numero plausibile dal testo del punteggio; se non riesce con
+    // sicurezza, segna il risultato come non affidabile per l'ordinamento (confident: false),
+    // così non finisce comunque in classifica con un valore inventato (es. 0).
     function scoreSortValue(result) {
       const type = result.scoreType;
       const detail = result.scoreDetail || {};
+      const display = String(result.scoreDisplay || '');
+      const numsInText = display.match(/\d+(?:[.,]\d+)?/g);
+      const maxNumInText = numsInText ? Math.max(...numsInText.map(n => parseFloat(n.replace(',', '.')))) : null;
+
       if (type === 'Time') {
-        const min = parseInt(detail.minutes, 10) || 0;
-        const sec = parseInt(detail.seconds, 10) || 0;
-        return { value: min * 60 + sec, higherIsBetter: false };
+        if (detail.minutes !== undefined || detail.seconds !== undefined) {
+          const min = parseInt(detail.minutes, 10) || 0;
+          const sec = parseInt(detail.seconds, 10) || 0;
+          return { value: min * 60 + sec, higherIsBetter: false, confident: true };
+        }
+        const m = display.match(/(\d{1,3}):(\d{2})/);
+        if (m) return { value: parseInt(m[1], 10) * 60 + parseInt(m[2], 10), higherIsBetter: false, confident: true };
+        return { value: 0, higherIsBetter: false, confident: false };
       }
       if (type === 'AMRAP') {
-        const rounds = parseInt(detail.rounds, 10) || 0;
-        const reps = parseInt(detail.reps, 10) || 0;
-        return { value: rounds * 1000 + reps, higherIsBetter: true };
+        if (detail.rounds !== undefined || detail.reps !== undefined) {
+          const rounds = parseInt(detail.rounds, 10) || 0;
+          const reps = parseInt(detail.reps, 10) || 0;
+          return { value: rounds * 1000 + reps, higherIsBetter: true, confident: true };
+        }
+        const m = display.match(/(\d+)\s*round/i);
+        if (m) return { value: parseInt(m[1], 10) * 1000, higherIsBetter: true, confident: true };
+        return { value: 0, higherIsBetter: true, confident: false };
       }
       if (type === 'Weight') {
         if (detail.perSet && Array.isArray(detail.sets)) {
           const weights = detail.sets.map(s => parseFloat(s.weight)).filter(n => isFinite(n));
-          return { value: weights.length ? Math.max(...weights) : 0, higherIsBetter: true };
+          return { value: weights.length ? Math.max(...weights) : 0, higherIsBetter: true, confident: weights.length > 0 };
         }
-        return { value: parseFloat(detail.weight) || 0, higherIsBetter: true };
+        if (detail.weight !== undefined) {
+          const v = parseFloat(detail.weight);
+          return { value: isFinite(v) ? v : 0, higherIsBetter: true, confident: isFinite(v) };
+        }
+        return { value: maxNumInText || 0, higherIsBetter: true, confident: maxNumInText !== null };
       }
-      if (type === 'Reps') return { value: parseFloat(detail.reps) || 0, higherIsBetter: true };
-      if (type === 'Distance') return { value: parseFloat(detail.distance) || 0, higherIsBetter: true };
-      if (type === 'Calories') return { value: parseFloat(detail.calories) || 0, higherIsBetter: true };
-      return { value: 0, higherIsBetter: true };
+      if (type === 'Reps' || type === 'Distance' || type === 'Calories') {
+        const field = type === 'Reps' ? detail.reps : (type === 'Distance' ? detail.distance : detail.calories);
+        const v = parseFloat(field);
+        if (isFinite(v)) return { value: v, higherIsBetter: true, confident: true };
+        return { value: maxNumInText || 0, higherIsBetter: true, confident: maxNumInText !== null };
+      }
+      return { value: 0, higherIsBetter: true, confident: false };
     }
 
-    // Ordina i risultati come classifica se condividono tutti lo stesso tipo di punteggio
-    // (tempo più basso vince, reps/peso/distanza/calorie più alto vince); altrimenti,
-    // essendo punteggi non confrontabili tra loro, ordina semplicemente per data più recente.
+    // Ordina i risultati come classifica se condividono tutti lo stesso tipo di punteggio e
+    // ognuno ha un valore numerico affidabile (tempo più basso vince, reps/peso/distanza/
+    // calorie più alto vince); altrimenti ordina semplicemente per data più recente.
     function sortCommunityResults(results) {
+      const withScores = results.map(r => ({ r, s: scoreSortValue(r) }));
       const types = new Set(results.map(r => r.scoreType));
-      if (types.size === 1) {
-        const withScores = results.map(r => ({ r, s: scoreSortValue(r) }));
+      const allConfident = withScores.every(x => x.s.confident);
+
+      if (types.size === 1 && allConfident) {
         const higherIsBetter = withScores[0].s.higherIsBetter;
         withScores.sort((a, b) => higherIsBetter ? (b.s.value - a.s.value) : (a.s.value - b.s.value));
         return withScores.map(x => x.r);
@@ -2248,10 +2275,35 @@
 
       document.getElementById('communityResultsTitle').innerText = title ? `RISULTATI: ${title.toUpperCase()}` : 'RISULTATI ALTRI ATLETI';
 
-      const matches = (globalData.results || []).filter(r =>
-        r.workout && title && r.workout.trim().toLowerCase() === title.toLowerCase() &&
-        (r.workoutType || '') === type
+      const norm = (s) => String(s || '').trim().toLowerCase();
+
+      // 1) Risultati "ricchi" salvati con Log Result (tipo/dettaglio strutturato, permette
+      // di fare classifica).
+      const richMatches = (globalData.results || []).filter(r =>
+        r.workout && title && norm(r.workout) === norm(title) && norm(r.workoutType) === norm(type)
       );
+
+      // 2) Fallback: alcuni atleti registrano un punteggio nel blocco senza mai aprire
+      // "Log Result" (solo il testo sintetico salvato nella sessione). Senza questo, i loro
+      // risultati resterebbero invisibili nel confronto. Deduciamo un tipo di punteggio
+      // plausibile dal tipo di blocco per poterli comunque includere in classifica.
+      const defaultScoreTypeMap = { 'For Time': 'Time', 'AMRAP': 'AMRAP', 'Sets': 'Weight', 'EMOM': 'Time' };
+      const richKeys = new Set(richMatches.map(r => `${norm(r.athlete)}|${r.date}`));
+      const fallbackMatches = [];
+      (globalData.wods || []).forEach(w => {
+        (w.blocks || []).forEach(b => {
+          if (!b.result || norm(b.title || 'WOD') !== norm(title) || norm(b.type || '') !== norm(type)) return;
+          const key = `${norm(w.athlete)}|${w.date}`;
+          if (richKeys.has(key)) return; // già coperto da un Log Result strutturato per quel giorno
+          fallbackMatches.push({
+            id: `wod-${w.id}`, athlete: w.athlete, date: w.date, workout: b.title, workoutType: b.type,
+            scoreType: defaultScoreTypeMap[b.type] || 'Time', scoreDetail: {}, scoreDisplay: b.result,
+            category: w.mode || '', movements: [], notes: ''
+          });
+        });
+      });
+
+      const matches = richMatches.concat(fallbackMatches);
 
       const content = document.getElementById('communityResultsContent');
       if (matches.length === 0) {
@@ -2261,7 +2313,7 @@
       }
 
       const sorted = sortCommunityResults(matches);
-      const rankable = new Set(matches.map(r => r.scoreType)).size === 1;
+      const rankable = new Set(matches.map(r => r.scoreType)).size === 1 && matches.every(r => scoreSortValue(r).confident);
 
       content.innerHTML = sorted.map((r, i) => {
         const isMe = r.athlete && r.athlete.toLowerCase() === activeAthlete;
