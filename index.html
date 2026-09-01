@@ -343,9 +343,12 @@
   <div id="cropModal" class="crop-modal">
     <div style="text-align: center; color: #fff; font-weight: bold; margin-bottom: 8px;">RITAGLIA IL WOD</div>
     <div class="crop-container"><img id="cropImage" style="max-width: 100%;"></div>
+    <div id="cropScanStatus" style="display:none; text-align:center; color:#fff; font-size:12px; margin-top:8px;">
+      ⏳ Estrazione testo in corso, attendi qualche secondo...
+    </div>
     <div class="crop-actions">
-      <button class="btn-secondary" onclick="closeCropModal()">ANNULLA</button>
-      <button class="btn-main" style="flex:1;" onclick="confirmCropAndScan()">ESTRAI</button>
+      <button class="btn-secondary" id="cropCancelBtn" onclick="closeCropModal()">ANNULLA</button>
+      <button class="btn-main" id="cropExtractBtn" style="flex:1;" onclick="withButtonGuard(this, confirmCropAndScan)">ESTRAI</button>
     </div>
   </div>
 
@@ -443,7 +446,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v14";
+    const APP_VERSION = "v15";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1074,6 +1077,8 @@
 
     function closeCropModal() {
       document.getElementById('cropModal').classList.remove('active');
+      document.getElementById('cropScanStatus').style.display = 'none';
+      document.getElementById('cropCancelBtn').disabled = false;
       if (cropper) {
         cropper.destroy();
         cropper = null;
@@ -1084,9 +1089,20 @@
 
     async function confirmCropAndScan() {
       if (!cropper || activeBlockIdForScan === null) return;
-      const canvas = cropper.getCroppedCanvas();
       const targetBlockId = activeBlockIdForScan;
-      closeCropModal();
+
+      // Una foto scattata al momento con la fotocamera ha una risoluzione molto più alta
+      // di uno screenshot (spesso 10+ megapixel): senza ridimensionarla l'OCR può metterci
+      // decine di secondi, e prima il modal si chiudeva subito lasciando l'utente senza
+      // nessun feedback nel frattempo (sembrava che la funzione non facesse nulla).
+      // Limitiamo il lato maggiore per velocizzare l'estrazione e teniamo il modal aperto
+      // con un messaggio di attesa finché l'OCR non ha finito.
+      const canvas = cropper.getCroppedCanvas({ maxWidth: 1800, maxHeight: 1800 });
+
+      const statusEl = document.getElementById('cropScanStatus');
+      const cancelBtn = document.getElementById('cropCancelBtn');
+      statusEl.style.display = 'block';
+      cancelBtn.disabled = true;
 
       try {
         const worker = await Tesseract.createWorker('eng+ita');
@@ -1094,10 +1110,13 @@
         await worker.terminate();
 
         const text = ret.data.text;
+        closeCropModal();
         parseAndFillBlock(targetBlockId, text);
       } catch (err) {
         console.error(err);
-        alert("Errore durante l'estrazione OCR.");
+        statusEl.style.display = 'none';
+        cancelBtn.disabled = false;
+        alert("Errore durante l'estrazione OCR. Riprova o ritaglia un'area più piccola.");
       }
     }
 
@@ -1172,7 +1191,17 @@
 
       block.querySelector('.block-type').value = type;
 
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      // Molti screenshot di altre app hanno un pallino/cerchietto colorato prima del nome
+      // del blocco (es. ⬤ Superset 1): l'OCR spesso lo legge come una "O" (o uno "0") isolata
+      // a inizio riga, che finiva nel titolo ("O Superset 1"). La ripuliamo qui: rimuoviamo
+      // le righe composte solo da quel carattere e la "O"/"0" isolata a inizio riga, ma solo
+      // quando è un token a sé (seguito da uno spazio) per non toccare parole vere che
+      // iniziano per "O" (es. "Overhead Press", "OHS").
+      const lines = text.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .filter(l => !/^[O0]$/.test(l))
+        .map(l => l.replace(/^[O0](?=\s)\s*/, '').trim());
 
       // Titolo: prima riga utile (o la seconda se la prima è solo una keyword tipo "AMRAP")
       let titleLineIndex = -1;
