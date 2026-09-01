@@ -220,7 +220,6 @@
         <button type="button" class="btn-remove" style="height: 24px; padding: 0 8px; font-size: 10px;" onclick="dismissProposedWod()">✕</button>
       </div>
       <div id="proposedWodContent"></div>
-      <button class="btn-main" style="margin-top: 10px;" onclick="useProposedWod()">USA QUESTO WOD COME BASE</button>
     </div>
 
     <!-- FORM DI REGISTRAZIONE (visibile per la giornata odierna, o mentre si modifica una sessione passata) -->
@@ -421,11 +420,11 @@
 
     // WOD già caricato oggi da un altro atleta, proposto come base da adattare.
     let proposedWodDismissed = false;
-    let proposedWodBlocks = null;
+    let proposedWodCandidates = []; // [{ athlete, blocks }] — uno per ogni atleta con lavoro caricato oggi
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v10";
+    const APP_VERSION = "v11";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Risultati (Log Result) associati ai blocchi della sessione corrente, indicizzati per blockId.
@@ -1237,7 +1236,7 @@
       const today = getTodayDateString();
       if (selectedRegistraDate !== today || editingWodId !== null || proposedWodDismissed) {
         card.style.display = 'none';
-        proposedWodBlocks = null;
+        proposedWodCandidates = [];
         return;
       }
 
@@ -1248,14 +1247,13 @@
 
       if (othersSessions.length === 0) {
         card.style.display = 'none';
-        proposedWodBlocks = null;
+        proposedWodCandidates = [];
         return;
       }
 
       // Un atleta può aver salvato più sessioni separate nello stesso giorno (es. ha premuto
       // "Salva" più volte invece di aggiungere un secondo blocco alla stessa sessione):
-      // raggruppiamo per atleta unendo tutti i blocchi, così non ne perdiamo nessuno, e
-      // proponiamo l'atleta con più blocchi caricati oggi (il lavoro più completo).
+      // raggruppiamo per atleta unendo tutti i blocchi, così non ne perdiamo nessuno.
       const byAthlete = {};
       othersSessions.forEach(w => {
         if (!byAthlete[w.athlete]) byAthlete[w.athlete] = { athlete: w.athlete, blocks: [], lastId: w.id };
@@ -1263,31 +1261,44 @@
         if (String(w.id).localeCompare(String(byAthlete[w.athlete].lastId)) > 0) byAthlete[w.athlete].lastId = w.id;
       });
 
-      const proposal = Object.values(byAthlete).sort((a, b) =>
+      // Se più atleti hanno caricato lavori DIVERSI oggi (es. tracce/programmazioni diverse
+      // nello stesso box), li mostriamo tutti: la scelta di quale usare spetta all'atleta,
+      // non la facciamo noi al posto suo scegliendone uno solo in automatico.
+      proposedWodCandidates = Object.values(byAthlete).sort((a, b) =>
         b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
-      )[0];
-      proposedWodBlocks = proposal.blocks;
+      );
 
-      document.getElementById('proposedWodTitle').innerText = `📋 ${proposal.athlete} ha già caricato il lavoro di oggi`;
-      const blocksSummary = proposal.blocks.map(b => `
-        <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
-          • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
+      const single = proposedWodCandidates.length === 1;
+      document.getElementById('proposedWodTitle').innerText = single
+        ? `📋 ${proposedWodCandidates[0].athlete} ha già caricato il lavoro di oggi`
+        : `📋 ${proposedWodCandidates.length} atleti hanno già caricato un lavoro oggi`;
+
+      document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map(c => `
+        <div style="${single ? '' : 'border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;'}">
+          ${single ? '' : `<div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(c.athlete)}</div>`}
+          ${c.blocks.map(b => `
+            <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
+              • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
+            </div>
+          `).join('')}
+          <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useProposedWod('${String(c.athlete).replace(/'/g, "\\'")}')">USA IL WOD DI ${escapeHtml(c.athlete).toUpperCase()}</button>
         </div>
       `).join('');
-      document.getElementById('proposedWodContent').innerHTML = blocksSummary || '<p style="color: var(--text-muted); font-size: 13px;">Nessun blocco.</p>';
 
       card.style.display = '';
     }
 
-    // Importa i blocchi (tipo/titolo/spiegazione) del WOD proposto nel form corrente, come base
-    // da adattare: non copia risultati o modalità RX/Scaled, che restano personali.
-    function useProposedWod() {
-      if (!proposedWodBlocks || proposedWodBlocks.length === 0) return;
+    // Importa i blocchi (tipo/titolo/spiegazione) del WOD proposto dall'atleta indicato nel
+    // form corrente, come base da adattare: non copia risultati o modalità RX/Scaled,
+    // che restano personali.
+    function useProposedWod(athleteName) {
+      const candidate = proposedWodCandidates.find(c => c.athlete === athleteName);
+      if (!candidate || !candidate.blocks || candidate.blocks.length === 0) return;
 
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
-      proposedWodBlocks.forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
+      candidate.blocks.forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
       if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
 
       proposedWodDismissed = true;
