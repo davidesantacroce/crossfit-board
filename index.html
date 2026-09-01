@@ -116,6 +116,27 @@
     .calendar-day.is-today .calendar-day-name { color: var(--accent); }
     #registraDayView .history-item:last-child { border-bottom: none; padding-bottom: 0; }
 
+    .active-days-range { display: flex; gap: 6px; margin-bottom: 14px; }
+    .active-days-range button {
+      flex: 1; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted);
+      padding: 8px 4px; border-radius: 8px; font-weight: 800; font-size: 11px; text-transform: uppercase; cursor: pointer;
+    }
+    .active-days-range button.active { background: var(--accent); color: var(--text); border-color: var(--accent); }
+    .active-days-chart-scroll { overflow-x: auto; }
+    .active-days-chart {
+      display: flex; align-items: flex-end; gap: 8px; height: 130px; min-width: 100%;
+      border-bottom: 1px solid var(--border); padding: 0 2px;
+    }
+    .active-days-chart.is-scrollable { min-width: max-content; }
+    .active-days-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; flex: 1 0 30px; min-width: 30px; }
+    .active-days-bar-count { font-size: 11px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+    .active-days-bar-count.is-zero { visibility: hidden; }
+    .active-days-bar { width: 20px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 3px; }
+    .active-days-labels { display: flex; gap: 8px; padding: 6px 2px 0; min-width: 100%; }
+    .active-days-labels.is-scrollable { min-width: max-content; }
+    .active-days-label-col { flex: 1 0 30px; min-width: 30px; text-align: center; font-size: 9px; color: var(--text-muted); white-space: nowrap; }
+    .active-days-empty { font-size: 13px; color: var(--text-muted); }
+
     .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
     .result-summary-box { background: rgba(46, 125, 50, 0.12); border: 1px solid #2e7d32; border-radius: 10px; padding: 12px; }
     .result-summary-score { font-size: 15px; font-weight: 900; color: #4caf50; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -275,6 +296,16 @@
 
   <!-- TAB ATLETA -->
   <div id="tab-atleta" class="tab-content">
+    <div class="card">
+      <div class="card-title">📊 GIORNI ATTIVI A SETTIMANA</div>
+      <div class="active-days-range">
+        <button type="button" class="active-days-range-btn active" data-range="recent" onclick="renderActiveDaysChart('recent')">RECENTI</button>
+        <button type="button" class="active-days-range-btn" data-range="year" onclick="renderActiveDaysChart('year')">12 MESI</button>
+        <button type="button" class="active-days-range-btn" data-range="all" onclick="renderActiveDaysChart('all')">SEMPRE</button>
+      </div>
+      <div id="activeDaysChartContainer"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">PROFILO ATLETA</div>
       <div class="form-group">
@@ -446,7 +477,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v15";
+    const APP_VERSION = "v16";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -763,6 +794,7 @@
           updateConnectionIndicator(true);
           renderHistory();
           renderResultsList();
+          renderActiveDaysChart();
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
           updateRegistraDateView();
@@ -908,6 +940,98 @@
     function switchToAthleteTab() {
       document.getElementById('loginOverlay').style.display = 'none';
       switchTab('atleta');
+    }
+
+    // Aggiunge/sottrae un numero di giorni a una data YYYY-MM-DD (fuso locale del dispositivo).
+    function addDaysToDateString(dateStr, days) {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + days);
+      return toDateString(d);
+    }
+
+    // Lunedì (YYYY-MM-DD) della settimana a cui appartiene la data passata.
+    function getWeekStartDateString(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      const day = d.getDay(); // 0 = domenica, 1 = lunedì, ...
+      const diffToMonday = (day === 0 ? -6 : 1 - day);
+      return addDaysToDateString(dateStr, diffToMonday);
+    }
+
+    function formatActiveDaysLabel(dateStr) {
+      const months = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+      const d = new Date(dateStr + 'T00:00:00');
+      return `${months[d.getMonth()]} ${d.getDate()}`;
+    }
+
+    let activeDaysCurrentRange = 'recent';
+
+    // Grafico "giorni attivi a settimana" nel tab ATLETA: una settimana (lun-dom) conta un
+    // giorno come attivo se l'atleta ha loggato almeno una sessione WOD in quella data
+    // (più sessioni nello stesso giorno contano una volta sola).
+    function renderActiveDaysChart(range) {
+      activeDaysCurrentRange = range || activeDaysCurrentRange;
+      document.querySelectorAll('.active-days-range-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.range === activeDaysCurrentRange);
+      });
+
+      const container = document.getElementById('activeDaysChartContainer');
+      if (!container) return;
+
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      const activeDates = new Set(
+        (globalData.wods || [])
+          .filter(w => w.athlete && activeAthlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && w.date)
+          .map(w => String(w.date).slice(0, 10))
+      );
+
+      if (activeDates.size === 0) {
+        container.innerHTML = '<p class="active-days-empty">Nessun allenamento registrato per il tuo profilo.</p>';
+        return;
+      }
+
+      const todayWeekStart = getWeekStartDateString(getTodayDateString());
+      let weeksCount;
+      if (activeDaysCurrentRange === 'recent') {
+        weeksCount = 8;
+      } else if (activeDaysCurrentRange === 'year') {
+        weeksCount = 52;
+      } else {
+        const earliestWeekStart = getWeekStartDateString(Array.from(activeDates).sort()[0]);
+        const diffDays = Math.round((new Date(todayWeekStart) - new Date(earliestWeekStart)) / 86400000);
+        weeksCount = Math.max(1, Math.round(diffDays / 7) + 1);
+      }
+
+      const weeks = [];
+      for (let i = weeksCount - 1; i >= 0; i--) {
+        const weekStart = addDaysToDateString(todayWeekStart, -i * 7);
+        let count = 0;
+        for (let d = 0; d < 7; d++) {
+          if (activeDates.has(addDaysToDateString(weekStart, d))) count++;
+        }
+        weeks.push({ weekStart, count });
+      }
+
+      const maxCount = Math.max(...weeks.map(w => w.count), 1);
+      const scrollable = weeks.length > 10;
+      const labelEvery = weeks.length <= 10 ? 1 : (weeks.length <= 20 ? 2 : 4);
+
+      const colsHtml = weeks.map(w => `
+        <div class="active-days-col">
+          <div class="active-days-bar-count ${w.count === 0 ? 'is-zero' : ''}">${w.count}</div>
+          <div class="active-days-bar" style="height: ${Math.round((w.count / maxCount) * 100)}%;"></div>
+        </div>
+      `).join('');
+
+      const labelsHtml = weeks.map((w, idx) => `
+        <div class="active-days-label-col">${idx % labelEvery === 0 ? formatActiveDaysLabel(w.weekStart) : ''}</div>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="active-days-chart-scroll">
+          <div class="active-days-chart ${scrollable ? 'is-scrollable' : ''}">${colsHtml}</div>
+          <div class="active-days-labels ${scrollable ? 'is-scrollable' : ''}">${labelsHtml}</div>
+        </div>
+      `;
     }
 
     // Il campo per creare un PIN nella tab ATLETA serve solo per una registrazione nuova
@@ -2613,7 +2737,7 @@
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'storico') { renderHistory(); renderResultsList(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
-      if (tab === 'atleta') { updateProfilePinVisibility(); }
+      if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); }
     }
 
     function setMode(mode) {
