@@ -408,7 +408,7 @@
 
     // WOD già caricato oggi da un altro atleta, proposto come base da adattare.
     let proposedWodDismissed = false;
-    let proposedWodSourceId = null;
+    let proposedWodBlocks = null;
 
     // Risultati (Log Result) associati ai blocchi della sessione corrente, indicizzati per blockId.
     let blockResults = {};
@@ -1113,6 +1113,13 @@
       blockResults = {};
 
       const sessionAthleteLower = session.athlete.toLowerCase();
+      const norm = (s) => String(s || '').trim().toLowerCase();
+
+      // Se non troviamo un Log Result strutturato, deduciamo comunque un tipo di punteggio
+      // sensato dal tipo di blocco (la stessa logica usata per un blocco nuovo), invece di
+      // forzare sempre "Time" indipendentemente dal tipo di WOD.
+      const defaultScoreTypeMap = { 'For Time': 'Time', 'AMRAP': 'AMRAP', 'Sets': 'Weight', 'EMOM': 'Time' };
+
       (session.blocks || []).forEach(b => {
         addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || '');
         const newBlockId = blockCounter;
@@ -1120,17 +1127,31 @@
         // Se esiste un Log Result strutturato corrispondente (stesso atleta/WOD/tipo/data),
         // lo ripristiniamo così "Modifica Risultato" mostra i valori esatti già loggati,
         // non solo il testo sintetico salvato nel blocco.
-        const matchingResult = (globalData.results || []).find(r =>
-          r.athlete && r.athlete.toLowerCase() === sessionAthleteLower &&
+        let matchingResult = (globalData.results || []).find(r =>
+          r.athlete && norm(r.athlete) === sessionAthleteLower &&
           r.date === session.date &&
-          r.workout === (b.title || 'WOD') &&
-          r.workoutType === (b.type || '')
+          norm(r.workout) === norm(b.title || 'WOD') &&
+          norm(r.workoutType) === norm(b.type || '')
         );
+
+        // Fallback: se il titolo non combacia esattamente (es. rinominato dopo aver loggato
+        // il risultato), proviamo ad abbinare solo per atleta+data+tipo, ma solo se quel
+        // giorno c'è un unico candidato di quel tipo (altrimenti l'abbinamento è ambiguo).
+        if (!matchingResult) {
+          const candidatesByType = (globalData.results || []).filter(r =>
+            r.athlete && norm(r.athlete) === sessionAthleteLower &&
+            r.date === session.date &&
+            norm(r.workoutType) === norm(b.type || '')
+          );
+          if (candidatesByType.length === 1) matchingResult = candidatesByType[0];
+        }
+
         if (matchingResult) {
           blockResults[newBlockId] = matchingResult;
         } else if (b.result) {
           blockResults[newBlockId] = {
-            id: `${session.id}-${newBlockId}`, scoreDisplay: b.result, scoreType: 'Time', scoreDetail: {},
+            id: `${session.id}-${newBlockId}`, scoreDisplay: b.result,
+            scoreType: defaultScoreTypeMap[b.type] || 'Time', scoreDetail: {},
             category: session.mode || 'RX', movements: [], notes: ''
           };
         }
@@ -1186,27 +1207,39 @@
       const today = getTodayDateString();
       if (selectedRegistraDate !== today || editingWodId !== null || proposedWodDismissed) {
         card.style.display = 'none';
-        proposedWodSourceId = null;
+        proposedWodBlocks = null;
         return;
       }
 
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
-      const others = (globalData.wods || []).filter(w =>
+      const othersSessions = (globalData.wods || []).filter(w =>
         w.date === today && w.athlete && w.athlete.toLowerCase() !== activeAthlete
       );
 
-      if (others.length === 0) {
+      if (othersSessions.length === 0) {
         card.style.display = 'none';
-        proposedWodSourceId = null;
+        proposedWodBlocks = null;
         return;
       }
 
-      // Tra le sessioni già caricate oggi da altri atleti, proponiamo la più recente.
-      const proposal = others.slice().sort((a, b) => String(b.id).localeCompare(String(a.id)))[0];
-      proposedWodSourceId = proposal.id;
+      // Un atleta può aver salvato più sessioni separate nello stesso giorno (es. ha premuto
+      // "Salva" più volte invece di aggiungere un secondo blocco alla stessa sessione):
+      // raggruppiamo per atleta unendo tutti i blocchi, così non ne perdiamo nessuno, e
+      // proponiamo l'atleta con più blocchi caricati oggi (il lavoro più completo).
+      const byAthlete = {};
+      othersSessions.forEach(w => {
+        if (!byAthlete[w.athlete]) byAthlete[w.athlete] = { athlete: w.athlete, blocks: [], lastId: w.id };
+        byAthlete[w.athlete].blocks.push(...(w.blocks || []));
+        if (String(w.id).localeCompare(String(byAthlete[w.athlete].lastId)) > 0) byAthlete[w.athlete].lastId = w.id;
+      });
+
+      const proposal = Object.values(byAthlete).sort((a, b) =>
+        b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
+      )[0];
+      proposedWodBlocks = proposal.blocks;
 
       document.getElementById('proposedWodTitle').innerText = `📋 ${proposal.athlete} ha già caricato il lavoro di oggi`;
-      const blocksSummary = (proposal.blocks || []).map(b => `
+      const blocksSummary = proposal.blocks.map(b => `
         <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
           • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
         </div>
@@ -1219,13 +1252,12 @@
     // Importa i blocchi (tipo/titolo/spiegazione) del WOD proposto nel form corrente, come base
     // da adattare: non copia risultati o modalità RX/Scaled, che restano personali.
     function useProposedWod() {
-      const proposal = (globalData.wods || []).find(w => String(w.id) === String(proposedWodSourceId));
-      if (!proposal) return;
+      if (!proposedWodBlocks || proposedWodBlocks.length === 0) return;
 
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
-      (proposal.blocks || []).forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
+      proposedWodBlocks.forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
       if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
 
       proposedWodDismissed = true;
