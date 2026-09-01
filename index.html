@@ -89,8 +89,9 @@
     .btn-remove { background: #c62828; color: white; border: none; border-radius: 6px; height: 42px; font-weight: bold; cursor: pointer; }
     .btn-add { background: var(--input-bg); border: 1px dashed var(--border); color: var(--text-muted); width: 100%; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; margin-top: 8px; }
 
-    .rm-row { display: grid; grid-template-columns: 1fr 100px; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .rm-row { display: grid; grid-template-columns: 1fr 100px 34px; gap: 8px; align-items: center; margin-bottom: 8px; }
     .rm-row span { font-size: 13px; font-weight: 700; color: var(--text); padding: 10px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; }
+    .rm-history-btn { width: 34px; height: 42px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 
     .btn-main { width: 100%; background: var(--accent); color: var(--text); border: none; padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; margin-top: 10px; }
     .btn-secondary { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; flex: 1; }
@@ -365,6 +366,28 @@
       </div>
 
       <button class="btn-main" onclick="saveLogResult()">SALVA RISULTATO</button>
+    </div>
+  </div>
+
+  <!-- MODAL RISULTATI ALTRI ATLETI (stesso WOD) -->
+  <div id="communityResultsModal" class="log-result-modal">
+    <div class="log-result-card">
+      <div class="log-result-header">
+        <div class="card-title" id="communityResultsTitle" style="margin-bottom: 0;">RISULTATI ALTRI ATLETI</div>
+        <button type="button" class="btn-remove" style="height: 28px; padding: 0 10px;" onclick="closeCommunityResultsModal()">✕</button>
+      </div>
+      <div id="communityResultsContent">Caricamento in corso...</div>
+    </div>
+  </div>
+
+  <!-- MODAL STORICO MASSIMALE -->
+  <div id="massimaleHistoryModal" class="log-result-modal">
+    <div class="log-result-card">
+      <div class="log-result-header">
+        <div class="card-title" id="massimaleHistoryTitle" style="margin-bottom: 0;">STORICO MASSIMALE</div>
+        <button type="button" class="btn-remove" style="height: 28px; padding: 0 10px;" onclick="closeMassimaleHistoryModal()">✕</button>
+      </div>
+      <div id="massimaleHistoryContent">Caricamento in corso...</div>
     </div>
   </div>
 
@@ -756,9 +779,11 @@
         document.getElementById('profileWeight').value = ath.weight;
       }
 
-      const athleteMaxs = globalData.massimali.filter(m => m.athlete.toLowerCase() === athleteName.toLowerCase());
+      // Il foglio Massimali ora tiene lo storico completo (una riga per ogni salvataggio nel
+      // tempo): per compilare il form prendiamo solo il valore più recente per ogni esercizio.
+      const latest = getLatestMassimaliMap(athleteName);
       const maxsMap = {};
-      athleteMaxs.forEach(m => { maxsMap[m.movement.toLowerCase()] = m.weight; });
+      Object.keys(latest).forEach(key => { maxsMap[key] = latest[key].weight; });
 
       renderRmContainer(maxsMap);
     }
@@ -766,14 +791,15 @@
     function renderRmContainer(savedMaxs = {}) {
       const container = document.getElementById('rmContainer');
       container.innerHTML = '';
-      
+
       CROSSFIT_STANDARD_RMS.forEach(movement => {
         const val = savedMaxs[movement.toLowerCase()] || '';
         const row = document.createElement('div');
         row.className = 'rm-row';
         row.innerHTML = `
           <span>${escapeHtml(movement)}</span>
-          <input type="text" class="rm-weight" data-movement="${escapeHtml(movement)}" placeholder="Kg / Reps / Tempo" value="${escapeHtml(val)}">
+          <input type="text" class="rm-weight" data-movement="${escapeHtml(movement)}" data-original="${escapeHtml(val)}" placeholder="Kg / Reps / Tempo" value="${escapeHtml(val)}">
+          ${val ? `<button type="button" class="rm-history-btn" title="Storico" onclick="openMassimaleHistoryModal('${movement.replace(/'/g, "\\'")}')">📈</button>` : '<span></span>'}
         `;
         container.appendChild(row);
       });
@@ -811,17 +837,28 @@
       if (!athleteName) { alert('Seleziona o salva prima il tuo profilo atleta!'); return; }
 
       const rows = document.querySelectorAll('.rm-weight');
+      let changedCount = 0;
       for (let input of rows) {
         const movement = input.getAttribute('data-movement');
         const weight = input.value.trim();
-        if (movement && weight && url) {
+        const original = input.getAttribute('data-original') || '';
+        // Ogni salvataggio aggiunge una nuova riga di storico datata (vedi Apps Script):
+        // inviamo quindi solo i valori realmente cambiati, per non duplicare righe identiche
+        // ogni volta che si preme "Salva Massimali" senza aver modificato nulla.
+        if (movement && weight && weight !== original && url) {
           await fetch(url, {
             method: 'POST',
-            body: JSON.stringify({ action: 'saveMassimale', athlete: athleteName, movement, weight })
+            body: JSON.stringify({ action: 'saveMassimale', athlete: athleteName, movement, weight, date: getTodayDateString() })
           });
+          changedCount++;
         }
       }
-      alert('Massimali e parametri CrossFit salvati con successo!');
+
+      if (changedCount === 0) {
+        alert('Nessuna modifica da salvare.');
+        return;
+      }
+      alert(`${changedCount} massimale/i aggiornato/i con successo!`);
       fetchCloudData();
     }
 
@@ -1369,18 +1406,119 @@
       return matchIn(text);
     }
 
-    // Recupera il massimale numerico salvato dall'atleta attivo per un dato esercizio.
-    // Restituisce null se l'atleta non ha ancora compilato quel campo (o non è numerico).
+    // Il foglio Massimali tiene lo storico completo: una riga per ogni salvataggio nel tempo
+    // (stesso atleta+esercizio può comparire più volte, con date diverse). Le funzioni sotto
+    // derivano da questo storico sia "il valore attuale" sia lo storico da mostrare per esteso.
+
+    // Normalizza una data YYYY-MM-DD per il confronto; date mancanti/non valide (righe
+    // storiche salvate prima dell'introduzione dello storico) sono trattate come le più vecchie.
+    function normalizeDateForCompare(d) {
+      return (d && /^\d{4}-\d{2}-\d{2}$/.test(String(d))) ? String(d) : '0000-00-00';
+    }
+
+    // Mappa {movimento in minuscolo -> riga più recente} per un atleta, a partire da tutto
+    // lo storico dei massimali.
+    function getLatestMassimaliMap(athleteName) {
+      const map = {};
+      if (!athleteName) return map;
+      (globalData.massimali || []).forEach(m => {
+        if (!m.athlete || !m.movement) return;
+        if (m.athlete.toLowerCase() !== athleteName.toLowerCase()) return;
+        const key = m.movement.toLowerCase();
+        const existing = map[key];
+        if (!existing || normalizeDateForCompare(m.date) >= normalizeDateForCompare(existing.date)) {
+          map[key] = m;
+        }
+      });
+      return map;
+    }
+
+    // Storico completo di un massimale per atleta+esercizio, dal più recente al più vecchio.
+    function getMassimaleHistory(athleteName, movementName) {
+      if (!athleteName || !movementName) return [];
+      return (globalData.massimali || [])
+        .filter(m => m.athlete && m.movement &&
+          m.athlete.toLowerCase() === athleteName.toLowerCase() &&
+          m.movement.toLowerCase() === movementName.toLowerCase())
+        .slice()
+        .sort((a, b) => normalizeDateForCompare(b.date).localeCompare(normalizeDateForCompare(a.date)));
+    }
+
+    // Recupera il massimale numerico più recente salvato dall'atleta attivo per un dato
+    // esercizio. Restituisce null se l'atleta non ha ancora compilato quel campo (o non è numerico).
     function getAthleteMaxValue(movementName) {
       const athleteName = localStorage.getItem('activeAthlete');
       if (!athleteName) return null;
-      const entry = (globalData.massimali || []).find(m =>
-        m.athlete && m.athlete.toLowerCase() === athleteName.toLowerCase() &&
-        m.movement && m.movement.toLowerCase() === movementName.toLowerCase()
-      );
+      const entry = getLatestMassimaliMap(athleteName)[movementName.toLowerCase()];
       if (!entry || entry.weight === undefined || entry.weight === null || entry.weight === '') return null;
       const val = parseFloat(String(entry.weight).replace(',', '.'));
       return (isFinite(val) && val > 0) ? val : null;
+    }
+
+    function openMassimaleHistoryModal(movementName) {
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) return;
+
+      const history = getMassimaleHistory(athleteName, movementName);
+      document.getElementById('massimaleHistoryTitle').innerText = movementName.toUpperCase();
+      const content = document.getElementById('massimaleHistoryContent');
+
+      if (history.length === 0) {
+        content.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun dato salvato ancora per questo esercizio.</p>';
+        document.getElementById('massimaleHistoryModal').classList.add('active');
+        return;
+      }
+
+      const currentEntry = history[0];
+      const currentValue = parseFloat(String(currentEntry.weight).replace(',', '.'));
+
+      // Trova la riga con il valore più alto in assoluto, per marcarla come PR.
+      const prEntry = history.reduce((best, h) => {
+        const v = parseFloat(String(h.weight).replace(',', '.'));
+        const bestV = parseFloat(String(best.weight).replace(',', '.'));
+        return (isFinite(v) && (!isFinite(bestV) || v > bestV)) ? h : best;
+      }, currentEntry);
+      const isCurrentPr = prEntry === currentEntry;
+
+      let html = `
+        <div style="text-align: center; margin-bottom: 20px; position: relative;">
+          ${isCurrentPr ? '<span style="position: absolute; top: 0; right: 0; border: 1.5px solid var(--accent); color: var(--accent); font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px;">PR</span>' : ''}
+          <div style="font-size: 42px; font-weight: 900;">${escapeHtml(String(currentEntry.weight))}</div>
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Attuale</div>
+        </div>
+        <div class="card-title">STORICO</div>
+      `;
+
+      html += history.map(h => `
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border);">
+          <span style="color: var(--text-muted); font-size: 13px;">${h.date ? escapeHtml(formatDateForDisplay(h.date)) : '—'}</span>
+          <span style="font-weight: 800;">${escapeHtml(String(h.weight))}${h === prEntry ? ' 🏆' : ''}</span>
+        </div>
+      `).join('');
+
+      // Tabella percentuali sul valore attuale: comoda per pianificare i lavori a % senza
+      // dover riaprire il blocco WOD (stessa logica della proposta peso per set).
+      if (isFinite(currentValue) && currentValue > 0) {
+        const percents = [105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30];
+        html += `
+          <div class="card-title" style="margin-top: 20px;">PERCENTUALI SUL VALORE ATTUALE</div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+            ${percents.map(p => `
+              <div style="background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 4px; text-align: center;">
+                <div style="font-weight: 800; font-size: 15px;">${roundToHalf(currentValue * p / 100)}</div>
+                <div style="font-size: 10px; color: var(--text-muted);">${p}%</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      content.innerHTML = html;
+      document.getElementById('massimaleHistoryModal').classList.add('active');
+    }
+
+    function closeMassimaleHistoryModal() {
+      document.getElementById('massimaleHistoryModal').classList.remove('active');
     }
 
     function roundToHalf(n) {
@@ -1826,8 +1964,9 @@
       const box = document.getElementById(`result-summary-${blockId}`);
       if (!box) return;
       const r = blockResults[blockId];
+      const communityBtn = `<button type="button" class="btn-secondary" style="width: 100%; margin-top: 8px; padding: 8px 10px; font-size: 11px;" onclick="openCommunityResultsModal(${blockId})">👥 Risultati Altri Atleti</button>`;
       if (!r) {
-        box.innerHTML = `<button type="button" class="btn-log-result" onclick="openLogResultModal(${blockId})">🏆 Log Result</button>`;
+        box.innerHTML = `<button type="button" class="btn-log-result" onclick="openLogResultModal(${blockId})">🏆 Log Result</button>${communityBtn}`;
         return;
       }
       box.innerHTML = `
@@ -1837,7 +1976,104 @@
           ${r.notes ? `<div class="result-summary-notes">"${escapeHtml(r.notes)}"</div>` : ''}
           <button type="button" class="btn-secondary" style="margin-top: 8px; padding: 6px 10px; font-size: 11px;" onclick="openLogResultModal(${blockId})">Modifica Risultato</button>
         </div>
+        ${communityBtn}
       `;
+    }
+
+    // ===================== RISULTATI DEGLI ALTRI ATLETI (stesso WOD) =====================
+
+    // Converte un risultato loggato in un valore numerico ordinabile, per costruire una
+    // classifica quando tutti gli atleti confrontati hanno usato lo stesso tipo di punteggio.
+    function scoreSortValue(result) {
+      const type = result.scoreType;
+      const detail = result.scoreDetail || {};
+      if (type === 'Time') {
+        const min = parseInt(detail.minutes, 10) || 0;
+        const sec = parseInt(detail.seconds, 10) || 0;
+        return { value: min * 60 + sec, higherIsBetter: false };
+      }
+      if (type === 'AMRAP') {
+        const rounds = parseInt(detail.rounds, 10) || 0;
+        const reps = parseInt(detail.reps, 10) || 0;
+        return { value: rounds * 1000 + reps, higherIsBetter: true };
+      }
+      if (type === 'Weight') {
+        if (detail.perSet && Array.isArray(detail.sets)) {
+          const weights = detail.sets.map(s => parseFloat(s.weight)).filter(n => isFinite(n));
+          return { value: weights.length ? Math.max(...weights) : 0, higherIsBetter: true };
+        }
+        return { value: parseFloat(detail.weight) || 0, higherIsBetter: true };
+      }
+      if (type === 'Reps') return { value: parseFloat(detail.reps) || 0, higherIsBetter: true };
+      if (type === 'Distance') return { value: parseFloat(detail.distance) || 0, higherIsBetter: true };
+      if (type === 'Calories') return { value: parseFloat(detail.calories) || 0, higherIsBetter: true };
+      return { value: 0, higherIsBetter: true };
+    }
+
+    // Ordina i risultati come classifica se condividono tutti lo stesso tipo di punteggio
+    // (tempo più basso vince, reps/peso/distanza/calorie più alto vince); altrimenti,
+    // essendo punteggi non confrontabili tra loro, ordina semplicemente per data più recente.
+    function sortCommunityResults(results) {
+      const types = new Set(results.map(r => r.scoreType));
+      if (types.size === 1) {
+        const withScores = results.map(r => ({ r, s: scoreSortValue(r) }));
+        const higherIsBetter = withScores[0].s.higherIsBetter;
+        withScores.sort((a, b) => higherIsBetter ? (b.s.value - a.s.value) : (a.s.value - b.s.value));
+        return withScores.map(x => x.r);
+      }
+      return results.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    }
+
+    function openCommunityResultsModal(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
+
+      const title = (block.querySelector('.block-title').value || '').trim();
+      const type = block.querySelector('.block-type').value;
+      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
+
+      document.getElementById('communityResultsTitle').innerText = title ? `RISULTATI: ${title.toUpperCase()}` : 'RISULTATI ALTRI ATLETI';
+
+      const matches = (globalData.results || []).filter(r =>
+        r.workout && title && r.workout.trim().toLowerCase() === title.toLowerCase() &&
+        (r.workoutType || '') === type
+      );
+
+      const content = document.getElementById('communityResultsContent');
+      if (matches.length === 0) {
+        content.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun altro atleta ha ancora loggato un risultato per questo WOD (il confronto si basa sul titolo del blocco: assicurati che sia lo stesso usato dagli altri).</p>';
+        document.getElementById('communityResultsModal').classList.add('active');
+        return;
+      }
+
+      const sorted = sortCommunityResults(matches);
+      const rankable = new Set(matches.map(r => r.scoreType)).size === 1;
+
+      content.innerHTML = sorted.map((r, i) => {
+        const isMe = r.athlete && r.athlete.toLowerCase() === activeAthlete;
+        const movementsArr = Array.isArray(r.movements) ? r.movements : (r.movements ? String(r.movements).split(',').map(s => s.trim()).filter(Boolean) : []);
+        return `
+          <div class="history-item" style="${isMe ? 'background: rgba(230, 74, 25, 0.08); border-radius: 8px; padding: 12px; margin-bottom: 4px;' : ''}">
+            <div class="history-item-header">
+              <div>
+                ${rankable ? `<span style="font-weight: 900; color: var(--accent); margin-right: 6px;">#${i + 1}</span>` : ''}
+                <span style="font-weight: 800;">${escapeHtml(r.athlete || '')}${isMe ? ' (tu)' : ''}</span>
+                <span style="background: ${r.category === 'SCALED' ? 'var(--input-bg)' : 'var(--accent)'}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; margin-left: 6px;">${escapeHtml(r.category || '')}</span>
+              </div>
+              <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(formatDateForDisplay(r.date))}</span>
+            </div>
+            <div style="margin-top: 6px; font-size: 14px; font-weight: 800; color: #2e7d32;">🏆 ${escapeHtml(r.scoreDisplay || '')}</div>
+            ${movementsArr.length ? `<div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">${escapeHtml(movementsArr.join(', '))}</div>` : ''}
+            ${r.notes ? `<div style="margin-top: 4px; font-size: 12px; color: var(--text-muted); font-style: italic;">"${escapeHtml(r.notes)}"</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('communityResultsModal').classList.add('active');
+    }
+
+    function closeCommunityResultsModal() {
+      document.getElementById('communityResultsModal').classList.remove('active');
     }
 
     function renderResultsList() {
