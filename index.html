@@ -105,6 +105,21 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
+    .calendar-card { padding: 14px 16px; }
+    .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .calendar-month-label { font-size: 15px; font-weight: 800; text-transform: capitalize; }
+    .calendar-jump-btn { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; width: 34px; height: 34px; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .calendar-week-row { display: flex; align-items: center; gap: 2px; }
+    .calendar-nav-btn { background: none; border: none; color: var(--text-muted); font-size: 20px; font-weight: 900; cursor: pointer; padding: 4px 2px; flex-shrink: 0; }
+    .calendar-days { flex: 1; display: flex; justify-content: space-between; gap: 4px; }
+    .calendar-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border-radius: 8px; border: 1.5px solid transparent; cursor: pointer; }
+    .calendar-day-name { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+    .calendar-day-num { font-size: 15px; font-weight: 800; color: var(--text); }
+    .calendar-day.has-log .calendar-day-num::after { content: ''; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin: 3px auto 0; }
+    .calendar-day.selected { border-color: var(--accent); background: rgba(230, 74, 25, 0.12); }
+    .calendar-day.is-today .calendar-day-name { color: var(--accent); }
+    #registraDayView .history-item:last-child { border-bottom: none; padding-bottom: 0; }
+
     .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
     .result-summary-box { background: rgba(46, 125, 50, 0.12); border: 1px solid #2e7d32; border-radius: 10px; padding: 12px; }
     .result-summary-score { font-size: 15px; font-weight: 900; color: #4caf50; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -177,7 +192,29 @@
 
   <!-- TAB REGISTRA -->
   <div id="tab-registra" class="tab-content active">
-    <div class="card">
+
+    <!-- CALENDARIO NAVIGABILE -->
+    <div class="card calendar-card">
+      <div class="calendar-header">
+        <div class="calendar-month-label" id="calendarMonthLabel"></div>
+        <button type="button" class="calendar-jump-btn" onclick="openCalendarJumpPicker()">📅</button>
+        <input type="date" id="calendarJumpInput" style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0;" onchange="jumpToCalendarDate(this.value)">
+      </div>
+      <div class="calendar-week-row">
+        <button type="button" class="calendar-nav-btn" onclick="shiftCalendarWeek(-1)">‹</button>
+        <div class="calendar-days" id="calendarDaysRow"></div>
+        <button type="button" class="calendar-nav-btn" onclick="shiftCalendarWeek(1)">›</button>
+      </div>
+    </div>
+
+    <!-- VISTA SOLA LETTURA: allenamento registrato in un giorno diverso da oggi -->
+    <div class="card" id="registraDayView" style="display: none;">
+      <div class="card-title" id="registraDayViewTitle">ALLENAMENTO</div>
+      <div id="registraDayViewContent"></div>
+    </div>
+
+    <!-- FORM DI REGISTRAZIONE (visibile solo per la giornata odierna) -->
+    <div class="card" id="registraFormCard">
       <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
         <button type="button" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
       </div>
@@ -401,11 +438,162 @@
 
     // Restituisce la data odierna in formato YYYY-MM-DD (fuso locale del dispositivo)
     function getTodayDateString() {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
+      return toDateString(new Date());
+    }
+
+    // Converte un oggetto Date in formato YYYY-MM-DD (fuso locale del dispositivo)
+    function toDateString(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
       return `${y}-${m}-${d}`;
+    }
+
+    // ===================== CALENDARIO NAVIGABILE (Tab Registra) =====================
+
+    const ITALIAN_DAY_LETTERS = ['D', 'L', 'M', 'M', 'G', 'V', 'S']; // Dom, Lun, Mar, Mer, Gio, Ven, Sab
+
+    // Data attualmente selezionata nel calendario (default: oggi)
+    let selectedRegistraDate = getTodayDateString();
+    // Qualsiasi giorno della settimana correntemente mostrata nella riga del calendario
+    let calendarAnchorDate = new Date();
+
+    // Restituisce il Domenica (inizio settimana) della settimana contenente la data data
+    function getWeekStart(date) {
+      const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      d.setDate(d.getDate() - d.getDay());
+      return d;
+    }
+
+    function renderRegistraCalendar() {
+      const monthLabelEl = document.getElementById('calendarMonthLabel');
+      const daysRow = document.getElementById('calendarDaysRow');
+      if (!monthLabelEl || !daysRow) return;
+
+      const monthLabel = calendarAnchorDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+      monthLabelEl.innerText = monthLabel;
+
+      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
+      const loggedDates = new Set(
+        (globalData.wods || [])
+          .filter(w => w.athlete && w.athlete.toLowerCase() === activeAthlete)
+          .map(w => w.date)
+      );
+
+      const todayStr = getTodayDateString();
+      const weekStart = getWeekStart(calendarAnchorDate);
+
+      let html = '';
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(weekStart.getDate() + i);
+        const dayStr = toDateString(dayDate);
+
+        const classes = ['calendar-day'];
+        if (dayStr === selectedRegistraDate) classes.push('selected');
+        if (dayStr === todayStr) classes.push('is-today');
+        if (loggedDates.has(dayStr)) classes.push('has-log');
+
+        html += `
+          <div class="${classes.join(' ')}" onclick="selectCalendarDate('${dayStr}')">
+            <div class="calendar-day-name">${ITALIAN_DAY_LETTERS[i]}</div>
+            <div class="calendar-day-num">${dayDate.getDate()}</div>
+          </div>
+        `;
+      }
+      daysRow.innerHTML = html;
+    }
+
+    function selectCalendarDate(dateStr) {
+      selectedRegistraDate = dateStr;
+      calendarAnchorDate = new Date(dateStr + 'T00:00:00');
+      renderRegistraCalendar();
+      updateRegistraDateView();
+    }
+
+    function shiftCalendarWeek(delta) {
+      calendarAnchorDate = new Date(calendarAnchorDate);
+      calendarAnchorDate.setDate(calendarAnchorDate.getDate() + delta * 7);
+      renderRegistraCalendar();
+    }
+
+    function openCalendarJumpPicker() {
+      const input = document.getElementById('calendarJumpInput');
+      if (!input) return;
+      if (input.showPicker) input.showPicker();
+      else input.click();
+    }
+
+    function jumpToCalendarDate(value) {
+      if (!value) return;
+      selectCalendarDate(value);
+    }
+
+    // Mostra il form di registrazione per la giornata odierna, oppure una vista
+    // di sola lettura con quanto già registrato per un altro giorno selezionato.
+    function updateRegistraDateView() {
+      const formCard = document.getElementById('registraFormCard');
+      const dayView = document.getElementById('registraDayView');
+      if (!formCard || !dayView) return;
+
+      const isToday = selectedRegistraDate === getTodayDateString();
+      formCard.style.display = isToday ? '' : 'none';
+      dayView.style.display = isToday ? 'none' : '';
+
+      if (!isToday) renderRegistraDayView();
+    }
+
+    function renderRegistraDayView() {
+      const titleEl = document.getElementById('registraDayViewTitle');
+      const contentEl = document.getElementById('registraDayViewContent');
+      if (!titleEl || !contentEl) return;
+
+      titleEl.innerText = `ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
+
+      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
+      const sessions = (globalData.wods || []).filter(w =>
+        w.date === selectedRegistraDate && w.athlete && w.athlete.toLowerCase() === activeAthlete
+      );
+
+      if (sessions.length === 0) {
+        contentEl.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento registrato per questo giorno.</p>';
+        return;
+      }
+
+      contentEl.innerHTML = sessions.map(item => {
+        let blocksHtml = '';
+        if (item.blocks && Array.isArray(item.blocks)) {
+          blocksHtml = item.blocks.map(b => {
+            const bodyHtml = b.explanation ? `
+              <div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin-top: 2px;">${escapeHtml(b.explanation)}</div>
+            ` : '';
+            const scoreHtml = b.result ? `
+              <div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">🏆 Score: ${escapeHtml(b.result)}</div>
+            ` : `
+              <div style="font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px;">Nessun risultato loggato.</div>
+            `;
+            return `
+              <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
+                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
+                ${bodyHtml}
+                ${scoreHtml}
+              </div>
+            `;
+          }).join('');
+        }
+
+        return `
+          <div class="history-item">
+            <div class="history-item-header">
+              <div>
+                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
+              </div>
+              <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+            </div>
+            ${blocksHtml}
+          </div>
+        `;
+      }).join('');
     }
 
     const CROSSFIT_STANDARD_RMS = [
@@ -423,6 +611,8 @@
 
     window.onload = function() {
       loadSavedLogos();
+      renderRegistraCalendar();
+      updateRegistraDateView();
       fetchCloudData().then(() => {
         checkUserLogin();
       });
@@ -478,6 +668,8 @@
           renderHistory();
           renderResultsList();
           loadLocalMassimaliAndProfile();
+          renderRegistraCalendar();
+          updateRegistraDateView();
         }
       } catch (err) {
         console.error("Errore sincronizzazione cloud:", err);
@@ -862,6 +1054,8 @@
 
       globalData.wods = globalData.wods.filter(item => String(item.id) !== String(id));
       renderHistory();
+      renderRegistraCalendar();
+      updateRegistraDateView();
     }
 
     function renderHistory() {
@@ -1540,6 +1734,7 @@
       document.querySelectorAll('.nav button')[map[tab]].classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'storico') { renderHistory(); renderResultsList(); }
+      if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
     }
 
     function setMode(mode) {
