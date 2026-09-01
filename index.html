@@ -174,7 +174,7 @@
         <p id="loginPinHint" style="font-size: 11px; color: var(--text-muted); margin-top: 8px; margin-bottom: 0;"></p>
       </div>
 
-      <button class="btn-main" onclick="performLogin()">ACCEDI</button>
+      <button class="btn-main" onclick="withButtonGuard(this, performLogin)">ACCEDI</button>
       
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">Non sei in elenco?</p>
@@ -254,7 +254,7 @@
         </div>
       </div>
 
-      <button class="btn-main" id="saveWodBtn" onclick="saveWodSession()">SALVA SESSIONE COMPLETA</button>
+      <button class="btn-main" id="saveWodBtn" onclick="withButtonGuard(this, saveWodSession)">SALVA SESSIONE COMPLETA</button>
     </div>
   </div>
 
@@ -300,14 +300,14 @@
         <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Ti servirà per accedere al tuo profilo. Se lo dimentichi, dovrà resettartelo un amministratore dal foglio Google.</p>
       </div>
 
-      <button class="btn-main" onclick="saveProfile()">REGISTRA / SALVA ATLETA</button>
+      <button class="btn-main" onclick="withButtonGuard(this, saveProfile)">REGISTRA / SALVA ATLETA</button>
     </div>
 
     <div class="card">
       <div class="card-title">MASSIMALI E PARAMETRI CROSSFIT</div>
       <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 14px;">Inserisci i tuoi massimali di sollevamento (Kg), ginnastica (max reps o secondi), e benchmark cardiovascolari (passo/tempo).</p>
       <div id="rmContainer"></div>
-      <button class="btn-main" style="margin-top: 12px;" onclick="saveMassimaliCloud()">SALVA MASSIMALI</button>
+      <button class="btn-main" style="margin-top: 12px;" onclick="withButtonGuard(this, saveMassimaliCloud)">SALVA MASSIMALI</button>
     </div>
   </div>
 
@@ -391,7 +391,7 @@
         <textarea id="lrNotes" rows="3" placeholder="Es. Ottime sensazioni, ridotto il peso alla terza serie..."></textarea>
       </div>
 
-      <button class="btn-main" onclick="saveLogResult()">SALVA RISULTATO</button>
+      <button class="btn-main" onclick="withButtonGuard(this, saveLogResult)">SALVA RISULTATO</button>
     </div>
   </div>
 
@@ -443,7 +443,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v13";
+    const APP_VERSION = "v14";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -475,6 +475,26 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/'/g, '&#39;');
+    }
+
+    // Disabilita il bottone premuto per tutta la durata di un'operazione asincrona (salvataggio,
+    // login, eliminazione...), così un doppio tap mentre la richiesta è ancora in corso (es. con
+    // connessione lenta) non genera un invio duplicato. Il bottone torna sempre cliccabile alla
+    // fine, sia in caso di successo che di errore. Se il bottone è già disabilitato (operazione
+    // già in corso), il nuovo click viene semplicemente ignorato.
+    // Non tocchiamo il testo del bottone (solo opacità): alcuni bottoni (es. "SALVA SESSIONE
+    // COMPLETA"/"SALVA MODIFICHE") gestiscono da soli la propria etichetta durante l'operazione,
+    // e sovrascriverla qui rischierebbe di rimetterla a quella sbagliata al termine.
+    async function withButtonGuard(button, fn) {
+      if (!button || button.disabled) return;
+      button.disabled = true;
+      button.style.opacity = '0.6';
+      try {
+        return await fn();
+      } finally {
+        button.disabled = false;
+        button.style.opacity = '';
+      }
     }
 
     function formatDateForDisplay(dateStr) {
@@ -672,7 +692,7 @@
               </div>
               <div style="display: flex; gap: 6px;">
                 <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
-                <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+                <button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button>
               </div>
             </div>
             ${blocksHtml}
@@ -1566,7 +1586,7 @@
               </div>
               <div style="display: flex; gap: 6px;">
                 <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
-                <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+                <button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button>
               </div>
             </div>
             ${contentHtml}
@@ -2528,7 +2548,7 @@
                 <span style="background: ${r.category === 'SCALED' ? 'var(--input-bg)' : 'var(--accent)'}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(r.category || '')}</span>
                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(r.date))}</span>
               </div>
-              <button class="btn-delete-history" onclick="deleteResult('${String(r.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+              <button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteResult('${String(r.id).replace(/'/g, "\\'")}'))">✕ Elimina</button>
             </div>
             <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${escapeHtml(r.workout || '')} ${r.workoutType ? '(' + escapeHtml(r.workoutType) + ')' : ''}</div>
             <div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">🏆 ${escapeHtml(r.scoreDisplay || '')} <span style="color: var(--text-muted); font-weight: 600; font-size: 11px;">(${escapeHtml(r.scoreType || '')})</span></div>
