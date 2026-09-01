@@ -124,17 +124,17 @@
     .active-days-range button.active { background: var(--accent); color: var(--text); border-color: var(--accent); }
     .active-days-chart-scroll { overflow-x: auto; }
     .active-days-chart {
-      display: flex; align-items: flex-end; gap: 8px; height: 130px; min-width: 100%;
+      display: flex; align-items: flex-end; gap: 4px; height: 130px; min-width: 100%;
       border-bottom: 1px solid var(--border); padding: 0 2px;
     }
     .active-days-chart.is-scrollable { min-width: max-content; }
-    .active-days-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; flex: 1 0 30px; min-width: 30px; }
+    .active-days-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; flex: 1 0 34px; min-width: 34px; }
     .active-days-bar-count { font-size: 11px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
     .active-days-bar-count.is-zero { visibility: hidden; }
     .active-days-bar { width: 20px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 3px; }
-    .active-days-labels { display: flex; gap: 8px; padding: 6px 2px 0; min-width: 100%; }
+    .active-days-labels { display: flex; gap: 4px; padding: 6px 2px 0; min-width: 100%; }
     .active-days-labels.is-scrollable { min-width: max-content; }
-    .active-days-label-col { flex: 1 0 30px; min-width: 30px; text-align: center; font-size: 9px; color: var(--text-muted); white-space: nowrap; }
+    .active-days-label-col { flex: 1 0 34px; min-width: 34px; text-align: center; font-size: 8px; color: var(--text-muted); white-space: nowrap; }
     .active-days-empty { font-size: 13px; color: var(--text-muted); }
 
     .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
@@ -319,6 +319,10 @@
         <button type="button" class="active-days-range-btn" data-range="all" onclick="renderActiveDaysChart('all')">SEMPRE</button>
       </div>
       <div id="activeDaysChartContainer"></div>
+      <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <button type="button" class="btn-secondary" style="flex: 1;" onclick="openPrsListModal('barbell')">🏋️ PRs</button>
+        <button type="button" class="btn-secondary" style="flex: 1;" onclick="openPrsListModal('benchmark')">🏆 Benchmark</button>
+      </div>
     </div>
 
     <div class="card">
@@ -354,6 +358,13 @@
       <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 14px;">Inserisci i tuoi massimali di sollevamento (Kg), ginnastica (max reps o secondi), e benchmark cardiovascolari (passo/tempo).</p>
       <div id="rmContainer"></div>
       <button class="btn-main" style="margin-top: 12px;" onclick="withButtonGuard(this, saveMassimaliCloud)">SALVA MASSIMALI</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏆 BENCHMARK WOD</div>
+      <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 14px;">I WOD benchmark più famosi del CrossFit (Girls, Hero e altri classici). Inserisci il tuo miglior risultato (tempo, rounds+reps o reps totali) — se non lo compili a mano, viene aggiornato in automatico ogni volta che logghi un risultato migliore per uno di questi WOD.</p>
+      <div id="benchmarkContainer"></div>
+      <button class="btn-main" style="margin-top: 12px;" onclick="withButtonGuard(this, saveMassimaliCloud)">SALVA BENCHMARK</button>
     </div>
   </div>
 
@@ -466,6 +477,17 @@
     </div>
   </div>
 
+  <!-- MODAL LISTA PRs / BENCHMARK -->
+  <div id="prsListModal" class="log-result-modal">
+    <div class="log-result-card">
+      <div class="log-result-header">
+        <div class="card-title" id="prsListTitle" style="margin-bottom: 0;">PRs</div>
+        <button type="button" class="btn-remove" style="height: 28px; padding: 0 10px;" onclick="closePrsListModal()">✕</button>
+      </div>
+      <div id="prsListContent">Caricamento in corso...</div>
+    </div>
+  </div>
+
   <input type="file" id="globalImageInput" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
 
   <script>
@@ -492,7 +514,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v18";
+    const APP_VERSION = "v19";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -763,6 +785,50 @@
       "SkiErg 500m (Tempo mm:ss)", "Mile Run (1.6 km - Tempo mm:ss)"
     ];
 
+    // Sottoinsieme di CROSSFIT_STANDARD_RMS che sono sollevamenti col bilanciere veri e propri
+    // (esclude ginnastica/cardio): usato per il tasto "PRs" nel tab Atleta. Stessi nomi esatti
+    // della lista sopra, per restare compatibili con i massimali già salvati.
+    const CROSSFIT_BARBELL_LIFTS = [
+      "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",
+      "Clean and Jerk", "Hang Clean", "Back Squat", "Front Squat",
+      "Overhead Squat", "Deadlift (Stacco)", "Bench Press (Panca Piana)",
+      "Push Press", "Push Jerk", "Split Jerk", "Thruster", "Overhead Lunge"
+    ];
+
+    // WOD benchmark più noti del CrossFit (Girls, Hero, e altri classici). scoreType indica
+    // come va interpretato/confrontato il risultato salvato: 'Time' = tempo mm:ss (vince il più
+    // basso), 'AMRAP' = rounds+reps, 'Reps' = reps/round totali (vince il più alto).
+    const CROSSFIT_BENCHMARK_WODS = [
+      { name: "Fran (21-15-9 Thruster 43/30kg + Pull-up)", scoreType: 'Time' },
+      { name: "Grace (30 Clean & Jerk 61/43kg)", scoreType: 'Time' },
+      { name: "Isabel (30 Snatch 61/43kg)", scoreType: 'Time' },
+      { name: "Diane (21-15-9 Deadlift 102/70kg + HSPU)", scoreType: 'Time' },
+      { name: "Elizabeth (21-15-9 Clean 61/43kg + Ring Dips)", scoreType: 'Time' },
+      { name: "Jackie (1000m Row + 50 Thruster 20kg + 30 Pull-up)", scoreType: 'Time' },
+      { name: "Karen (150 Wall Ball 9/6kg)", scoreType: 'Time' },
+      { name: "Annie (50-40-30-20-10 Double Under + Sit-up)", scoreType: 'Time' },
+      { name: "Cindy (AMRAP 20' 5 Pull-up/10 Push-up/15 Air Squat)", scoreType: 'AMRAP' },
+      { name: "Mary (AMRAP 20' 5 HSPU/10 Pistol/15 Pull-up)", scoreType: 'AMRAP' },
+      { name: "Angie (100 Pull-up/100 Push-up/100 Sit-up/100 Squat)", scoreType: 'Time' },
+      { name: "Barbara (5 round 20 Pull-up/30 Push-up/40 Sit-up/50 Squat)", scoreType: 'Time' },
+      { name: "Chelsea (EMOM 30' 5 Pull-up/10 Push-up/15 Squat)", scoreType: 'Reps' },
+      { name: "Eva (5 round 800m Run + 30 KB Swing 32kg + 30 Pull-up)", scoreType: 'Time' },
+      { name: "Helen (3 round 400m Run + 21 KB Swing 24kg + 12 Pull-up)", scoreType: 'Time' },
+      { name: "Kelly (5 round 400m Run + 30 Box Jump 61cm + 30 Wall Ball)", scoreType: 'Time' },
+      { name: "Linda (Deadlift/Bench/Clean 10-9-8...1 sul peso corporeo)", scoreType: 'Time' },
+      { name: "Lynne (5 round max Bench Press peso corporeo + max Pull-up)", scoreType: 'Reps' },
+      { name: "Nancy (5 round 400m Run + 15 Overhead Squat 43kg)", scoreType: 'Time' },
+      { name: "Nicole (AMRAP 20' 400m Run + max Pull-up)", scoreType: 'AMRAP' },
+      { name: "Murph (1 Mile + 100 Pull-up + 200 Push-up + 300 Squat + 1 Mile)", scoreType: 'Time' },
+      { name: "DT (5 round 12 Deadlift/9 Hang Power Clean/6 Push Jerk 70kg)", scoreType: 'Time' },
+      { name: "JT (21-15-9 HSPU/Ring Dips/Push-up)", scoreType: 'Time' },
+      { name: "Randy (75 Power Snatch 34kg)", scoreType: 'Time' },
+      { name: "Michael (3 round 800m Run + 50 Back Extension + 50 Sit-up)", scoreType: 'Time' },
+      { name: "Fight Gone Bad (3 round AMRAP 17', reps totali)", scoreType: 'Reps' },
+      { name: "Filthy Fifty (50 reps x 10 esercizi)", scoreType: 'Time' },
+      { name: "The Seven (7 round di 7 esercizi a 61kg/32kg)", scoreType: 'Time' }
+    ];
+
     window.onload = function() {
       applyDefaultLogos();
       applyAppVersion();
@@ -998,10 +1064,17 @@
       return addDaysToDateString(dateStr, diffToMonday);
     }
 
-    function formatActiveDaysLabel(dateStr) {
-      const months = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
-      const d = new Date(dateStr + 'T00:00:00');
-      return `${months[d.getMonth()]} ${d.getDate()}`;
+    // Etichetta di una settimana come intervallo "inizio-fine" (es. "31/8-6/9"): mostrare solo
+    // il lunedì (es. "Ago 31") confondeva chi si aspettava di vedere il mese corrente quando la
+    // settimana in corso inizia nel mese precedente (es. la settimana che contiene oggi 1
+    // settembre può iniziare lunedì 31 agosto).
+    function formatActiveDaysLabel(weekStartStr) {
+      const weekEndStr = addDaysToDateString(weekStartStr, 6);
+      const fmt = (dateStr) => {
+        const d = new Date(dateStr + 'T00:00:00');
+        return `${d.getDate()}/${d.getMonth() + 1}`;
+      };
+      return `${fmt(weekStartStr)}-${fmt(weekEndStr)}`;
     }
 
     let activeDaysCurrentRange = 'recent';
@@ -1121,11 +1194,14 @@
       renderRmContainer(maxsMap);
     }
 
-    function renderRmContainer(savedMaxs = {}) {
-      const container = document.getElementById('rmContainer');
+    // Riempie un container di righe "esercizio + campo valore" (stesso markup per massimali
+    // classici e benchmark WOD, entrambi salvati con la stessa logica su 'saveMassimale').
+    function renderMovementInputRows(containerId, movementNames, savedMaxs) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
       container.innerHTML = '';
 
-      CROSSFIT_STANDARD_RMS.forEach(movement => {
+      movementNames.forEach(movement => {
         const val = savedMaxs[movement.toLowerCase()] || '';
         const row = document.createElement('div');
         row.className = 'rm-row';
@@ -1136,6 +1212,11 @@
         `;
         container.appendChild(row);
       });
+    }
+
+    function renderRmContainer(savedMaxs = {}) {
+      renderMovementInputRows('rmContainer', CROSSFIT_STANDARD_RMS, savedMaxs);
+      renderMovementInputRows('benchmarkContainer', CROSSFIT_BENCHMARK_WODS.map(b => b.name), savedMaxs);
     }
 
     async function saveProfile() {
@@ -1439,6 +1520,7 @@
       };
 
       if (url) {
+        showFunLoadingOverlay();
         try {
           // In modifica ripuliamo prima le vecchie righe della sessione: saveWodSession
           // accoda sempre nuove righe, quindi senza questo passaggio un blocco rimosso o
@@ -1449,10 +1531,11 @@
 
           const response = await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
           if (response.ok) {
+            await fetchCloudData();
+            hideFunLoadingOverlay();
             alert(isEditing ? 'Modifiche salvate!' : 'Sessione multi-blocco salvata sul Foglio Google!');
             editingWodId = null;
             editingWodDate = null;
-            await fetchCloudData();
 
             document.getElementById('workoutBlocksContainer').innerHTML = '';
             blockCounter = 0;
@@ -1462,10 +1545,12 @@
 
             switchTab('storico');
           } else {
+            hideFunLoadingOverlay();
             alert('Errore durante il salvataggio sul cloud.');
           }
         } catch (err) {
           console.error("Errore salvataggio WOD:", err);
+          hideFunLoadingOverlay();
           alert('Errore di connessione durante il salvataggio.');
         }
       }
@@ -2036,6 +2121,120 @@
       return (isFinite(val) && val > 0) ? val : null;
     }
 
+    // Trova la definizione di benchmark (nome esatto + scoreType) per un dato nome di
+    // massimale, se corrisponde a uno dei WOD in CROSSFIT_BENCHMARK_WODS.
+    function findBenchmarkDef(movementName) {
+      if (!movementName) return null;
+      return CROSSFIT_BENCHMARK_WODS.find(b => b.name.toLowerCase() === movementName.toLowerCase()) || null;
+    }
+
+    // Riconosce se il titolo di un blocco corrisponde a uno dei benchmark WOD noti (match sul
+    // nome base, es. "Fran" o "Fran RX" -> benchmark "Fran (...)"), per l'aggiornamento
+    // automatico del PR quando si logga un risultato.
+    function detectBenchmarkForBlock(title) {
+      if (!title) return null;
+      const t = title.trim();
+      for (const b of CROSSFIT_BENCHMARK_WODS) {
+        const base = b.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        const re = new RegExp('^' + escapeRegex(base) + '\\b', 'i');
+        if (re.test(t)) return b;
+      }
+      return null;
+    }
+
+    // Converte lo score type/detail del Log Result (vedi buildLrScoreResult) in un valore
+    // numerico comparabile e nella direzione di miglioramento, per capire se un nuovo
+    // risultato batte un massimale/benchmark già salvato. Ritorna null se il tipo di
+    // punteggio non è comparabile a un massimale/benchmark (es. Distance/Calories).
+    function extractComparableScore(scoreType, scoreDetail) {
+      if (scoreType === 'Time') {
+        const total = (parseInt(scoreDetail.minutes, 10) || 0) * 60 + (parseInt(scoreDetail.seconds, 10) || 0);
+        return total > 0 ? { value: total, higherIsBetter: false } : null;
+      }
+      if (scoreType === 'AMRAP') {
+        const rounds = parseInt(scoreDetail.rounds, 10) || 0;
+        const reps = parseInt(scoreDetail.reps, 10) || 0;
+        return (rounds > 0 || reps > 0) ? { value: rounds * 100000 + reps, higherIsBetter: true } : null;
+      }
+      if (scoreType === 'Reps') {
+        const reps = parseInt(scoreDetail.reps, 10) || 0;
+        return reps > 0 ? { value: reps, higherIsBetter: true } : null;
+      }
+      if (scoreType === 'Weight' && !scoreDetail.perSet) {
+        const w = parseFloat(String(scoreDetail.weight).replace(',', '.'));
+        if (!isFinite(w) || w <= 0) return null;
+        const kg = scoreDetail.unit === 'lbs' ? w * 0.453592 : w;
+        return { value: kg, higherIsBetter: true };
+      }
+      return null;
+    }
+
+    // Riprova a interpretare un valore massimale/benchmark già salvato in formato libero
+    // (lo stesso testo scritto qui in precedenza: "4:30", "20 rounds + 5 reps", "150 reps",
+    // "80 kg") nello stesso formato atteso per lo scoreType dato. Ritorna null se il testo non
+    // è in quel formato (es. l'atleta lo ha scritto a mano diversamente): in quel caso non
+    // tocchiamo il dato esistente, per non sovrascrivere per errore un valore inserito a mano.
+    function parseStoredComparableScore(text, scoreType) {
+      if (!text) return null;
+      const s = String(text).trim();
+      if (scoreType === 'Time') {
+        const m = s.match(/^(\d{1,3}):(\d{2})$/);
+        return m ? (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) : null;
+      }
+      if (scoreType === 'AMRAP') {
+        const m = s.match(/^(\d+)\s*rounds?(?:\s*\+\s*(\d+)\s*reps?)?$/i);
+        return m ? (parseInt(m[1], 10) * 100000 + (m[2] ? parseInt(m[2], 10) : 0)) : null;
+      }
+      if (scoreType === 'Reps') {
+        const m = s.match(/^(\d+)\s*reps?$/i);
+        return m ? parseInt(m[1], 10) : null;
+      }
+      if (scoreType === 'Weight') {
+        const m = s.match(/^(\d+(?:[.,]\d+)?)\s*(kg|lbs)?$/i);
+        if (!m) return null;
+        const v = parseFloat(m[1].replace(',', '.'));
+        return (m[2] && m[2].toLowerCase() === 'lbs') ? v * 0.453592 : v;
+      }
+      return null;
+    }
+
+    // Se un risultato loggato (Log Result di un blocco) corrisponde a un benchmark WOD o cita
+    // un massimale della lista, aggiorna il valore salvato quando il nuovo risultato è un
+    // miglioramento (o non c'era ancora nulla di salvato). Se il risultato salvato è migliore
+    // (o non è confrontabile, es. inserito a mano in un formato diverso), non tocca nulla.
+    async function maybeAutoUpdateMassimale(movementName, scoreType, scoreDetail, scoreDisplay, athleteName, date) {
+      const comparable = extractComparableScore(scoreType, scoreDetail);
+      if (!comparable) return;
+
+      const latest = getLatestMassimaliMap(athleteName)[movementName.toLowerCase()];
+      const previousValue = latest ? parseStoredComparableScore(latest.weight, scoreType) : null;
+
+      const isImprovement = previousValue === null ||
+        (comparable.higherIsBetter ? comparable.value > previousValue : comparable.value < previousValue);
+      if (!isImprovement) return;
+
+      const url = getScriptUrl();
+      if (url) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'saveMassimale', athlete: athleteName, movement: movementName, weight: scoreDisplay, date })
+          });
+        } catch (err) {
+          console.error('Errore aggiornamento automatico massimale/benchmark:', err);
+          return;
+        }
+      }
+
+      globalData.massimali = globalData.massimali || [];
+      globalData.massimali.push({ athlete: athleteName, movement: movementName, weight: scoreDisplay, date });
+
+      // Se il tab ATLETA è già aperto, aggiorna subito i campi visibili.
+      if (document.getElementById('tab-atleta')?.classList.contains('active')) {
+        loadLocalMassimaliAndProfile();
+      }
+    }
+
     function openMassimaleHistoryModal(movementName) {
       const athleteName = localStorage.getItem('activeAthlete');
       if (!athleteName) return;
@@ -2053,11 +2252,20 @@
       const currentEntry = history[0];
       const currentValue = parseFloat(String(currentEntry.weight).replace(',', '.'));
 
-      // Trova la riga con il valore più alto in assoluto, per marcarla come PR.
+      // Trova la riga migliore per marcarla come PR: per i massimali classici vince il valore
+      // più alto, per i benchmark a tempo (es. Fran) vince il tempo più basso.
+      const benchmarkDef = findBenchmarkDef(movementName);
+      const higherIsBetter = !benchmarkDef || benchmarkDef.scoreType !== 'Time';
+      const parseForCompare = (text) => benchmarkDef
+        ? parseStoredComparableScore(text, benchmarkDef.scoreType)
+        : parseFloat(String(text).replace(',', '.'));
+
       const prEntry = history.reduce((best, h) => {
-        const v = parseFloat(String(h.weight).replace(',', '.'));
-        const bestV = parseFloat(String(best.weight).replace(',', '.'));
-        return (isFinite(v) && (!isFinite(bestV) || v > bestV)) ? h : best;
+        const v = parseForCompare(h.weight);
+        const bestV = parseForCompare(best.weight);
+        if (v === null || !isFinite(v)) return best;
+        if (bestV === null || !isFinite(bestV)) return h;
+        return (higherIsBetter ? v > bestV : v < bestV) ? h : best;
       }, currentEntry);
       const isCurrentPr = prEntry === currentEntry;
 
@@ -2078,8 +2286,9 @@
       `).join('');
 
       // Tabella percentuali sul valore attuale: comoda per pianificare i lavori a % senza
-      // dover riaprire il blocco WOD (stessa logica della proposta peso per set).
-      if (isFinite(currentValue) && currentValue > 0) {
+      // dover riaprire il blocco WOD (stessa logica della proposta peso per set). Non ha senso
+      // per i benchmark WOD (es. percentuali su un tempo), quindi la saltiamo per quelli.
+      if (!benchmarkDef && isFinite(currentValue) && currentValue > 0) {
         const percents = [105, 100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30];
         html += `
           <div class="card-title" style="margin-top: 20px;">PERCENTUALI SUL VALORE ATTUALE</div>
@@ -2100,6 +2309,50 @@
 
     function closeMassimaleHistoryModal() {
       document.getElementById('massimaleHistoryModal').classList.remove('active');
+    }
+
+    // Elenco riassuntivo di tutti i PR (bilanciere) o benchmark WOD compilati, aperto dai due
+    // tasti sotto il grafico Giorni Attivi nel tab Atleta. Ogni riga apre lo storico completo
+    // di quel singolo esercizio/benchmark (stessa modale usata dal tab Massimali).
+    function openPrsListModal(kind) {
+      const isBenchmark = kind === 'benchmark';
+      document.getElementById('prsListTitle').innerText = isBenchmark ? '🏆 BENCHMARK' : '🏋️ BARBELL PRs';
+      const content = document.getElementById('prsListContent');
+
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) {
+        content.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Effettua prima il login con il tuo profilo atleta!</p>';
+        document.getElementById('prsListModal').classList.add('active');
+        return;
+      }
+
+      const movementNames = isBenchmark ? CROSSFIT_BENCHMARK_WODS.map(b => b.name) : CROSSFIT_BARBELL_LIFTS;
+      const latest = getLatestMassimaliMap(athleteName);
+      const withValue = movementNames
+        .map(name => ({ name, entry: latest[name.toLowerCase()] }))
+        .filter(x => x.entry && x.entry.weight);
+
+      if (withValue.length === 0) {
+        content.innerHTML = `<p style="color: var(--text-muted); font-size: 13px;">Nessun ${isBenchmark ? 'benchmark' : 'PR'} salvato ancora. Vai su ATLETA → ${isBenchmark ? 'Benchmark WOD' : 'Massimali'} per compilarlo, oppure logga un risultato per uno di questi ${isBenchmark ? 'WOD' : 'movimenti'} per aggiornarlo in automatico.</p>`;
+        document.getElementById('prsListModal').classList.add('active');
+        return;
+      }
+
+      content.innerHTML = withValue.map(x => `
+        <div class="history-item" style="cursor: pointer;" onclick="closePrsListModal(); openMassimaleHistoryModal('${x.name.replace(/'/g, "\\'")}')">
+          <div class="history-item-header">
+            <span style="font-weight: 800; font-size: 13px;">${escapeHtml(x.name)}</span>
+            <span style="font-weight: 900; color: var(--accent);">${escapeHtml(String(x.entry.weight))}</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${x.entry.date ? escapeHtml(formatDateForDisplay(x.entry.date)) : ''}</div>
+        </div>
+      `).join('');
+
+      document.getElementById('prsListModal').classList.add('active');
+    }
+
+    function closePrsListModal() {
+      document.getElementById('prsListModal').classList.remove('active');
     }
 
     function roundToHalf(n) {
@@ -2541,6 +2794,21 @@
       globalData.results = globalData.results || [];
       const idx = globalData.results.findIndex(r => String(r.id) === String(result.id));
       if (idx >= 0) { globalData.results[idx] = result; } else { globalData.results.unshift(result); }
+
+      // PR automatico: se il blocco è uno dei benchmark WOD noti, o cita un massimale della
+      // lista, aggiorna il valore salvato quando questo risultato è un miglioramento (o non
+      // c'era ancora nulla salvato per quell'esercizio/benchmark).
+      const benchmarkMatch = detectBenchmarkForBlock(blockTitle);
+      if (benchmarkMatch && benchmarkMatch.scoreType === scoreType) {
+        await maybeAutoUpdateMassimale(benchmarkMatch.name, scoreType, scoreDetail, scoreDisplay, athleteName, result.date);
+      } else if (scoreType === 'Weight' && !scoreDetail.perSet) {
+        const explanationEl = block ? block.querySelector('.block-explanation') : null;
+        const blockExplanation = explanationEl ? explanationEl.value : '';
+        const exerciseName = detectExerciseNameForMassimale(blockTitle + '\n' + blockExplanation);
+        if (exerciseName) {
+          await maybeAutoUpdateMassimale(exerciseName, scoreType, scoreDetail, scoreDisplay, athleteName, result.date);
+        }
+      }
     }
 
     function renderBlockResultSummary(blockId) {
