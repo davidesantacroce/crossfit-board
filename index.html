@@ -139,6 +139,9 @@
     .detected-sets-hint { font-size: 12px; color: var(--accent); font-weight: 700; margin-top: -8px; margin-bottom: 16px; }
     .detected-sets-hint:empty { display: none; margin: 0; }
 
+    .suggested-weight-hint { font-size: 12px; color: #4caf50; font-weight: 700; margin-top: 4px; margin-bottom: 16px; }
+    .missing-max-hint { font-size: 12px; color: #ffa726; font-weight: 700; margin-top: 4px; margin-bottom: 16px; }
+
     .lr-perset-list { display: flex; flex-direction: column; gap: 8px; }
     .lr-perset-row { display: flex; align-items: center; gap: 8px; }
     .lr-perset-label { width: 52px; flex-shrink: 0; font-size: 12px; font-weight: 800; color: var(--text-muted); }
@@ -670,6 +673,7 @@
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
           updateRegistraDateView();
+          refreshAllBlockHints();
         }
       } catch (err) {
         console.error("Errore sincronizzazione cloud:", err);
@@ -923,6 +927,7 @@
         </div>
 
         <div class="detected-sets-hint" id="detected-sets-${currentId}"></div>
+        <div class="suggested-weight-hint" id="suggested-weight-${currentId}"></div>
 
         <div class="form-group">
           <label>RISULTATO</label>
@@ -1298,6 +1303,105 @@
       return null;
     }
 
+    // ============== PROPOSTA PESO PER SET (basata su % + massimale atleta) ==============
+
+    function escapeRegex(str) {
+      return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Estrae dal testo tutte le percentuali (es. "70%", "@ 82,5%") e le abbina ai set:
+    // se il numero di percentuali trovate coincide col numero di set, una per set;
+    // se ne trova una sola, la applica a tutti i set. Altrimenti (ambiguo) non propone nulla.
+    function detectPercentagesForSets(text, numSets) {
+      if (!text || !numSets) return null;
+      const matches = text.match(/(\d{1,3}(?:[.,]\d+)?)\s*%/g);
+      if (!matches || matches.length === 0) return null;
+
+      const values = matches.map(m => parseFloat(m.replace(',', '.').replace('%', '')));
+      if (!values.every(v => v > 0 && v <= 100)) return null;
+
+      if (values.length === numSets) return values;
+      if (values.length === 1) return new Array(numSets).fill(values[0]);
+      return null;
+    }
+
+    // Individua a quale esercizio della lista massimali (CROSSFIT_STANDARD_RMS) si riferisce
+    // il testo del blocco, facendo vincere il nome più specifico/lungo in caso di più match.
+    function detectExerciseNameForMassimale(text) {
+      if (!text) return null;
+      const candidates = CROSSFIT_STANDARD_RMS
+        .map(name => ({ name, base: name.replace(/\s*\([^)]*\)\s*$/, '').trim() }))
+        .sort((a, b) => b.base.length - a.base.length);
+
+      for (const c of candidates) {
+        const re = new RegExp('\\b' + escapeRegex(c.base) + '\\b', 'i');
+        if (re.test(text)) return c.name;
+      }
+      return null;
+    }
+
+    // Recupera il massimale numerico salvato dall'atleta attivo per un dato esercizio.
+    // Restituisce null se l'atleta non ha ancora compilato quel campo (o non è numerico).
+    function getAthleteMaxValue(movementName) {
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) return null;
+      const entry = (globalData.massimali || []).find(m =>
+        m.athlete && m.athlete.toLowerCase() === athleteName.toLowerCase() &&
+        m.movement && m.movement.toLowerCase() === movementName.toLowerCase()
+      );
+      if (!entry || entry.weight === undefined || entry.weight === null || entry.weight === '') return null;
+      const val = parseFloat(String(entry.weight).replace(',', '.'));
+      return (isFinite(val) && val > 0) ? val : null;
+    }
+
+    function roundToHalf(n) {
+      return Math.round(n * 2) / 2;
+    }
+
+    // Calcola la proposta di peso per ogni set di un blocco Sets/EMOM che contiene percentuali,
+    // basandosi sul massimale dell'esercizio rilevato. Restituisce:
+    // - null se non ci sono abbastanza informazioni (niente %, esercizio non riconosciuto, ecc.)
+    // - { missingMassimale: true, exerciseName } se l'esercizio è riconosciuto ma il massimale non è impostato
+    // - { weights, percentages, exerciseName, maxValue } con i pesi proposti (uno per set)
+    function computeSuggestedSetWeights(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return null;
+
+      const type = block.querySelector('.block-type').value;
+      if (type !== 'Sets' && type !== 'EMOM') return null;
+
+      const titleEl = block.querySelector('.block-title');
+      const explEl = block.querySelector('.block-explanation');
+      const text = (titleEl ? titleEl.value : '') + '\n' + (explEl ? explEl.value : '');
+
+      const setsInfo = getBlockSetsInfo(type, text);
+      if (!setsInfo || setsInfo.numSets <= 1) return null;
+
+      const percentages = detectPercentagesForSets(text, setsInfo.numSets);
+      if (!percentages) return null;
+
+      const exerciseName = detectExerciseNameForMassimale(text);
+      if (!exerciseName) return null;
+
+      const maxValue = getAthleteMaxValue(exerciseName);
+      if (maxValue === null) {
+        return { missingMassimale: true, exerciseName };
+      }
+
+      const weights = percentages.map(p => roundToHalf(maxValue * p / 100));
+      return { weights, percentages, exerciseName, maxValue };
+    }
+
+    // Ricalcola gli hint (set rilevati + peso proposto) per tutti i blocchi correntemente
+    // in pagina. Serve quando arrivano dati freschi da cloud (es. dopo il caricamento dei
+    // massimali), così le proposte di peso non restano basate su dati non ancora arrivati.
+    function refreshAllBlockHints() {
+      document.querySelectorAll('[id^="workout-block-"]').forEach(b => {
+        const blockId = b.id.replace('workout-block-', '');
+        renderDetectedSetsHint(blockId);
+      });
+    }
+
     // Mostra un'indicazione informativa (non editabile) col numero di set rilevati
     // automaticamente dal testo del blocco, per i blocchi di tipo Sets/Strength o EMOM.
     function renderDetectedSetsHint(blockId) {
@@ -1308,8 +1412,10 @@
 
       const typeSelect = block.querySelector('.block-type');
       const type = typeSelect ? typeSelect.value : '';
+      const suggestionElEarly = document.getElementById(`suggested-weight-${blockId}`);
       if (type !== 'Sets' && type !== 'EMOM') {
         hintEl.innerHTML = '';
+        if (suggestionElEarly) suggestionElEarly.innerHTML = '';
         return;
       }
 
@@ -1320,6 +1426,23 @@
       hintEl.innerHTML = info
         ? (info.reps ? `🔢 Rilevati: ${info.numSets} set x ${info.reps} reps` : `🔢 Rilevati: ${info.numSets} set`)
         : '';
+
+      // Se il WOD contiene percentuali su un esercizio riconosciuto, propone il peso per
+      // ogni set in base al massimale dell'atleta, oppure ricorda di compilarlo se manca.
+      const suggestion = computeSuggestedSetWeights(blockId);
+      const suggestionEl = suggestionElEarly;
+      if (suggestionEl) {
+        if (suggestion && suggestion.weights) {
+          suggestionEl.className = 'suggested-weight-hint';
+          suggestionEl.innerHTML = `💡 Peso proposto per set (${escapeHtml(suggestion.exerciseName)}, massimale ${escapeHtml(String(suggestion.maxValue))} Kg): ${suggestion.weights.map(w => escapeHtml(String(w))).join(' / ')} Kg`;
+        } else if (suggestion && suggestion.missingMassimale) {
+          suggestionEl.className = 'missing-max-hint';
+          suggestionEl.innerHTML = `⚠️ Il WOD contiene percentuali su <b>${escapeHtml(suggestion.exerciseName)}</b>, ma non hai ancora inserito il tuo massimale per questo esercizio. Vai su ATLETA → Massimali per compilarlo e ricevere il peso proposto.`;
+        } else {
+          suggestionEl.className = 'suggested-weight-hint';
+          suggestionEl.innerHTML = '';
+        }
+      }
     }
 
     // Scandisce titolo e spiegazione del blocco per suggerire automaticamente i movimenti coinvolti.
@@ -1466,19 +1589,32 @@
       const unit = prefill.unit || 'kg';
       const existingSets = (prefill.perSet && Array.isArray(prefill.sets)) ? prefill.sets : null;
 
+      // Se non c'è già un risultato salvato per questo blocco, propone il peso per set
+      // calcolato dalle percentuali del WOD sul massimale dell'atleta (se disponibile).
+      const suggestion = (!existingSets && lrActiveBlockId !== null) ? computeSuggestedSetWeights(lrActiveBlockId) : null;
+
       lrPerSetScores = [];
       for (let i = 0; i < setsInfo.numSets; i++) {
         const existing = existingSets ? existingSets[i] : null;
+        const suggestedWeight = (!existing && suggestion && suggestion.weights) ? String(suggestion.weights[i]) : '';
         lrPerSetScores.push({
-          weight: existing ? (existing.weight || '') : '',
+          weight: existing ? (existing.weight || '') : suggestedWeight,
           done: existing ? (existing.done !== false) : true
         });
       }
 
       const repsHint = setsInfo.reps ? `x${setsInfo.reps} reps` : '';
 
+      let suggestionHintHtml = '';
+      if (suggestion && suggestion.weights) {
+        suggestionHintHtml = `<div class="suggested-weight-hint">💡 Peso proposto in base al tuo massimale di <b>${escapeHtml(suggestion.exerciseName)}</b> (${escapeHtml(String(suggestion.maxValue))} Kg). Verifica e modifica se necessario.</div>`;
+      } else if (suggestion && suggestion.missingMassimale) {
+        suggestionHintHtml = `<div class="missing-max-hint">⚠️ Il WOD contiene percentuali su <b>${escapeHtml(suggestion.exerciseName)}</b>, ma non hai ancora inserito il tuo massimale per questo esercizio. Vai su ATLETA → Massimali per compilarlo e ricevere il peso proposto.</div>`;
+      }
+
       container.innerHTML = `
         <label>CARICO PER SET${repsHint ? ' (' + repsHint + ')' : ''}</label>
+        ${suggestionHintHtml}
         <div class="form-row" style="margin-bottom: 8px;">
           <div class="form-group" style="max-width: 110px;">
             <select id="lrPerSetUnit">
