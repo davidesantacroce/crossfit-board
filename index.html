@@ -159,11 +159,21 @@
       
       <div class="form-group" style="text-align: left;">
         <label>IL TUO NOME</label>
-        <select id="loginAthleteSelect" style="margin-bottom: 16px;">
+        <select id="loginAthleteSelect" style="margin-bottom: 16px;" onchange="onLoginAthleteChange()">
           <option value="">-- Seleziona Atleta --</option>
         </select>
       </div>
-      
+
+      <div class="form-group" id="loginPinGroup" style="display: none; text-align: left;">
+        <label id="loginPinLabel">PIN</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="loginPinInput" placeholder="••••" oninput="sanitizePinInput(this)" style="letter-spacing: 6px; text-align: center; font-size: 18px;">
+        <div id="loginPinConfirmWrap" style="display: none; margin-top: 12px;">
+          <label>CONFERMA PIN</label>
+          <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="loginPinConfirmInput" placeholder="••••" oninput="sanitizePinInput(this)" style="letter-spacing: 6px; text-align: center; font-size: 18px;">
+        </div>
+        <p id="loginPinHint" style="font-size: 11px; color: var(--text-muted); margin-top: 8px; margin-bottom: 0;"></p>
+      </div>
+
       <button class="btn-main" onclick="performLogin()">ACCEDI</button>
       
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
@@ -281,6 +291,15 @@
           <input type="number" step="0.1" id="profileWeight" placeholder="Kg">
         </div>
       </div>
+
+      <div class="form-group" id="profilePinGroup" style="display: none;">
+        <label>CREA UN PIN (4 CIFRE)</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="profilePin" placeholder="••••" oninput="sanitizePinInput(this)" style="letter-spacing: 6px; text-align: center; font-size: 18px;">
+        <label style="margin-top: 12px;">CONFERMA PIN</label>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" id="profilePinConfirm" placeholder="••••" oninput="sanitizePinInput(this)" style="letter-spacing: 6px; text-align: center; font-size: 18px;">
+        <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Ti servirà per accedere al tuo profilo. Se lo dimentichi, dovrà resettartelo un amministratore dal foglio Google.</p>
+      </div>
+
       <button class="btn-main" onclick="saveProfile()">REGISTRA / SALVA ATLETA</button>
     </div>
 
@@ -424,8 +443,13 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v11";
+    const APP_VERSION = "v12";
     const APP_VERSION_DATE = "01/09/2026";
+
+    // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
+    // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
+    // una nuova misura di sicurezza, come il PIN, e la si vuole applicare subito a tutti).
+    const REQUIRED_LOGIN_VERSION = "2";
 
     // Risultati (Log Result) associati ai blocchi della sessione corrente, indicizzati per blockId.
     let blockResults = {};
@@ -735,10 +759,24 @@
       }
     }
 
+    // Toglie tutto ciò che non è cifra da un campo PIN, SENZA rimuovere eventuali zeri
+    // iniziali (a differenza di sanitizeIntInput, che li toglie e romperebbe un PIN "0042").
+    function sanitizePinInput(el) {
+      el.value = el.value.replace(/[^\d]/g, '').slice(0, 4);
+    }
+
     function checkUserLogin() {
+      // Forza un nuovo login una tantum quando REQUIRED_LOGIN_VERSION cambia (es. introduzione
+      // del PIN): così la protezione si applica subito anche a chi era già "dentro" da prima,
+      // invece di restare valida solo per i login futuri.
+      if (localStorage.getItem('loginVersion') !== REQUIRED_LOGIN_VERSION) {
+        localStorage.removeItem('activeAthlete');
+        localStorage.setItem('loginVersion', REQUIRED_LOGIN_VERSION);
+      }
+
       const activeAthlete = localStorage.getItem('activeAthlete');
       const overlay = document.getElementById('loginOverlay');
-      
+
       if (!activeAthlete) {
         const loginSelect = document.getElementById('loginAthleteSelect');
         loginSelect.innerHTML = '<option value="">-- Seleziona Atleta --</option>';
@@ -748,6 +786,7 @@
           opt.innerText = ath.name;
           loginSelect.appendChild(opt);
         });
+        document.getElementById('loginPinGroup').style.display = 'none';
         overlay.style.display = 'flex';
       } else {
         overlay.style.display = 'none';
@@ -756,12 +795,86 @@
       }
     }
 
-    function performLogin() {
+    // Mostra/nasconde il campo PIN nella schermata di login in base a se l'atleta scelto
+    // ne ha già impostato uno (chiede di verificarlo) o no (chiede di crearne uno nuovo).
+    function onLoginAthleteChange() {
+      const name = document.getElementById('loginAthleteSelect').value;
+      const pinGroup = document.getElementById('loginPinGroup');
+      const confirmWrap = document.getElementById('loginPinConfirmWrap');
+      const label = document.getElementById('loginPinLabel');
+      const hint = document.getElementById('loginPinHint');
+
+      document.getElementById('loginPinInput').value = '';
+      document.getElementById('loginPinConfirmInput').value = '';
+
+      if (!name) { pinGroup.style.display = 'none'; return; }
+
+      const ath = (globalData.athletes || []).find(a => a.name.toLowerCase() === name.toLowerCase());
+      const hasPin = !!(ath && ath.hasPin);
+
+      pinGroup.style.display = '';
+      if (hasPin) {
+        label.innerText = 'PIN';
+        confirmWrap.style.display = 'none';
+        hint.innerText = 'Inserisci il PIN a 4 cifre del tuo profilo.';
+      } else {
+        label.innerText = 'CREA UN PIN (4 CIFRE)';
+        confirmWrap.style.display = '';
+        hint.innerText = "Prima volta: scegli un PIN a 4 cifre per proteggere il tuo profilo. Se lo dimentichi, dovrà resettartelo un amministratore.";
+      }
+    }
+
+    async function performLogin() {
       const selectedName = document.getElementById('loginAthleteSelect').value;
       if (!selectedName) {
         alert('Seleziona un nome dalla lista.');
         return;
       }
+
+      const ath = (globalData.athletes || []).find(a => a.name.toLowerCase() === selectedName.toLowerCase());
+      const hasPin = !!(ath && ath.hasPin);
+      const pin = document.getElementById('loginPinInput').value.trim();
+
+      if (!/^\d{4}$/.test(pin)) { alert('Il PIN deve essere di 4 cifre.'); return; }
+
+      const url = getScriptUrl();
+      if (!url) { alert('Connessione al cloud non disponibile: impossibile verificare il PIN.'); return; }
+
+      if (!hasPin) {
+        // Prima volta per questo atleta: creiamo il PIN invece di verificarlo.
+        const pinConfirm = document.getElementById('loginPinConfirmInput').value.trim();
+        if (pin !== pinConfirm) { alert('I due PIN inseriti non coincidono.'); return; }
+        try {
+          const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'setPin', name: selectedName, pin }) });
+          const data = await res.json();
+          if (!res.ok || data.status !== 'success') {
+            alert(data && data.message ? data.message : 'Errore durante la creazione del PIN. Riprova.');
+            return;
+          }
+        } catch (err) {
+          console.error('Errore creazione PIN:', err);
+          alert('Errore di connessione durante la creazione del PIN.');
+          return;
+        }
+      } else {
+        try {
+          const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'verifyPin', name: selectedName, pin }) });
+          const data = await res.json();
+          if (!res.ok || data.status === 'locked') {
+            alert('Troppi tentativi errati: riprova tra qualche minuto.');
+            return;
+          }
+          if (data.status !== 'success' || !data.valid) {
+            alert('PIN errato.');
+            return;
+          }
+        } catch (err) {
+          console.error('Errore verifica PIN:', err);
+          alert('Errore di connessione durante la verifica del PIN.');
+          return;
+        }
+      }
+
       localStorage.setItem('activeAthlete', selectedName);
       document.getElementById('loginOverlay').style.display = 'none';
       loadActiveAthlete();
@@ -772,6 +885,15 @@
     function switchToAthleteTab() {
       document.getElementById('loginOverlay').style.display = 'none';
       switchTab('atleta');
+    }
+
+    // Il campo per creare un PIN nella tab ATLETA serve solo per una registrazione nuova
+    // (nessun activeAthlete ancora impostato): chi è già loggato ed edita solo età/peso non
+    // deve vedere né tantomeno poter sovrascrivere il proprio PIN da qui per sbaglio.
+    function updateProfilePinVisibility() {
+      const group = document.getElementById('profilePinGroup');
+      if (!group) return;
+      group.style.display = localStorage.getItem('activeAthlete') ? 'none' : '';
     }
 
     function logoutUser() {
@@ -833,6 +955,17 @@
       const name = document.getElementById('profileName').value.trim();
       if (!name) { alert('Inserisci un nome valido'); return; }
 
+      // Il PIN va creato solo per una registrazione nuova (nessun atleta ancora loggato su
+      // questo dispositivo): chi è già loggato ed edita solo età/peso salta questo controllo.
+      const isNewRegistration = !localStorage.getItem('activeAthlete');
+      let pin = null;
+      if (isNewRegistration) {
+        pin = document.getElementById('profilePin').value.trim();
+        const pinConfirm = document.getElementById('profilePinConfirm').value.trim();
+        if (!/^\d{4}$/.test(pin)) { alert('Scegli un PIN di 4 cifre per proteggere il tuo profilo.'); return; }
+        if (pin !== pinConfirm) { alert('I due PIN inseriti non coincidono.'); return; }
+      }
+
       const payload = {
         action: 'saveAthlete',
         name: name,
@@ -840,9 +973,10 @@
         weight: document.getElementById('profileWeight').value,
         height: ''
       };
+      if (pin) payload.pin = pin;
 
       localStorage.setItem('activeAthlete', name);
-      
+
       if (url) {
         await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
         alert('Atleta registrato e salvato sul cloud!');
@@ -2424,6 +2558,7 @@
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'storico') { renderHistory(); renderResultsList(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
+      if (tab === 'atleta') { updateProfilePinVisibility(); }
     }
 
     function setMode(mode) {
