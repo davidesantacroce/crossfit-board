@@ -945,9 +945,16 @@
 
       const upperText = text.toUpperCase();
       let type = 'For Time';
+
+      // "N RM" con o senza spazio (es. "1RM", "1 RM", "3RM") indica un lavoro di forza a percentuale.
+      const hasRmReference = /\d\s*RM\b/i.test(text);
+      // Più righe con percentuale di carico (es. "@55% 1RM Snatch" ripetuto) sono un forte indizio
+      // di un blocco Sets/Strength anche senza parole chiave esplicite.
+      const multiPercentLines = (text.match(/(?:^|\n)[^\n@]*@\s*\d{1,3}\s*%[^\n]*/gim) || []).length >= 2;
+
       if (upperText.includes('AMRAP')) type = 'AMRAP';
       else if (upperText.includes('EMOM')) type = 'EMOM';
-      else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY') || upperText.includes('1 RM')) type = 'Sets';
+      else if (upperText.includes('SETS') || upperText.includes('STRENGTH') || upperText.includes('HEAVY') || hasRmReference || multiPercentLines) type = 'Sets';
 
       block.querySelector('.block-type').value = type;
 
@@ -973,6 +980,9 @@
       }
 
       // Spiegazione WOD: tutto il testo OCR, esclusa l'eventuale riga già usata come titolo
+      // (se la riga era troppo lunga il titolo mostrato è troncato, ma non è un problema per
+      // il rilevamento di set/percentuali/esercizio: le altre righe restano intatte in
+      // spiegazione, e detectExerciseNameForMassimale prova tutte le occorrenze di "%").
       const explanationLines = lines.filter((_, idx) => idx !== titleLineIndex);
       const explanationText = explanationLines.length > 0 ? explanationLines.join('\n') : text.trim();
       const explanationEl = block.querySelector('.block-explanation');
@@ -1333,11 +1343,30 @@
         .map(name => ({ name, base: name.replace(/\s*\([^)]*\)\s*$/, '').trim() }))
         .sort((a, b) => b.base.length - a.base.length);
 
-      for (const c of candidates) {
-        const re = new RegExp('\\b' + escapeRegex(c.base) + '\\b', 'i');
-        if (re.test(text)) return c.name;
+      const matchIn = (snippet) => {
+        for (const c of candidates) {
+          const re = new RegExp('\\b' + escapeRegex(c.base) + '\\b', 'i');
+          if (re.test(snippet)) return c.name;
+        }
+        return null;
+      };
+
+      // Priorità: l'esercizio dichiarato subito dopo la percentuale (es. "@60% 1RM Snatch"),
+      // che è quello a cui il carico si riferisce davvero — utile quando la riga cita più
+      // movimenti (es. "1 Power Snatch + 1 Snatch @55% 1RM Snatch": il riferimento è lo Snatch).
+      // Prova tutte le occorrenze di "%" nel testo (non solo la prima): se una riga è stata
+      // corrotta da un troncamento altrove, le altre righe intatte permettono comunque il match.
+      const pctLineRegex = /@?\s*\d{1,3}(?:[.,]\d+)?\s*%\s*(?:1?RM\s*(?:of|del)?\s*)?([^\n]*)/gi;
+      let pctMatch;
+      while ((pctMatch = pctLineRegex.exec(text)) !== null) {
+        if (pctMatch[1]) {
+          const afterPct = matchIn(pctMatch[1]);
+          if (afterPct) return afterPct;
+        }
       }
-      return null;
+
+      // Fallback: cerca ovunque nel testo, il nome più specifico/lungo vince.
+      return matchIn(text);
     }
 
     // Recupera il massimale numerico salvato dall'atleta attivo per un dato esercizio.
