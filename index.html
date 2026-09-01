@@ -211,8 +211,23 @@
       <div id="registraDayViewContent"></div>
     </div>
 
-    <!-- FORM DI REGISTRAZIONE (visibile solo per la giornata odierna) -->
+    <!-- WOD GIÀ CARICATO DA UN ALTRO ATLETA OGGI: proposto come base da adattare -->
+    <div class="card" id="proposedWodCard" style="display: none;">
+      <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <span id="proposedWodTitle">📋 WOD DI OGGI GIÀ CARICATO</span>
+        <button type="button" class="btn-remove" style="height: 24px; padding: 0 8px; font-size: 10px;" onclick="dismissProposedWod()">✕</button>
+      </div>
+      <div id="proposedWodContent"></div>
+      <button class="btn-main" style="margin-top: 10px;" onclick="useProposedWod()">USA QUESTO WOD COME BASE</button>
+    </div>
+
+    <!-- FORM DI REGISTRAZIONE (visibile per la giornata odierna, o mentre si modifica una sessione passata) -->
     <div class="card" id="registraFormCard">
+      <div id="editModeBanner" style="display: none; align-items: center; justify-content: space-between; background: rgba(230, 74, 25, 0.12); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px;">
+        <span id="editModeBannerText" style="font-size: 12px; font-weight: 800; color: var(--accent);"></span>
+        <button type="button" class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="cancelEditWod()">Annulla</button>
+      </div>
+
       <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
         <button type="button" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
       </div>
@@ -228,7 +243,7 @@
         </div>
       </div>
 
-      <button class="btn-main" onclick="saveWodSession()">SALVA SESSIONE COMPLETA</button>
+      <button class="btn-main" id="saveWodBtn" onclick="saveWodSession()">SALVA SESSIONE COMPLETA</button>
     </div>
   </div>
 
@@ -385,6 +400,15 @@
     let blockCounter = 0;
     let activeBlockIdForScan = null;
     let pendingCropFile = null;
+
+    // Modalità modifica di una sessione già salvata (Storico o vista giorno di Registra):
+    // editingWodId/editingWodDate sono null quando si sta invece creando una sessione nuova.
+    let editingWodId = null;
+    let editingWodDate = null;
+
+    // WOD già caricato oggi da un altro atleta, proposto come base da adattare.
+    let proposedWodDismissed = false;
+    let proposedWodSourceId = null;
 
     // Risultati (Log Result) associati ai blocchi della sessione corrente, indicizzati per blockId.
     let blockResults = {};
@@ -548,10 +572,14 @@
       if (!formCard || !dayView) return;
 
       const isToday = selectedRegistraDate === getTodayDateString();
-      formCard.style.display = isToday ? '' : 'none';
-      dayView.style.display = isToday ? 'none' : '';
+      // Mentre si modifica una sessione passata, il form resta visibile anche se la data
+      // selezionata nel calendario non è quella odierna.
+      const showForm = isToday || editingWodId !== null;
+      formCard.style.display = showForm ? '' : 'none';
+      dayView.style.display = showForm ? 'none' : '';
 
-      if (!isToday) renderRegistraDayView();
+      if (!showForm) renderRegistraDayView();
+      updateProposedWodCard();
     }
 
     function renderRegistraDayView() {
@@ -599,7 +627,10 @@
               <div>
                 <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
               </div>
-              <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
+                <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+              </div>
             </div>
             ${blocksHtml}
           </div>
@@ -1020,10 +1051,11 @@
         blocksData.push({ type, title, explanation, result });
       });
 
+      const isEditing = editingWodId !== null;
       const entry = {
         action: 'saveWodSession',
-        id: String(Date.now()),
-        date: getTodayDateString(),
+        id: isEditing ? editingWodId : String(Date.now()),
+        date: isEditing ? editingWodDate : getTodayDateString(),
         athlete: athleteName,
         mode: currentMode,
         blocks: blocksData
@@ -1031,15 +1063,25 @@
 
       if (url) {
         try {
+          // In modifica ripuliamo prima le vecchie righe della sessione: saveWodSession
+          // accoda sempre nuove righe, quindi senza questo passaggio un blocco rimosso o
+          // un numero di blocchi diverso lascerebbe righe duplicate/orfane sul Foglio.
+          if (isEditing) {
+            await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'deleteWod', id: String(editingWodId) }) });
+          }
+
           const response = await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
           if (response.ok) {
-            alert('Sessione multi-blocco salvata sul Foglio Google!');
+            alert(isEditing ? 'Modifiche salvate!' : 'Sessione multi-blocco salvata sul Foglio Google!');
+            editingWodId = null;
+            editingWodDate = null;
             await fetchCloudData();
-            
+
             document.getElementById('workoutBlocksContainer').innerHTML = '';
             blockCounter = 0;
             blockResults = {};
             addWorkoutBlock();
+            updateSaveButtonLabel();
 
             switchTab('storico');
           } else {
@@ -1050,6 +1092,149 @@
           alert('Errore di connessione durante il salvataggio.');
         }
       }
+    }
+
+    // Carica una sessione già salvata (propria) nel form di Registra per correggerla.
+    function editWodSession(id) {
+      const session = (globalData.wods || []).find(w => String(w.id) === String(id));
+      if (!session) { alert('Sessione non trovata.'); return; }
+
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      if (!activeAthlete || !session.athlete || session.athlete.toLowerCase() !== activeAthlete.toLowerCase()) {
+        alert('Puoi modificare solo le tue sessioni.');
+        return;
+      }
+
+      editingWodId = session.id;
+      editingWodDate = session.date;
+
+      document.getElementById('workoutBlocksContainer').innerHTML = '';
+      blockCounter = 0;
+      blockResults = {};
+
+      const sessionAthleteLower = session.athlete.toLowerCase();
+      (session.blocks || []).forEach(b => {
+        addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || '');
+        const newBlockId = blockCounter;
+
+        // Se esiste un Log Result strutturato corrispondente (stesso atleta/WOD/tipo/data),
+        // lo ripristiniamo così "Modifica Risultato" mostra i valori esatti già loggati,
+        // non solo il testo sintetico salvato nel blocco.
+        const matchingResult = (globalData.results || []).find(r =>
+          r.athlete && r.athlete.toLowerCase() === sessionAthleteLower &&
+          r.date === session.date &&
+          r.workout === (b.title || 'WOD') &&
+          r.workoutType === (b.type || '')
+        );
+        if (matchingResult) {
+          blockResults[newBlockId] = matchingResult;
+        } else if (b.result) {
+          blockResults[newBlockId] = {
+            id: `${session.id}-${newBlockId}`, scoreDisplay: b.result, scoreType: 'Time', scoreDetail: {},
+            category: session.mode || 'RX', movements: [], notes: ''
+          };
+        }
+        renderBlockResultSummary(newBlockId);
+      });
+
+      if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
+
+      currentMode = session.mode || 'RX';
+      setMode(currentMode);
+
+      updateSaveButtonLabel();
+      switchTab('registra'); // switchTab richiama già updateRegistraDateView()
+    }
+
+    // Esce dalla modalità modifica senza salvare, tornando a un form vuoto per una nuova sessione.
+    function cancelEditWod() {
+      editingWodId = null;
+      editingWodDate = null;
+      document.getElementById('workoutBlocksContainer').innerHTML = '';
+      blockCounter = 0;
+      blockResults = {};
+      addWorkoutBlock();
+      currentMode = 'RX';
+      setMode('RX');
+      updateSaveButtonLabel();
+      updateRegistraDateView();
+    }
+
+    // Aggiorna testo del bottone salva e banner in base alla modalità (nuova sessione / modifica).
+    function updateSaveButtonLabel() {
+      const btn = document.getElementById('saveWodBtn');
+      const banner = document.getElementById('editModeBanner');
+      const bannerText = document.getElementById('editModeBannerText');
+      if (!btn || !banner || !bannerText) return;
+
+      if (editingWodId !== null) {
+        btn.innerText = 'SALVA MODIFICHE';
+        bannerText.innerText = `✏️ Stai modificando la sessione del ${formatDateForDisplay(editingWodDate)}`;
+        banner.style.display = 'flex';
+      } else {
+        btn.innerText = 'SALVA SESSIONE COMPLETA';
+        banner.style.display = 'none';
+      }
+    }
+
+    // ===================== WOD PROPOSTO DA ALTRI ATLETI (stesso giorno) =====================
+
+    function updateProposedWodCard() {
+      const card = document.getElementById('proposedWodCard');
+      if (!card) return;
+
+      const today = getTodayDateString();
+      if (selectedRegistraDate !== today || editingWodId !== null || proposedWodDismissed) {
+        card.style.display = 'none';
+        proposedWodSourceId = null;
+        return;
+      }
+
+      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
+      const others = (globalData.wods || []).filter(w =>
+        w.date === today && w.athlete && w.athlete.toLowerCase() !== activeAthlete
+      );
+
+      if (others.length === 0) {
+        card.style.display = 'none';
+        proposedWodSourceId = null;
+        return;
+      }
+
+      // Tra le sessioni già caricate oggi da altri atleti, proponiamo la più recente.
+      const proposal = others.slice().sort((a, b) => String(b.id).localeCompare(String(a.id)))[0];
+      proposedWodSourceId = proposal.id;
+
+      document.getElementById('proposedWodTitle').innerText = `📋 ${proposal.athlete} ha già caricato il lavoro di oggi`;
+      const blocksSummary = (proposal.blocks || []).map(b => `
+        <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
+          • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
+        </div>
+      `).join('');
+      document.getElementById('proposedWodContent').innerHTML = blocksSummary || '<p style="color: var(--text-muted); font-size: 13px;">Nessun blocco.</p>';
+
+      card.style.display = '';
+    }
+
+    // Importa i blocchi (tipo/titolo/spiegazione) del WOD proposto nel form corrente, come base
+    // da adattare: non copia risultati o modalità RX/Scaled, che restano personali.
+    function useProposedWod() {
+      const proposal = (globalData.wods || []).find(w => String(w.id) === String(proposedWodSourceId));
+      if (!proposal) return;
+
+      document.getElementById('workoutBlocksContainer').innerHTML = '';
+      blockCounter = 0;
+      blockResults = {};
+      (proposal.blocks || []).forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
+      if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
+
+      proposedWodDismissed = true;
+      updateProposedWodCard();
+    }
+
+    function dismissProposedWod() {
+      proposedWodDismissed = true;
+      updateProposedWodCard();
     }
 
     async function deleteWod(id) {
@@ -1163,7 +1348,10 @@
                 <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(item.date))}</span>
               </div>
-              <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
+                <button class="btn-delete-history" onclick="deleteWod('${String(item.id).replace(/'/g, "\\'")}')">✕ Elimina</button>
+              </div>
             </div>
             ${contentHtml}
           </div>
@@ -1878,7 +2066,9 @@
       const result = {
         id: resultId,
         athlete: athleteName,
-        date: getTodayDateString(),
+        // Se si sta modificando una sessione passata, il risultato va datato come la sessione
+        // stessa, non come oggi (altrimenti finirebbe associato al giorno sbagliato).
+        date: editingWodId !== null ? editingWodDate : getTodayDateString(),
         workout: blockTitle,
         workoutType: blockType,
         scoreType,
