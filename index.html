@@ -287,14 +287,6 @@
       <div id="workoutBlocksContainer"></div>
 
       <div class="form-group" style="margin-top: 16px;">
-        <label>🤝 FATTO IN COPPIA/TEAM CON (OPZIONALE)</label>
-        <div id="sessionPartnersTags" class="tag-input-box"></div>
-        <input type="text" id="sessionPartnerInput" list="sessionPartnerOptions" placeholder="Scrivi il nome di un atleta registrato e premi Invio" onkeydown="handleSessionPartnerInputKeydown(event)">
-        <datalist id="sessionPartnerOptions"></datalist>
-        <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Salva automaticamente la stessa sessione anche nello storico personale dei compagni indicati.</p>
-      </div>
-
-      <div class="form-group" style="margin-top: 16px;">
         <label>MODALITÀ</label>
         <div class="rx-scaled-toggle">
           <div id="btnRx" class="rx-btn active" onclick="setMode('RX')">✓ RX</div>
@@ -522,7 +514,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v20";
+    const APP_VERSION = "v19";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -536,11 +528,6 @@
     let lrCategory = 'RX';
     let lrMovements = [];
     let lrPerSetScores = [];
-
-    // Compagni con cui si è fatta la sessione corrente (WOD in coppia/team): nomi esatti di
-    // atleti già registrati, scelti dalla tendina. Alla registrazione, la stessa sessione
-    // viene salvata automaticamente anche nel loro storico personale.
-    let sessionPartners = [];
 
     // Movimenti CrossFit comuni usati per suggerire automaticamente i "movimenti coinvolti"
     // leggendo titolo e spiegazione del blocco quando si apre il Log Result.
@@ -920,7 +907,6 @@
           updateConnectionIndicator(true);
           renderHistory();
           renderActiveDaysChart();
-          renderSessionPartnerOptions();
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
           updateRegistraDateView();
@@ -1530,18 +1516,13 @@
       });
 
       const isEditing = editingWodId !== null;
-      // Chi ha fatto la sessione insieme all'atleta attivo (per il badge "🤝 Con:"): sé stesso
-      // escluso, gli altri compagni sì. Il campo "team" richiede supporto lato Apps Script per
-      // essere salvato/riletto: se non c'è ancora, viene semplicemente ignorato dal backend.
-      const allParticipants = [athleteName, ...sessionPartners];
       const entry = {
         action: 'saveWodSession',
         id: isEditing ? editingWodId : String(Date.now()),
         date: isEditing ? editingWodDate : getTodayDateString(),
         athlete: athleteName,
         mode: currentMode,
-        blocks: blocksData,
-        team: allParticipants.filter(n => n.toLowerCase() !== athleteName.toLowerCase())
+        blocks: blocksData
       };
 
       if (url) {
@@ -1556,28 +1537,6 @@
 
           const response = await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
           if (response.ok) {
-            // WOD in coppia/team: solo per una sessione nuova (non in modifica, altrimenti non
-            // sapremmo quale riga dei compagni aggiornare) salviamo la stessa sessione anche
-            // nello storico personale di ogni compagno indicato, con un id proprio.
-            if (!isEditing) {
-              for (const partnerName of sessionPartners) {
-                const partnerEntry = {
-                  action: 'saveWodSession',
-                  id: `${entry.id}-team-${partnerName.replace(/\s+/g, '').toLowerCase()}`,
-                  date: entry.date,
-                  athlete: partnerName,
-                  mode: currentMode,
-                  blocks: blocksData,
-                  team: allParticipants.filter(n => n.toLowerCase() !== partnerName.toLowerCase())
-                };
-                try {
-                  await fetch(url, { method: 'POST', body: JSON.stringify(partnerEntry) });
-                } catch (err) {
-                  console.error(`Errore salvataggio sessione team per ${partnerName}:`, err);
-                }
-              }
-            }
-
             await fetchCloudData();
             hideFunLoadingOverlay();
             alert(isEditing ? 'Modifiche salvate!' : 'Sessione multi-blocco salvata sul Foglio Google!');
@@ -1587,8 +1546,6 @@
             document.getElementById('workoutBlocksContainer').innerHTML = '';
             blockCounter = 0;
             blockResults = {};
-            sessionPartners = [];
-            renderSessionPartnersTags();
             addWorkoutBlock();
             updateSaveButtonLabel();
 
@@ -1622,10 +1579,6 @@
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
-      // Solo per mostrare con chi era stata fatta (badge): il salvataggio in modifica aggiorna
-      // solo la tua riga, non quella dei compagni (vedi saveWodSession).
-      sessionPartners = Array.isArray(session.team) ? session.team.slice() : [];
-      renderSessionPartnersTags();
 
       const sessionAthleteLower = session.athlete.toLowerCase();
       const norm = (s) => String(s || '').trim().toLowerCase();
@@ -1695,8 +1648,6 @@
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
-      sessionPartners = [];
-      renderSessionPartnersTags();
       addWorkoutBlock();
       currentMode = 'RX';
       setMode('RX');
@@ -1917,7 +1868,6 @@
               <div>
                 <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(item.date))}</span>
-                ${Array.isArray(item.team) && item.team.length ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">🤝 Con: ${escapeHtml(item.team.join(', '))}</div>` : ''}
               </div>
               <div style="display: flex; gap: 6px;">
                 <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
@@ -2739,68 +2689,6 @@
         }
         input.value = '';
       }
-    }
-
-    // ===================== WOD IN COPPIA/TEAM (compagni sessione corrente) =====================
-
-    function renderSessionPartnersTags() {
-      const box = document.getElementById('sessionPartnersTags');
-      if (!box) return;
-      box.innerHTML = sessionPartners.map((name, i) => `
-        <span class="tag-chip">${escapeHtml(name)} <button type="button" onclick="removeSessionPartner(${i})">✕</button></span>
-      `).join('');
-    }
-
-    function removeSessionPartner(idx) {
-      sessionPartners.splice(idx, 1);
-      renderSessionPartnersTags();
-    }
-
-    function handleSessionPartnerInputKeydown(evt) {
-      if (evt.key === 'Enter' || evt.key === ',') {
-        evt.preventDefault();
-        addSessionPartnerFromInput();
-      }
-    }
-
-    // A differenza dei "movimenti" (testo libero), il nome del compagno deve corrispondere
-    // esattamente a un atleta già registrato: è il nome con cui verrà salvata la sua copia
-    // della sessione, quindi un nome sbagliato la farebbe finire nello storico di nessuno.
-    function addSessionPartnerFromInput() {
-      const input = document.getElementById('sessionPartnerInput');
-      const raw = input.value.trim().replace(/,$/, '');
-      if (!raw) return;
-
-      const activeAthlete = localStorage.getItem('activeAthlete') || '';
-      const match = (globalData.athletes || []).find(a => a.name && a.name.toLowerCase() === raw.toLowerCase());
-      if (!match) {
-        alert(`Nessun atleta registrato con il nome "${raw}". Scegli un nome dalla lista suggerita mentre scrivi.`);
-        return;
-      }
-      if (match.name.toLowerCase() === activeAthlete.toLowerCase()) {
-        alert('Non puoi aggiungere te stesso come compagno.');
-        return;
-      }
-      if (sessionPartners.some(p => p.toLowerCase() === match.name.toLowerCase())) {
-        input.value = '';
-        return;
-      }
-
-      sessionPartners.push(match.name);
-      renderSessionPartnersTags();
-      input.value = '';
-    }
-
-    // Elenco suggerimenti (datalist) per il campo compagno: tutti gli atleti registrati
-    // tranne l'atleta attivo. Va richiamata quando cambiano i dati cloud o l'atleta loggato.
-    function renderSessionPartnerOptions() {
-      const datalist = document.getElementById('sessionPartnerOptions');
-      if (!datalist) return;
-      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
-      datalist.innerHTML = (globalData.athletes || [])
-        .filter(a => a.name && a.name.toLowerCase() !== activeAthlete)
-        .map(a => `<option value="${escapeHtml(a.name)}"></option>`)
-        .join('');
     }
 
     function buildLrScoreResult() {
