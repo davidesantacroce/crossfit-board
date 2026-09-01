@@ -168,6 +168,19 @@
     .lr-perset-reps-hint { font-size: 11px; color: var(--text-muted); white-space: nowrap; font-weight: 700; }
     .lr-perset-done-toggle { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text-muted); font-size: 14px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
     .lr-perset-done-toggle.done { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+    .fun-loading-overlay {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-color);
+      z-index: 3000; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px; box-sizing: border-box; text-align: center;
+    }
+    .fun-loading-overlay.active { display: flex; }
+    .fun-loading-spinner {
+      width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: fun-loading-spin 0.8s linear infinite; margin-bottom: 20px;
+    }
+    @keyframes fun-loading-spin { to { transform: rotate(360deg); } }
+    .fun-loading-message { font-size: 16px; font-weight: 800; color: var(--text); max-width: 320px; }
   </style>
 </head>
 <body>
@@ -202,6 +215,12 @@
         <button type="button" class="btn-secondary" style="width: 100%; font-size: 12px; padding: 10px;" onclick="switchToAthleteTab()">Registrati nella Tab Atleta</button>
       </div>
     </div>
+  </div>
+
+  <!-- OVERLAY DI CARICAMENTO SESSIONI -->
+  <div id="funLoadingOverlay" class="fun-loading-overlay">
+    <div class="fun-loading-spinner"></div>
+    <div class="fun-loading-message" id="funLoadingMessage"></div>
   </div>
 
   <div class="header">
@@ -473,7 +492,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v17";
+    const APP_VERSION = "v18";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -749,13 +768,39 @@
       applyAppVersion();
       renderRegistraCalendar();
       updateRegistraDateView();
+      showFunLoadingOverlay();
       fetchCloudData().then(() => {
+        hideFunLoadingOverlay();
         checkUserLogin();
       });
       if(document.getElementById('workoutBlocksContainer').children.length === 0) {
         addWorkoutBlock();
       }
     };
+
+    // Messaggini simpatici mostrati mentre si caricano le sessioni dal cloud (all'avvio
+    // dell'app e subito dopo il login), giusto per rendere l'attesa un po' più divertente.
+    const FUN_LOADING_MESSAGES = [
+      "Ha il booster",
+      "Brilli come Armando",
+      "Negoziooooooo",
+      "Sei più bullo di Davide Calabrese",
+      "Non fare il falso cortese",
+      "Era buono lo shampoo che hai rubato?"
+    ];
+
+    function showFunLoadingOverlay() {
+      const overlay = document.getElementById('funLoadingOverlay');
+      const msgEl = document.getElementById('funLoadingMessage');
+      if (!overlay || !msgEl) return;
+      msgEl.innerText = FUN_LOADING_MESSAGES[Math.floor(Math.random() * FUN_LOADING_MESSAGES.length)];
+      overlay.classList.add('active');
+    }
+
+    function hideFunLoadingOverlay() {
+      const overlay = document.getElementById('funLoadingOverlay');
+      if (overlay) overlay.classList.remove('active');
+    }
 
     function getScriptUrl() {
       return "https://script.google.com/macros/s/AKfycbyIldpm4JgmgG95ewn-r4dtiyUZmJvFXBKeAt845ty1zCFwRboR5pKJ2wtYKzgoAGih/exec";
@@ -929,7 +974,8 @@
       document.getElementById('loginOverlay').style.display = 'none';
       loadActiveAthlete();
       loadLocalMassimaliAndProfile();
-      fetchCloudData();
+      showFunLoadingOverlay();
+      fetchCloudData().then(() => hideFunLoadingOverlay());
     }
 
     function switchToAthleteTab() {
