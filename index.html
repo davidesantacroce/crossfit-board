@@ -146,6 +146,27 @@
     .active-days-label-col { flex: 1 0 34px; min-width: 34px; text-align: center; font-size: 8px; color: var(--text-muted); white-space: nowrap; }
     .active-days-empty { font-size: 13px; color: var(--text-muted); }
 
+    /* Card Whoop: metriche giornaliere (recovery/strain/sonno) + allenamenti registrati dalla fascia. */
+    .whoop-stats { display: flex; gap: 10px; margin-bottom: 4px; }
+    .whoop-stat { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; text-align: center; }
+    .whoop-stat-label { font-size: 9px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .whoop-stat-value { font-size: 22px; font-weight: 900; margin: 6px 0 2px; line-height: 1; }
+    .whoop-stat-sub { font-size: 9px; color: var(--text-muted); }
+    .whoop-stat-value.is-empty { color: var(--text-muted); font-size: 18px; }
+    .whoop-recovery-high { color: #16a34a; }
+    .whoop-recovery-mid { color: #eab308; }
+    .whoop-recovery-low { color: #dc2626; }
+    .whoop-date { font-size: 10px; color: var(--text-muted); margin-top: 12px; }
+    .whoop-workouts { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .whoop-workouts-title { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; }
+    .whoop-workout { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .whoop-workout:last-child { border-bottom: none; }
+    .whoop-workout-name { font-size: 13px; font-weight: 700; }
+    .whoop-workout-date { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .whoop-workout-metrics { font-size: 11px; color: var(--text-muted); text-align: right; white-space: nowrap; }
+    .whoop-workout-strain { color: var(--accent); font-weight: 800; }
+    .whoop-empty { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
     .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
     .result-summary-box { background: rgba(46, 125, 50, 0.12); border: 1px solid #2e7d32; border-radius: 10px; padding: 12px; }
     .result-summary-score { font-size: 15px; font-weight: 900; color: #4caf50; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -326,6 +347,12 @@
       </div>
     </div>
 
+    <!-- Compare solo se l'atleta loggato ha dati Whoop sincronizzati (vedi renderWhoopCard). -->
+    <div class="card" id="whoopCard" style="display: none;">
+      <div class="card-title">⌚ WHOOP</div>
+      <div id="whoopContainer"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">PROFILO ATLETA</div>
       <div class="form-group">
@@ -493,7 +520,7 @@
 
   <script>
     let cropper = null;
-    let globalData = { wods: [], athletes: [], massimali: [], results: [] };
+    let globalData = { wods: [], athletes: [], massimali: [], results: [], whoop: [] };
 
     // Un WOD "pubblicato in bacheca" è una riga della stessa tabella Wods, distinta solo dal
     // valore speciale di "mode" qui sotto (nessun campo/tabella nuova sul backend): niente
@@ -530,8 +557,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v25";
-    const APP_VERSION_DATE = "01/09/2026";
+    const APP_VERSION = "v26";
+    const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -920,9 +947,11 @@
         if (res.ok) {
           globalData = await res.json();
           globalData.results = globalData.results || [];
+          globalData.whoop = globalData.whoop || [];
           updateConnectionIndicator(true);
           renderHistory();
           renderActiveDaysChart();
+          renderWhoopCard();
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
           updateRegistraDateView();
@@ -1168,6 +1197,117 @@
           <div class="active-days-labels ${scrollable ? 'is-scrollable' : ''}">${labelsHtml}</div>
         </div>
       `;
+    }
+
+    // La colonna "date" del foglio Whoop può arrivare come stringa "YYYY-MM-DD" oppure, se
+    // Google Sheets l'ha interpretata come data, come timestamp ISO a mezzanotte locale
+    // (es. "2025-10-01T22:00:00.000Z" per il 2 ottobre in Italia). Tagliare i primi 10
+    // caratteri sbaglierebbe di un giorno in quel caso: qui ricostruiamo il giorno nel fuso
+    // locale del browser.
+    function whoopDayKey(value) {
+      if (!value) return '';
+      const raw = String(value);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+      const parsed = new Date(raw);
+      if (isNaN(parsed.getTime())) return raw.slice(0, 10);
+      const pad = n => String(n).padStart(2, '0');
+      return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
+    }
+
+    function whoopRecordsFor(athlete, type) {
+      if (!athlete) return [];
+      return (globalData.whoop || [])
+        .filter(w => w.athlete && w.athlete.toLowerCase() === athlete.toLowerCase() && (!type || w.type === type))
+        .map(w => ({ ...w, day: whoopDayKey(w.date), data: w.data || {} }))
+        .sort((a, b) => b.day.localeCompare(a.day));
+    }
+
+    // Le soglie sono quelle usate da Whoop stesso: verde da 67 in su, giallo 34-66, rosso sotto.
+    function whoopRecoveryClass(score) {
+      if (score >= 67) return 'whoop-recovery-high';
+      if (score >= 34) return 'whoop-recovery-mid';
+      return 'whoop-recovery-low';
+    }
+
+    function whoopStatTile(label, value, sub, valueClass) {
+      const isEmpty = value === null || value === undefined || value === '';
+      return `
+        <div class="whoop-stat">
+          <div class="whoop-stat-label">${label}</div>
+          <div class="whoop-stat-value ${isEmpty ? 'is-empty' : (valueClass || '')}">${isEmpty ? '—' : value}</div>
+          <div class="whoop-stat-sub">${isEmpty ? 'nessun dato' : sub}</div>
+        </div>
+      `;
+    }
+
+    // Mostra recovery/strain/sonno dell'ultimo giorno sincronizzato e gli ultimi allenamenti
+    // registrati dalla fascia. La card resta nascosta per gli atleti senza dati Whoop.
+    function renderWhoopCard() {
+      const card = document.getElementById('whoopCard');
+      const container = document.getElementById('whoopContainer');
+      if (!card || !container) return;
+
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      const all = whoopRecordsFor(activeAthlete);
+      if (all.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = '';
+
+      const recovery = whoopRecordsFor(activeAthlete, 'recovery')[0];
+      const cycle = whoopRecordsFor(activeAthlete, 'cycle')[0];
+      const sleep = whoopRecordsFor(activeAthlete, 'sleep')[0];
+      const workouts = whoopRecordsFor(activeAthlete, 'workout').slice(0, 5);
+
+      const recoveryScore = recovery && Number.isFinite(recovery.data.recoveryScore) ? Math.round(recovery.data.recoveryScore) : null;
+      const strain = cycle && Number.isFinite(cycle.data.strain) ? cycle.data.strain.toFixed(1) : null;
+      const sleepPerf = sleep && Number.isFinite(sleep.data.sleepPerformancePercentage) ? Math.round(sleep.data.sleepPerformancePercentage) : null;
+
+      const statsHtml = `
+        <div class="whoop-stats">
+          ${whoopStatTile('Recovery', recoveryScore === null ? null : recoveryScore + '%',
+              recovery && Number.isFinite(recovery.data.restingHeartRate) ? `${recovery.data.restingHeartRate} bpm a riposo` : 'recupero',
+              recoveryScore === null ? '' : whoopRecoveryClass(recoveryScore))}
+          ${whoopStatTile('Strain', strain, 'sforzo giornaliero')}
+          ${whoopStatTile('Sonno', sleepPerf === null ? null : sleepPerf + '%', 'qualità del sonno')}
+        </div>
+      `;
+
+      const lastDay = all[0].day;
+      const daysAgo = Math.round((new Date(getTodayDateString()) - new Date(lastDay)) / 86400000);
+      const staleHint = daysAgo > 7
+        ? ' — la fascia non sincronizza da un po\', i dati si aggiorneranno da soli quando riprendi a indossarla'
+        : '';
+      const dateHtml = `<div class="whoop-date">Ultimo dato: ${formatDateForDisplay(lastDay)}${staleHint}</div>`;
+
+      let workoutsHtml = '';
+      if (workouts.length > 0) {
+        const rows = workouts.map(w => {
+          const metrics = [];
+          if (Number.isFinite(w.data.strain)) metrics.push(`<span class="whoop-workout-strain">Strain ${w.data.strain.toFixed(1)}</span>`);
+          if (Number.isFinite(w.data.averageHeartRate)) metrics.push(`${w.data.averageHeartRate} bpm medi`);
+          if (Number.isFinite(w.data.maxHeartRate)) metrics.push(`max ${w.data.maxHeartRate}`);
+          if (Number.isFinite(w.data.kilojoule)) metrics.push(`${Math.round(w.data.kilojoule * 0.239)} kcal`);
+          return `
+            <div class="whoop-workout">
+              <div>
+                <div class="whoop-workout-name">${w.data.sportName || 'Allenamento'}</div>
+                <div class="whoop-workout-date">${formatDateForDisplay(w.day)}</div>
+              </div>
+              <div class="whoop-workout-metrics">${metrics.join(' · ')}</div>
+            </div>
+          `;
+        }).join('');
+        workoutsHtml = `
+          <div class="whoop-workouts">
+            <div class="whoop-workouts-title">Allenamenti rilevati dalla fascia</div>
+            ${rows}
+          </div>
+        `;
+      }
+
+      container.innerHTML = statsHtml + dateHtml + workoutsHtml;
     }
 
     // Il campo per creare un PIN nella tab ATLETA serve solo per una registrazione nuova
@@ -3153,7 +3293,7 @@
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'storico') { renderHistory(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
-      if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); }
+      if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderWhoopCard(); }
     }
   </script>
 </body>
