@@ -575,6 +575,14 @@ function syncWhoopData() {
     sheet.appendRow(["athlete", "type", "date", "recordId", "data", "updatedAt"]);
   }
 
+  // Senza questo, Google Sheets interpreta "2025-10-02" come data vera e la restituisce a
+  // doGet come timestamp ISO a mezzanotte locale ("2025-10-01T22:00:00.000Z"), cioè il giorno
+  // prima. Forzando il formato testo la colonna resta la stringa YYYY-MM-DD che scriviamo.
+  var dateColIndex = getColumnIndex(sheet, "date");
+  if (dateColIndex > 0) {
+    sheet.getRange(1, dateColIndex, sheet.getMaxRows(), 1).setNumberFormat("@");
+  }
+
   var since = new Date();
   since.setDate(since.getDate() - 14);
   var startIso = Utilities.formatDate(since, "UTC", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
