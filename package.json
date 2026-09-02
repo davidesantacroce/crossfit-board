@@ -1,0 +1,12 @@
+{
+  "name": "crossfit-board",
+  "private": true,
+  "description": "Test automatici per index.html (CrossFit Bicocca)",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
+}
