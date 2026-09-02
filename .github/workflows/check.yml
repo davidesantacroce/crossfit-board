@@ -4,12 +4,18 @@ on:
   push:
     paths:
       - 'index.html'
+      - 'tests/**'
+      - 'package.json'
+      - 'playwright.config.js'
       - '.github/scripts/check-syntax.js'
       - '.github/workflows/check.yml'
   pull_request:
     branches: [main]
     paths:
       - 'index.html'
+      - 'tests/**'
+      - 'package.json'
+      - 'playwright.config.js'
       - '.github/scripts/check-syntax.js'
       - '.github/workflows/check.yml'
 
@@ -23,3 +29,15 @@ jobs:
         with:
           node-version: '20'
       - run: node .github/scripts/check-syntax.js
+
+  tests:
+    name: Test Playwright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npm test

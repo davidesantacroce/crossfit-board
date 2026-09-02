@@ -1,0 +1,99 @@
+# Changelog
+
+Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la data mostrati
+qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
+Impostazioni. Versioni più recenti in cima.
+
+## v25 — 2026-09-02
+- Badge rosso stile notifica iOS sul pulsante "👥 Risultati Altri Atleti", col numero di
+  persone che hanno già loggato quel WOD — live nel form di Registra, in Storico e nella vista
+  di un giorno passato.
+- Aggiunto un controllo automatico su GitHub Actions che verifica la sintassi JS di
+  `index.html` ad ogni push (vedi `.github/workflows/check.yml`).
+
+## v24 — 2026-09-02
+- Il form di Registra non parte più con una Parte vuota precompilata: resta vuoto finché non
+  premi "+ Aggiungi Lavoro" (ora più grande, a tutta larghezza).
+- RX/Scaled non è più un toggle unico per l'intera sessione: ogni Parte ha il proprio toggle,
+  così parti diverse della stessa sessione possono avere modalità diverse. Il badge RX/SCALED
+  in Storico è ora per singolo blocco.
+
+## v23 — 2026-09-02
+- La bacheca WOD del giorno resta visibile dopo aver usato un WOD proposto (prima spariva).
+- WOD identici pubblicati/salvati da atleti diversi vengono accorpati in un'unica card con
+  tutti i nomi, invece di ripetersi.
+- SALVA SESSIONE COMPLETA e PUBBLICA SOLO IL WOD rifiutano una Parte senza titolo né
+  spiegazione.
+
+## v22 — 2026-09-02
+- Bacheca "WOD del giorno": oltre alle sessioni complete di altri atleti, ora include i WOD
+  pubblicati con il nuovo tasto "📋 Pubblica solo il WOD" (senza risultato personale), incluse
+  le proprie pubblicazioni. Nessuna modifica al backend richiesta.
+
+## v21 — 2026-09-01
+- Rimossa la funzione "WOD in coppia/team" introdotta in v20 (richiesta esplicita).
+
+## v20 — 2026-09-01 *(rimossa in v21)*
+- WOD in coppia/team: log condiviso automaticamente nello storico dei compagni indicati.
+
+## v19 — 2026-09-01
+- I messaggi simpatici della schermata di caricamento compaiono anche premendo "Salva Sessione
+  Completa", non solo all'avvio/login.
+- Le etichette del grafico Giorni Attivi a Settimana mostrano l'intervallo completo della
+  settimana (es. "31/8-6/9") invece del solo lunedì iniziale.
+- Tasti PRs / Benchmark sotto il grafico nel tab Atleta.
+- Sezione Benchmark WOD nei Massimali con i WOD benchmark più noti del CrossFit.
+- Aggiornamento automatico di massimali/benchmark quando si registra un risultato
+  migliorativo.
+- *(fix same-day)* Corretto un errore di sintassi introdotto editando a mano
+  `FUN_LOADING_MESSAGES` (virgole mancanti tra le frasi, che rompeva l'intera app).
+
+## v18 — 2026-09-01
+- Migliorato l'import foto WOD: pulisce l'artefatto OCR "O" dal cerchietto colorato nei titoli
+  e mostra uno stato di caricamento durante l'estrazione.
+- Grafico "Giorni Attivi a Settimana" nel tab Atleta.
+- Rimossa la card ridondante "Risultati Loggati" dal tab Storico.
+- Messaggi simpatici nella schermata di caricamento sessioni (avvio app e login).
+
+## v17 — 2026-09-01
+- Rimossa la card "Risultati Loggati" dal tab Storico (ridondante con il confronto per blocco).
+
+## v16 — 2026-09-01
+- Grafico "Giorni Attivi a Settimana" nel tab Atleta.
+
+## v15 — 2026-09-01
+- Import foto WOD: pulizia dell'artefatto OCR "O" e stato di caricamento durante l'estrazione.
+
+## v14 — 2026-09-01
+- Doppi invii bloccati disabilitando il bottone durante il salvataggio (evita sessioni/risultati
+  duplicati se si preme due volte).
+
+## v13 — 2026-09-01
+- Corretto un crash del bottone "Modifica" nello Storico quando il blocco aveva movimenti già
+  loggati (`movements` non normalizzato in array).
+
+## v12 — 2026-09-01
+- PIN personale a 4 cifre per atleta al login.
+
+## v11 — 2026-09-01
+- Se più atleti caricano WOD diversi lo stesso giorno, vengono mostrati tutti come proposta,
+  non solo il primo.
+
+## v10 — 2026-09-01
+- Tasto "Risultati Altri Atleti" aggiunto anche in Storico e nel calendario di Registra (prima
+  solo nel form live).
+
+## v9 — 2026-09-01
+- Nel confronto con altri atleti sono inclusi anche i risultati salvati senza mai aprire "Log
+  Result" (solo testo sintetico nel blocco).
+
+## v8 — 2026-09-01
+- Introdotta la visualizzazione della versione dell'app (header + tab Impostazioni). Prima
+  versione tracciata con un numero visibile.
+
+## Prima del versionamento — fino al 2026-08-31
+Base dell'app costruita prima che la versione fosse mostrata all'utente: sessioni WOD
+multi-blocco, Log Result per singolo blocco (con rilevamento automatico di set/percentuali e
+proposta di peso dal massimale), storico con ricerca, calendario di Registra, storico
+massimali con tabella percentuali, loghi fissi, proposta del WOD già caricato da altri atleti,
+modifica delle sessioni salvate.
