@@ -79,6 +79,8 @@
     .rx-scaled-toggle { display: flex; gap: 10px; margin-top: 10px; }
     .rx-btn { flex: 1; padding: 12px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); font-weight: 800; border-radius: 8px; cursor: pointer; text-align: center; }
     .rx-btn.active { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+    .rx-scaled-toggle-block { display: flex; gap: 6px; margin-bottom: 12px; }
+    .rx-scaled-toggle-block .rx-btn { padding: 6px; font-size: 11px; }
 
     .exercise-row { display: grid; grid-template-columns: 80px 1fr 100px 35px; gap: 8px; align-items: center; margin-bottom: 8px; }
     .btn-remove { background: #c62828; color: white; border: none; border-radius: 6px; height: 42px; font-weight: bold; cursor: pointer; }
@@ -279,20 +281,10 @@
         <button type="button" class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="cancelEditWod()">Annulla</button>
       </div>
 
-      <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" class="btn-secondary" style="padding: 6px 12px; font-size: 11px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
-      </div>
+      <button type="button" class="btn-secondary" style="width: 100%; padding: 14px; font-size: 14px; margin-bottom: 16px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
 
       <!-- Contenitore Dinamico Blocchi Multipli -->
       <div id="workoutBlocksContainer"></div>
-
-      <div class="form-group" style="margin-top: 16px;">
-        <label>MODALITÀ</label>
-        <div class="rx-scaled-toggle">
-          <div id="btnRx" class="rx-btn active" onclick="setMode('RX')">✓ RX</div>
-          <div id="btnScaled" class="rx-btn" onclick="setMode('SCALED')">SCALED</div>
-        </div>
-      </div>
 
       <button class="btn-main" id="saveWodBtn" onclick="withButtonGuard(this, saveWodSession)">SALVA SESSIONE COMPLETA</button>
       <button type="button" class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="withButtonGuard(this, publishDailyWod)">📋 PUBBLICA SOLO IL WOD (senza risultato)</button>
@@ -493,7 +485,6 @@
   <input type="file" id="globalImageInput" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
 
   <script>
-    let currentMode = 'RX';
     let cropper = null;
     let globalData = { wods: [], athletes: [], massimali: [], results: [] };
 
@@ -505,6 +496,13 @@
     const PUBLISHED_WOD_MODE = 'PUBLISHED';
     function isPublishedWod(w) { return w && w.mode === PUBLISHED_WOD_MODE; }
     function formatModeBadge(mode) { return mode === PUBLISHED_WOD_MODE ? '📋 PUBBLICATO' : (mode || ''); }
+
+    // Badge RX/SCALED per singolo blocco (non più per l'intera sessione): usato ovunque si
+    // elenca il titolo di una Parte nello Storico/vista giornaliera.
+    function blockCategoryBadge(category) {
+      if (!category) return '';
+      return `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; margin-right: 6px;">${escapeHtml(category)}</span>`;
+    }
 
     // Loghi fissi dell'app (palestra e programmazione): incorporati direttamente,
     // non piu' caricabili dagli atleti.
@@ -525,7 +523,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v23";
+    const APP_VERSION = "v24";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -757,7 +755,7 @@
             const communityBtn = `<button type="button" class="btn-secondary" style="width: 100%; margin-top: 6px; padding: 6px 10px; font-size: 11px;" onclick="openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')">👥 Risultati Altri Atleti</button>`;
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
-                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
+                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
                 ${bodyHtml}
                 ${scoreHtml}
                 ${communityBtn}
@@ -770,7 +768,7 @@
           <div class="history-item">
             <div class="history-item-header">
               <div>
-                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>
+                ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
               </div>
               <div style="display: flex; gap: 6px;">
                 <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
@@ -850,9 +848,9 @@
         hideFunLoadingOverlay();
         checkUserLogin();
       });
-      if(document.getElementById('workoutBlocksContainer').children.length === 0) {
-        addWorkoutBlock();
-      }
+      // Niente Parte vuota precompilata all'apertura: si parte da zero, con "+ Aggiungi
+      // Lavoro" come primo passo (la bacheca WOD del giorno resta comunque visibile sopra
+      // se qualcuno ha già pubblicato/salvato qualcosa oggi).
     };
 
     // Messaggini simpatici mostrati mentre si caricano le sessioni dal cloud (all'avvio
@@ -1383,10 +1381,10 @@
       }
     }
 
-    function addWorkoutBlock(prefillType = "For Time", prefillTitle = "", prefillExplanation = "") {
+    function addWorkoutBlock(prefillType = "For Time", prefillTitle = "", prefillExplanation = "", prefillCategory = "RX") {
       blockCounter++;
       const container = document.getElementById('workoutBlocksContainer');
-      
+
       const blockDiv = document.createElement('div');
       blockDiv.className = 'wod-explanation-box';
       blockDiv.id = `workout-block-${blockCounter}`;
@@ -1400,7 +1398,14 @@
             <button type="button" class="btn-remove" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="document.getElementById('workout-block-${currentId}').remove()">✕</button>
           </div>
         </div>
-        
+
+        <!-- RX/Scaled è per singola Parte, non per l'intera sessione: parti diverse della
+             stessa sessione (es. forza Rx + metcon Scaled) possono avere modalità diverse. -->
+        <div class="rx-scaled-toggle-block">
+          <div class="rx-btn block-category-btn ${prefillCategory !== 'SCALED' ? 'active' : ''}" data-cat="RX" onclick="setBlockCategory(${currentId}, 'RX')">✓ RX</div>
+          <div class="rx-btn block-category-btn ${prefillCategory === 'SCALED' ? 'active' : ''}" data-cat="SCALED" onclick="setBlockCategory(${currentId}, 'SCALED')">SCALED</div>
+        </div>
+
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
             <label>TIPO</label>
@@ -1433,6 +1438,21 @@
       container.appendChild(blockDiv);
       renderBlockResultSummary(currentId);
       renderDetectedSetsHint(currentId);
+    }
+
+    function setBlockCategory(blockId, cat) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (!block) return;
+      block.querySelectorAll('.block-category-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.cat === cat);
+      });
+    }
+
+    // Legge RX/SCALED impostato sulla singola Parte (default RX se il blocco non c'è più).
+    function getBlockCategory(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      const active = block ? block.querySelector('.block-category-btn.active') : null;
+      return active ? active.dataset.cat : 'RX';
     }
 
     function parseAndFillBlock(blockId, text) {
@@ -1537,13 +1557,15 @@
         const title = block.querySelector('.block-title').value || 'WOD';
         const explanationEl = block.querySelector('.block-explanation');
         const explanation = explanationEl ? explanationEl.value : '';
+        // RX/Scaled è per singola Parte, non per l'intera sessione (vedi setBlockCategory).
+        const category = getBlockCategory(blockIdAttr);
 
         // Il risultato del blocco viene ora registrato tramite "Log Result" (vedi blockResults).
         // Qui manteniamo solo il valore testuale sintetico per compatibilità con lo storico esistente.
         const loggedResult = blockResults[blockIdAttr];
         const result = loggedResult ? loggedResult.scoreDisplay : '';
 
-        blocksData.push({ type, title, explanation, result });
+        blocksData.push({ type, title, explanation, result, category });
       });
 
       const isEditing = editingWodId !== null;
@@ -1552,7 +1574,6 @@
         id: isEditing ? editingWodId : String(Date.now()),
         date: isEditing ? editingWodDate : getTodayDateString(),
         athlete: athleteName,
-        mode: currentMode,
         blocks: blocksData
       };
 
@@ -1577,7 +1598,6 @@
             document.getElementById('workoutBlocksContainer').innerHTML = '';
             blockCounter = 0;
             blockResults = {};
-            addWorkoutBlock();
             updateSaveButtonLabel();
 
             switchTab('storico');
@@ -1674,7 +1694,7 @@
       const defaultScoreTypeMap = { 'For Time': 'Time', 'AMRAP': 'AMRAP', 'Sets': 'Weight', 'EMOM': 'Time' };
 
       (session.blocks || []).forEach(b => {
-        addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || '');
+        addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || '', b.category || session.mode || 'RX');
         const newBlockId = blockCounter;
 
         // Se esiste un Log Result strutturato corrispondente (stesso atleta/WOD/tipo/data),
@@ -1711,7 +1731,7 @@
           blockResults[newBlockId] = {
             id: `${session.id}-${newBlockId}`, scoreDisplay: b.result,
             scoreType: defaultScoreTypeMap[b.type] || 'Time', scoreDetail: {},
-            category: session.mode || 'RX', movements: [], notes: ''
+            category: b.category || session.mode || 'RX', movements: [], notes: ''
           };
         }
         renderBlockResultSummary(newBlockId);
@@ -1719,23 +1739,18 @@
 
       if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
 
-      currentMode = session.mode || 'RX';
-      setMode(currentMode);
-
       updateSaveButtonLabel();
       switchTab('registra'); // switchTab richiama già updateRegistraDateView()
     }
 
-    // Esce dalla modalità modifica senza salvare, tornando a un form vuoto per una nuova sessione.
+    // Esce dalla modalità modifica senza salvare, tornando a un form vuoto per una nuova sessione
+    // (senza ricreare una Parte vuota: si riparte da zero, come all'apertura di Registra).
     function cancelEditWod() {
       editingWodId = null;
       editingWodDate = null;
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
-      addWorkoutBlock();
-      currentMode = 'RX';
-      setMode('RX');
       updateSaveButtonLabel();
       updateRegistraDateView();
     }
@@ -1949,7 +1964,7 @@
 
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
-                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
+                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
                 ${bodyHtml}
                 ${scoreHtml}
                 ${communityBtn}
@@ -1963,7 +1978,7 @@
             </div>
           `).join('');
           contentHtml = `
-            <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${escapeHtml(item.title || '')} (${escapeHtml(item.type || '')})</div>
+            <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${blockCategoryBadge(item.mode)}${escapeHtml(item.title || '')} (${escapeHtml(item.type || '')})</div>
             <div style="margin-top: 6px;">${exercisesHtml}</div>
             ${item.result ? `<div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${escapeHtml(item.result)}</div>` : ''}
           `;
@@ -1973,7 +1988,7 @@
           <div class="history-item">
             <div class="history-item-header">
               <div>
-                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>
+                ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(item.date))}</span>
               </div>
               <div style="display: flex; gap: 6px;">
@@ -2603,7 +2618,9 @@
       renderLrMovementsTags();
       document.getElementById('lrMovementInput').value = '';
 
-      setLrCategory(existing ? existing.category : currentMode);
+      // Se non c'è ancora un risultato loggato, propone la RX/SCALED già impostata su questa
+      // Parte (il toggle è per singolo blocco, non per l'intera sessione).
+      setLrCategory(existing ? existing.category : getBlockCategory(blockId));
 
       document.getElementById('lrNotes').value = existing ? (existing.notes || '') : '';
 
@@ -3054,7 +3071,7 @@
           fallbackMatches.push({
             id: `wod-${w.id}`, athlete: w.athlete, date: w.date, workout: b.title, workoutType: b.type,
             scoreType: defaultScoreTypeMap[b.type] || 'Time', scoreDetail: {}, scoreDisplay: b.result,
-            category: w.mode || '', movements: [], notes: ''
+            category: b.category || '', movements: [], notes: ''
           });
         });
       });
@@ -3108,12 +3125,6 @@
       if (tab === 'storico') { renderHistory(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
       if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); }
-    }
-
-    function setMode(mode) {
-      currentMode = mode;
-      document.getElementById('btnRx').classList.toggle('active', mode === 'RX');
-      document.getElementById('btnScaled').classList.toggle('active', mode === 'SCALED');
     }
   </script>
 </body>
