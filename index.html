@@ -92,6 +92,13 @@
 
     .btn-main { width: 100%; background: var(--accent); color: var(--text); border: none; padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; margin-top: 10px; }
     .btn-secondary { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; flex: 1; }
+    .community-btn-wrap { position: relative; }
+    .notification-badge {
+      position: absolute; top: -7px; right: -7px; background: #ff3b30; color: #fff;
+      font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center; padding: 0 4px;
+      box-shadow: 0 0 0 2px var(--card-bg); line-height: 1; pointer-events: none;
+    }
     .btn-import { background: var(--input-bg); border: 1px dashed var(--accent); color: var(--accent); text-align: center; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; display: block; }
     
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
@@ -523,7 +530,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v24";
+    const APP_VERSION = "v25";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -752,7 +759,7 @@
             ` : `
               <div style="font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px;">Nessun risultato loggato.</div>
             `;
-            const communityBtn = `<button type="button" class="btn-secondary" style="width: 100%; margin-top: 6px; padding: 6px 10px; font-size: 11px;" onclick="openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')">👥 Risultati Altri Atleti</button>`;
+            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')`, b.title, b.type);
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
                 <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
@@ -1409,7 +1416,7 @@
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
             <label>TIPO</label>
-            <select class="block-type" onchange="renderDetectedSetsHint(${currentId})">
+            <select class="block-type" onchange="renderDetectedSetsHint(${currentId}); renderBlockResultSummary(${currentId})">
               <option value="For Time" ${prefillType === 'For Time' ? 'selected' : ''}>For Time</option>
               <option value="AMRAP" ${prefillType === 'AMRAP' ? 'selected' : ''}>AMRAP</option>
               <option value="Sets" ${prefillType === 'Sets' ? 'selected' : ''}>Sets / Strength</option>
@@ -1418,7 +1425,7 @@
           </div>
           <div class="form-group" style="flex: 1;">
             <label>TITOLO</label>
-            <input type="text" class="block-title" placeholder="Es. Metcon 1" value="${escapeHtml(prefillTitle)}">
+            <input type="text" class="block-title" placeholder="Es. Metcon 1" value="${escapeHtml(prefillTitle)}" oninput="renderBlockResultSummary(${currentId})">
           </div>
         </div>
 
@@ -1960,7 +1967,7 @@
               scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${escapeHtml(b.result)}</div>`;
             }
 
-            const communityBtn = `<button type="button" class="btn-secondary" style="width: 100%; margin-top: 6px; padding: 6px 10px; font-size: 11px;" onclick="openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')">👥 Risultati Altri Atleti</button>`;
+            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')`, b.title, b.type);
 
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
@@ -2945,7 +2952,10 @@
       const box = document.getElementById(`result-summary-${blockId}`);
       if (!box) return;
       const r = blockResults[blockId];
-      const communityBtn = `<button type="button" class="btn-secondary" style="width: 100%; margin-top: 8px; padding: 8px 10px; font-size: 11px;" onclick="openCommunityResultsModal(${blockId})">👥 Risultati Altri Atleti</button>`;
+      const block = document.getElementById(`workout-block-${blockId}`);
+      const liveTitle = block ? block.querySelector('.block-title').value : '';
+      const liveType = block ? block.querySelector('.block-type').value : '';
+      const communityBtn = renderCommunityButton(`openCommunityResultsModal(${blockId})`, liveTitle, liveType);
       if (!r) {
         box.innerHTML = `<button type="button" class="btn-log-result" onclick="openLogResultModal(${blockId})">🏆 Log Result</button>${communityBtn}`;
         return;
@@ -3041,13 +3051,10 @@
       openCommunityResultsModalFor(title, type);
     }
 
-    // Versione principale, usata anche dalle viste di sola lettura (Storico, giorno passato nel
-    // calendario di Registra) dove non esiste un blocco form da cui leggere titolo/tipo.
-    function openCommunityResultsModalFor(title, type) {
-      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
-
-      document.getElementById('communityResultsTitle').innerText = title ? `RISULTATI: ${title.toUpperCase()}` : 'RISULTATI ALTRI ATLETI';
-
+    // Tutti i risultati (di qualunque atleta, te compreso) per un dato titolo+tipo di blocco:
+    // usata sia per popolare la modale di confronto sia per il numero sul badge del pulsante
+    // "Risultati Altri Atleti" (vedi renderCommunityButton).
+    function getCommunityMatches(title, type) {
       const norm = (s) => String(s || '').trim().toLowerCase();
 
       // 1) Risultati "ricchi" salvati con Log Result (tipo/dettaglio strutturato, permette
@@ -3076,7 +3083,29 @@
         });
       });
 
-      const matches = richMatches.concat(fallbackMatches);
+      return richMatches.concat(fallbackMatches);
+    }
+
+    // Pulsante "Risultati Altri Atleti" con il numero di persone che hanno già loggato quel WOD
+    // in un badge in stile notifica iOS, in alto a destra sul pulsante (assente se nessuno).
+    function renderCommunityButton(onclickAttr, title, type) {
+      const count = title ? getCommunityMatches(title, type).length : 0;
+      return `
+        <div class="community-btn-wrap" style="margin-top: 6px;">
+          <button type="button" class="btn-secondary" style="width: 100%; padding: 6px 10px; font-size: 11px;" onclick="${onclickAttr}">👥 Risultati Altri Atleti</button>
+          ${count > 0 ? `<span class="notification-badge">${count > 99 ? '99+' : count}</span>` : ''}
+        </div>
+      `;
+    }
+
+    // Versione principale, usata anche dalle viste di sola lettura (Storico, giorno passato nel
+    // calendario di Registra) dove non esiste un blocco form da cui leggere titolo/tipo.
+    function openCommunityResultsModalFor(title, type) {
+      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
+
+      document.getElementById('communityResultsTitle').innerText = title ? `RISULTATI: ${title.toUpperCase()}` : 'RISULTATI ALTRI ATLETI';
+
+      const matches = getCommunityMatches(title, type);
 
       const content = document.getElementById('communityResultsContent');
       if (matches.length === 0) {
