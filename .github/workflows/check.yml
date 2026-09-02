@@ -1,0 +1,25 @@
+name: Check
+
+on:
+  push:
+    paths:
+      - 'index.html'
+      - '.github/scripts/check-syntax.js'
+      - '.github/workflows/check.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '.github/scripts/check-syntax.js'
+      - '.github/workflows/check.yml'
+
+jobs:
+  syntax-check:
+    name: Verifica sintassi JS di index.html
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node .github/scripts/check-syntax.js
