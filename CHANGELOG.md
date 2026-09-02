@@ -4,6 +4,18 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v27 — 2026-09-02
+- Si possono **programmare i WOD dei giorni futuri**: selezionando una data futura nel
+  calendario, il form si apre in modalità programmazione e il WOD si pubblica in anticipo con
+  "📋 PUBBLICA IL WOD DEL ...". Comparirà in bacheca quel giorno.
+- Su una data futura il pulsante "SALVA SESSIONE COMPLETA" è nascosto (e il salvataggio è
+  comunque rifiutato): un risultato non può riferirsi a un allenamento non ancora svolto.
+- La bacheca segue il giorno selezionato e mostra cosa è già stato programmato per quella data,
+  così non si pubblicano due volte lo stesso WOD.
+- Nel calendario i giorni futuri con un WOD già programmato hanno un pallino vuoto, distinto
+  dal pallino pieno degli allenamenti svolti.
+- I giorni passati restano in sola lettura come prima.
+
 ## v26 — 2026-09-02
 - Nuova card **⌚ WHOOP** nella tab Atleta: recovery, strain e qualità del sonno dell'ultimo
   giorno sincronizzato, più l'elenco degli allenamenti rilevati dalla fascia (sport, strain,

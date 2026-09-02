@@ -123,6 +123,8 @@
     .calendar-day.has-log .calendar-day-num::after { content: ''; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin: 3px auto 0; }
     .calendar-day.selected { border-color: var(--accent); background: rgba(230, 74, 25, 0.12); }
     .calendar-day.is-today .calendar-day-name { color: var(--accent); }
+    /* Giorno futuro con un WOD gia' pubblicato: pallino vuoto, per distinguerlo da un allenamento svolto (pieno). */
+    .calendar-day.has-programmed:not(.has-log) .calendar-day-num::after { content: ''; display: block; width: 5px; height: 5px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--accent); margin: 3px auto 0; }
     #registraDayView .history-item:last-child { border-bottom: none; padding-bottom: 0; }
 
     .active-days-range { display: flex; gap: 6px; margin-bottom: 14px; }
@@ -309,14 +311,19 @@
         <button type="button" class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="cancelEditWod()">Annulla</button>
       </div>
 
+      <div id="futureDayBanner" style="display: none; background: rgba(230, 74, 25, 0.08); border: 1px dashed var(--accent); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px;">
+        <div id="futureDayBannerText" style="font-size: 12px; font-weight: 800; color: var(--accent);"></div>
+        <p style="font-size: 11px; color: var(--text-muted); margin: 6px 0 0;">Pubblicalo in anticipo: comparirà in bacheca quel giorno. Il tuo risultato lo registrerai quando avrai fatto l'allenamento.</p>
+      </div>
+
       <button type="button" class="btn-secondary" style="width: 100%; padding: 14px; font-size: 14px; margin-bottom: 16px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
 
       <!-- Contenitore Dinamico Blocchi Multipli -->
       <div id="workoutBlocksContainer"></div>
 
       <button class="btn-main" id="saveWodBtn" onclick="withButtonGuard(this, saveWodSession)">SALVA SESSIONE COMPLETA</button>
-      <button type="button" class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="withButtonGuard(this, publishDailyWod)">📋 PUBBLICA SOLO IL WOD (senza risultato)</button>
-      <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Condivide subito il lavoro qui sopra in bacheca per tutti, senza registrare un risultato tuo: lo fai/lo logghi dopo, quando vuoi.</p>
+      <button type="button" class="btn-secondary" id="publishWodBtn" style="width: 100%; margin-top: 10px;" onclick="withButtonGuard(this, publishDailyWod)">📋 PUBBLICA SOLO IL WOD (senza risultato)</button>
+      <p id="publishWodHint" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Condivide subito il lavoro qui sopra in bacheca per tutti, senza registrare un risultato tuo: lo fai/lo logghi dopo, quando vuoi.</p>
     </div>
   </div>
 
@@ -557,7 +564,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v26";
+    const APP_VERSION = "v27";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -690,7 +697,15 @@
           .map(w => w.date)
       );
 
+      // WOD pubblicati in anticipo per un giorno futuro, di chiunque: servono a far vedere
+      // nel calendario che quel giorno "c'è già qualcosa", anche se non l'hai caricato tu.
       const todayStr = getTodayDateString();
+      const programmedDates = new Set(
+        (globalData.wods || [])
+          .filter(w => isPublishedWod(w) && w.date && w.date > todayStr)
+          .map(w => w.date)
+      );
+
       const weekStart = getWeekStart(calendarAnchorDate);
 
       let html = '';
@@ -703,6 +718,7 @@
         if (dayStr === selectedRegistraDate) classes.push('selected');
         if (dayStr === todayStr) classes.push('is-today');
         if (loggedDates.has(dayStr)) classes.push('has-log');
+        if (programmedDates.has(dayStr)) classes.push('has-programmed');
 
         html += `
           <div class="${classes.join(' ')}" onclick="selectCalendarDate('${dayStr}')">
@@ -747,11 +763,31 @@
       if (!formCard || !dayView) return;
 
       const isToday = selectedRegistraDate === getTodayDateString();
+      // Confronto fra stringhe YYYY-MM-DD: ordinamento lessicografico e cronologico coincidono.
+      const isFuture = selectedRegistraDate > getTodayDateString();
       // Mentre si modifica una sessione passata, il form resta visibile anche se la data
       // selezionata nel calendario non è quella odierna.
-      const showForm = isToday || editingWodId !== null;
+      const showForm = isToday || isFuture || editingWodId !== null;
       formCard.style.display = showForm ? '' : 'none';
       dayView.style.display = showForm ? 'none' : '';
+
+      // Su un giorno futuro si può solo PROGRAMMARE il WOD: l'allenamento non è ancora stato
+      // fatto, quindi non ha senso salvare una sessione con un risultato.
+      const isProgramming = isFuture && editingWodId === null;
+      const banner = document.getElementById('futureDayBanner');
+      const bannerText = document.getElementById('futureDayBannerText');
+      const saveBtn = document.getElementById('saveWodBtn');
+      const publishBtn = document.getElementById('publishWodBtn');
+      const publishHint = document.getElementById('publishWodHint');
+      if (banner) banner.style.display = isProgramming ? '' : 'none';
+      if (bannerText && isProgramming) bannerText.innerText = `📅 STAI PROGRAMMANDO IL WOD DI ${formatDateForDisplay(selectedRegistraDate)}`;
+      if (saveBtn) saveBtn.style.display = isProgramming ? 'none' : '';
+      if (publishHint) publishHint.style.display = isProgramming ? 'none' : '';
+      if (publishBtn) {
+        publishBtn.innerText = isProgramming
+          ? `📋 PUBBLICA IL WOD DEL ${formatDateForDisplay(selectedRegistraDate)}`
+          : '📋 PUBBLICA SOLO IL WOD (senza risultato)';
+      }
 
       if (!showForm) renderRegistraDayView();
       updateProposedWodCard();
@@ -1697,6 +1733,13 @@
         return;
       }
 
+      // Rete di sicurezza: sui giorni futuri il pulsante è già nascosto (vedi
+      // updateRegistraDateView), ma un risultato non può riferirsi a un allenamento non svolto.
+      if (editingWodId === null && selectedRegistraDate > getTodayDateString()) {
+        alert('Non puoi registrare un risultato per un giorno futuro: pubblica il WOD e logga il risultato quando lo avrai fatto.');
+        return;
+      }
+
       let blocksData = [];
       blockElements.forEach(block => {
         const blockIdAttr = block.id.replace('workout-block-', '');
@@ -1719,7 +1762,7 @@
       const entry = {
         action: 'saveWodSession',
         id: isEditing ? editingWodId : String(Date.now()),
-        date: isEditing ? editingWodDate : getTodayDateString(),
+        date: isEditing ? editingWodDate : selectedRegistraDate,
         athlete: athleteName,
         blocks: blocksData
       };
@@ -1788,10 +1831,11 @@
         blocksData.push({ type, title, explanation, result: '' });
       });
 
+      const isFuture = selectedRegistraDate > getTodayDateString();
       const entry = {
         action: 'saveWodSession',
         id: String(Date.now()),
-        date: getTodayDateString(),
+        date: selectedRegistraDate,
         athlete: athleteName,
         mode: PUBLISHED_WOD_MODE,
         blocks: blocksData
@@ -1803,7 +1847,9 @@
         await fetchCloudData();
         hideFunLoadingOverlay();
         if (response.ok) {
-          alert('WOD pubblicato in bacheca! Quando lo fai, torna qui e logga il tuo risultato con "Salva Sessione Completa".');
+          alert(isFuture
+            ? `WOD programmato per il ${formatDateForDisplay(selectedRegistraDate)}! Comparirà in bacheca quel giorno, e allora potrai loggare il tuo risultato.`
+            : 'WOD pubblicato in bacheca! Quando lo fai, torna qui e logga il tuo risultato con "Salva Sessione Completa".');
         } else {
           alert('Errore durante la pubblicazione sul cloud.');
         }
@@ -1925,8 +1971,11 @@
       const card = document.getElementById('proposedWodCard');
       if (!card) return;
 
-      const today = getTodayDateString();
-      if (selectedRegistraDate !== today || editingWodId !== null || proposedWodDismissed) {
+      // La bacheca segue il giorno selezionato: su una data futura mostra i WOD già
+      // programmati per quel giorno, così non se ne pubblicano due uguali.
+      const isFuture = selectedRegistraDate > getTodayDateString();
+      const isToday = selectedRegistraDate === getTodayDateString();
+      if ((!isToday && !isFuture) || editingWodId !== null || proposedWodDismissed) {
         card.style.display = 'none';
         proposedWodCandidates = [];
         return;
@@ -1938,7 +1987,7 @@
       // per essere condivisi prima che qualcuno li faccia.
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const relevantSessions = (globalData.wods || []).filter(w =>
-        w.date === today && w.athlete && (w.athlete.toLowerCase() !== activeAthlete || isPublishedWod(w))
+        w.date === selectedRegistraDate && w.athlete && (w.athlete.toLowerCase() !== activeAthlete || isPublishedWod(w))
       );
 
       if (relevantSessions.length === 0) {
@@ -1974,7 +2023,9 @@
         b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
       );
 
-      document.getElementById('proposedWodTitle').innerText = `📋 BACHECA WOD DI OGGI (${proposedWodCandidates.length})`;
+      document.getElementById('proposedWodTitle').innerText = isFuture
+        ? `📋 GIÀ PROGRAMMATO PER IL ${formatDateForDisplay(selectedRegistraDate)} (${proposedWodCandidates.length})`
+        : `📋 BACHECA WOD DI OGGI (${proposedWodCandidates.length})`;
 
       document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map((c, idx) => {
         const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);
