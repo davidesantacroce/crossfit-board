@@ -4,6 +4,16 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v26 — 2026-09-02
+- Nuova card **⌚ WHOOP** nella tab Atleta: recovery, strain e qualità del sonno dell'ultimo
+  giorno sincronizzato, più l'elenco degli allenamenti rilevati dalla fascia (sport, strain,
+  frequenza cardiaca media/massima, calorie).
+- La card compare solo per gli atleti che hanno effettivamente dati Whoop collegati; le
+  metriche mancanti mostrano un trattino invece di sparire, e se l'ultimo dato è più vecchio
+  di una settimana viene segnalato che la fascia non sincronizza da un po'.
+- I dati arrivano dal foglio "Whoop", popolato dal backend Apps Script tramite l'API Whoop
+  (OAuth 2.0) con sincronizzazione automatica giornaliera.
+
 ## v25 — 2026-09-02
 - Badge rosso stile notifica iOS sul pulsante "👥 Risultati Altri Atleti", col numero di
   persone che hanno già loggato quel WOD — live nel form di Registra, in Storico e nella vista
