@@ -295,6 +295,8 @@
       </div>
 
       <button class="btn-main" id="saveWodBtn" onclick="withButtonGuard(this, saveWodSession)">SALVA SESSIONE COMPLETA</button>
+      <button type="button" class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="withButtonGuard(this, publishDailyWod)">📋 PUBBLICA SOLO IL WOD (senza risultato)</button>
+      <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Condivide subito il lavoro qui sopra in bacheca per tutti, senza registrare un risultato tuo: lo fai/lo logghi dopo, quando vuoi.</p>
     </div>
   </div>
 
@@ -495,6 +497,15 @@
     let cropper = null;
     let globalData = { wods: [], athletes: [], massimali: [], results: [] };
 
+    // Un WOD "pubblicato in bacheca" è una riga della stessa tabella Wods, distinta solo dal
+    // valore speciale di "mode" qui sotto (nessun campo/tabella nuova sul backend): niente
+    // RX/Scaled né punteggio, serve solo a condividere il testo del lavoro con tutti prima che
+    // qualcuno lo faccia davvero. Va escluso da tutto ciò che conta "giorni allenati" (calendario,
+    // grafico Giorni Attivi), ma resta visibile/eliminabile/modificabile come le altre sessioni.
+    const PUBLISHED_WOD_MODE = 'PUBLISHED';
+    function isPublishedWod(w) { return w && w.mode === PUBLISHED_WOD_MODE; }
+    function formatModeBadge(mode) { return mode === PUBLISHED_WOD_MODE ? '📋 PUBBLICATO' : (mode || ''); }
+
     // Loghi fissi dell'app (palestra e programmazione): incorporati direttamente,
     // non piu' caricabili dagli atleti.
     const GYM_LOGO_DATA_URI = "data:image/png;base64,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";
@@ -514,7 +525,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v21";
+    const APP_VERSION = "v22";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -643,7 +654,7 @@
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const loggedDates = new Set(
         (globalData.wods || [])
-          .filter(w => w.athlete && w.athlete.toLowerCase() === activeAthlete)
+          .filter(w => w.athlete && w.athlete.toLowerCase() === activeAthlete && !isPublishedWod(w))
           .map(w => w.date)
       );
 
@@ -759,7 +770,7 @@
           <div class="history-item">
             <div class="history-item-header">
               <div>
-                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
+                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>
               </div>
               <div style="display: flex; gap: 6px;">
                 <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
@@ -1100,7 +1111,7 @@
       const activeAthlete = localStorage.getItem('activeAthlete');
       const activeDates = new Set(
         (globalData.wods || [])
-          .filter(w => w.athlete && activeAthlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && w.date)
+          .filter(w => w.athlete && activeAthlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && w.date && !isPublishedWod(w))
           .map(w => String(w.date).slice(0, 10))
       );
 
@@ -1562,6 +1573,54 @@
       }
     }
 
+    // Pubblica solo il testo del WOD di oggi in bacheca (vedi updateProposedWodCard), senza
+    // registrare un risultato personale: stessa azione 'saveWodSession' usata per una sessione
+    // vera, ma con mode=PUBLISHED_WOD_MODE come marcatore e senza alcun punteggio nei blocchi.
+    // Il form NON viene svuotato dopo: puoi continuare e loggare il tuo risultato quando vuoi.
+    async function publishDailyWod() {
+      const url = getScriptUrl();
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) { alert('Effettua prima il login con il tuo profilo atleta!'); return; }
+      if (!url) return;
+
+      const blockElements = document.querySelectorAll('[id^="workout-block-"]');
+      if (blockElements.length === 0) { alert('Aggiungi almeno un blocco di allenamento.'); return; }
+
+      const blocksData = [];
+      blockElements.forEach(block => {
+        const type = block.querySelector('.block-type').value;
+        const title = block.querySelector('.block-title').value || 'WOD';
+        const explanationEl = block.querySelector('.block-explanation');
+        const explanation = explanationEl ? explanationEl.value : '';
+        blocksData.push({ type, title, explanation, result: '' });
+      });
+
+      const entry = {
+        action: 'saveWodSession',
+        id: String(Date.now()),
+        date: getTodayDateString(),
+        athlete: athleteName,
+        mode: PUBLISHED_WOD_MODE,
+        blocks: blocksData
+      };
+
+      showFunLoadingOverlay();
+      try {
+        const response = await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
+        await fetchCloudData();
+        hideFunLoadingOverlay();
+        if (response.ok) {
+          alert('WOD pubblicato in bacheca! Quando lo fai, torna qui e logga il tuo risultato con "Salva Sessione Completa".');
+        } else {
+          alert('Errore durante la pubblicazione sul cloud.');
+        }
+      } catch (err) {
+        console.error('Errore pubblicazione WOD del giorno:', err);
+        hideFunLoadingOverlay();
+        alert('Errore di connessione durante la pubblicazione.');
+      }
+    }
+
     // Carica una sessione già salvata (propria) nel form di Registra per correggerla.
     function editWodSession(id) {
       const session = (globalData.wods || []).find(w => String(w.id) === String(id));
@@ -1685,22 +1744,27 @@
         return;
       }
 
+      // Bacheca del giorno: include le sessioni complete di ALTRI atleti (come prima, per
+      // riprendere un lavoro già fatto da qualcuno) e in più i WOD "pubblicati" da chiunque
+      // (te compreso) con l'apposito tasto — quelli non hanno ancora un risultato, sono lì solo
+      // per essere condivisi prima che qualcuno li faccia.
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
-      const othersSessions = (globalData.wods || []).filter(w =>
-        w.date === today && w.athlete && w.athlete.toLowerCase() !== activeAthlete
+      const relevantSessions = (globalData.wods || []).filter(w =>
+        w.date === today && w.athlete && (w.athlete.toLowerCase() !== activeAthlete || isPublishedWod(w))
       );
 
-      if (othersSessions.length === 0) {
+      if (relevantSessions.length === 0) {
         card.style.display = 'none';
         proposedWodCandidates = [];
         return;
       }
 
       // Un atleta può aver salvato più sessioni separate nello stesso giorno (es. ha premuto
-      // "Salva" più volte invece di aggiungere un secondo blocco alla stessa sessione):
-      // raggruppiamo per atleta unendo tutti i blocchi, così non ne perdiamo nessuno.
+      // "Salva" più volte invece di aggiungere un secondo blocco alla stessa sessione, o ha sia
+      // pubblicato il WOD sia salvato la propria sessione completa): raggruppiamo per atleta
+      // unendo tutti i blocchi, così non ne perdiamo nessuno.
       const byAthlete = {};
-      othersSessions.forEach(w => {
+      relevantSessions.forEach(w => {
         if (!byAthlete[w.athlete]) byAthlete[w.athlete] = { athlete: w.athlete, blocks: [], lastId: w.id };
         byAthlete[w.athlete].blocks.push(...(w.blocks || []));
         if (String(w.id).localeCompare(String(byAthlete[w.athlete].lastId)) > 0) byAthlete[w.athlete].lastId = w.id;
@@ -1713,22 +1777,22 @@
         b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
       );
 
-      const single = proposedWodCandidates.length === 1;
-      document.getElementById('proposedWodTitle').innerText = single
-        ? `📋 ${proposedWodCandidates[0].athlete} ha già caricato il lavoro di oggi`
-        : `📋 ${proposedWodCandidates.length} atleti hanno già caricato un lavoro oggi`;
+      document.getElementById('proposedWodTitle').innerText = `📋 BACHECA WOD DI OGGI (${proposedWodCandidates.length})`;
 
-      document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map(c => `
-        <div style="${single ? '' : 'border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;'}">
-          ${single ? '' : `<div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(c.athlete)}</div>`}
+      document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map(c => {
+        const isSelf = c.athlete.toLowerCase() === activeAthlete;
+        return `
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
+          <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${isSelf ? 'Pubblicato da te' : escapeHtml(c.athlete)}</div>
           ${c.blocks.map(b => `
             <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
               • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
             </div>
           `).join('')}
-          <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useProposedWod('${String(c.athlete).replace(/'/g, "\\'")}')">USA IL WOD DI ${escapeHtml(c.athlete).toUpperCase()}</button>
+          <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useProposedWod('${String(c.athlete).replace(/'/g, "\\'")}')">${isSelf ? 'RIUSA QUESTO WOD' : 'USA IL WOD DI ' + escapeHtml(c.athlete).toUpperCase()}</button>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       card.style.display = '';
     }
@@ -1866,7 +1930,7 @@
           <div class="history-item">
             <div class="history-item-header">
               <div>
-                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(item.mode || '')}</span>
+                <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>
                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(item.date))}</span>
               </div>
               <div style="display: flex; gap: 6px;">
