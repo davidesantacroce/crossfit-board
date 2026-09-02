@@ -525,7 +525,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v22";
+    const APP_VERSION = "v23";
     const APP_VERSION_DATE = "01/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1502,6 +1502,20 @@
       renderDetectedSetsHint(blockId);
     }
 
+    // Posizione (1-based, per il messaggio) del primo blocco senza né titolo né spiegazione, o
+    // null se sono tutti compilati. Evita di salvare/pubblicare una card lasciata a metà (es.
+    // dopo aver premuto "+ Aggiungi Lavoro" per un secondo blocco mai riempito).
+    function findEmptyBlockPosition(blockElements) {
+      for (let i = 0; i < blockElements.length; i++) {
+        const block = blockElements[i];
+        const title = (block.querySelector('.block-title').value || '').trim();
+        const explanationEl = block.querySelector('.block-explanation');
+        const explanation = (explanationEl ? explanationEl.value : '').trim();
+        if (!title && !explanation) return i + 1;
+      }
+      return null;
+    }
+
     async function saveWodSession() {
       const url = getScriptUrl();
       const athleteName = localStorage.getItem('activeAthlete');
@@ -1509,6 +1523,12 @@
 
       const blockElements = document.querySelectorAll('[id^="workout-block-"]');
       if (blockElements.length === 0) { alert('Aggiungi almeno un blocco di allenamento.'); return; }
+
+      const emptyPos = findEmptyBlockPosition(blockElements);
+      if (emptyPos !== null) {
+        alert(`La Parte #${emptyPos} non è compilata: aggiungi almeno un titolo o una spiegazione, oppure rimuovila con ✕, prima di salvare.`);
+        return;
+      }
 
       let blocksData = [];
       blockElements.forEach(block => {
@@ -1585,6 +1605,12 @@
 
       const blockElements = document.querySelectorAll('[id^="workout-block-"]');
       if (blockElements.length === 0) { alert('Aggiungi almeno un blocco di allenamento.'); return; }
+
+      const emptyPos = findEmptyBlockPosition(blockElements);
+      if (emptyPos !== null) {
+        alert(`La Parte #${emptyPos} non è compilata: aggiungi almeno un titolo o una spiegazione, oppure rimuovila con ✕, prima di pubblicare.`);
+        return;
+      }
 
       const blocksData = [];
       blockElements.forEach(block => {
@@ -1770,26 +1796,36 @@
         if (String(w.id).localeCompare(String(byAthlete[w.athlete].lastId)) > 0) byAthlete[w.athlete].lastId = w.id;
       });
 
-      // Se più atleti hanno caricato lavori DIVERSI oggi (es. tracce/programmazioni diverse
-      // nello stesso box), li mostriamo tutti: la scelta di quale usare spetta all'atleta,
-      // non la facciamo noi al posto suo scegliendone uno solo in automatico.
-      proposedWodCandidates = Object.values(byAthlete).sort((a, b) =>
+      // Se più atleti hanno pubblicato/salvato lo STESSO identico WOD (es. tutti trascrivono la
+      // stessa lavagna), li accorpiamo in un'unica card con tutti i nomi, invece di ripetere N
+      // volte lo stesso contenuto in bacheca. WOD DIVERSI restano invece separati: la scelta di
+      // quale usare spetta all'atleta, non la facciamo noi al posto suo scegliendone uno solo.
+      const bySignature = {};
+      Object.values(byAthlete).forEach(c => {
+        const sig = wodBlocksSignature(c.blocks);
+        if (!bySignature[sig]) bySignature[sig] = { athletes: [], blocks: c.blocks, lastId: c.lastId };
+        bySignature[sig].athletes.push(c.athlete);
+        if (String(c.lastId).localeCompare(String(bySignature[sig].lastId)) > 0) bySignature[sig].lastId = c.lastId;
+      });
+
+      proposedWodCandidates = Object.values(bySignature).sort((a, b) =>
         b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
       );
 
       document.getElementById('proposedWodTitle').innerText = `📋 BACHECA WOD DI OGGI (${proposedWodCandidates.length})`;
 
-      document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map(c => {
-        const isSelf = c.athlete.toLowerCase() === activeAthlete;
+      document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map((c, idx) => {
+        const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);
+        const isSelfOnly = names.length === 1 && names[0] === 'te';
         return `
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
-          <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${isSelf ? 'Pubblicato da te' : escapeHtml(c.athlete)}</div>
+          <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
           ${c.blocks.map(b => `
             <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
               • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
             </div>
           `).join('')}
-          <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useProposedWod('${String(c.athlete).replace(/'/g, "\\'")}')">${isSelf ? 'RIUSA QUESTO WOD' : 'USA IL WOD DI ' + escapeHtml(c.athlete).toUpperCase()}</button>
+          <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useProposedWod(${idx})">${isSelfOnly ? 'RIUSA QUESTO WOD' : 'USA QUESTO WOD'}</button>
         </div>
       `;
       }).join('');
@@ -1797,11 +1833,21 @@
       card.style.display = '';
     }
 
-    // Importa i blocchi (tipo/titolo/spiegazione) del WOD proposto dall'atleta indicato nel
-    // form corrente, come base da adattare: non copia risultati o modalità RX/Scaled,
-    // che restano personali.
-    function useProposedWod(athleteName) {
-      const candidate = proposedWodCandidates.find(c => c.athlete === athleteName);
+    // Firma testuale di un set di blocchi (tipo+titolo+spiegazione normalizzati), usata solo
+    // per capire se due WOD pubblicati da persone diverse sono "lo stesso lavoro" e vanno
+    // mostrati come una card unica invece che ripetuti.
+    function wodBlocksSignature(blocks) {
+      return (blocks || [])
+        .map(b => `${String(b.type || '').trim().toLowerCase()}|${String(b.title || '').trim().toLowerCase()}|${String(b.explanation || '').trim().toLowerCase().replace(/\s+/g, ' ')}`)
+        .join('||');
+    }
+
+    // Importa i blocchi (tipo/titolo/spiegazione) del WOD proposto in bacheca nel form
+    // corrente, come base da adattare: non copia risultati o modalità RX/Scaled, che restano
+    // personali. Non nasconde più la bacheca dopo l'uso, così resta possibile tornare indietro
+    // e riprendere lo stesso (o un altro) WOD se nel frattempo lo svuoti o lo cancelli.
+    function useProposedWod(idx) {
+      const candidate = proposedWodCandidates[idx];
       if (!candidate || !candidate.blocks || candidate.blocks.length === 0) return;
 
       document.getElementById('workoutBlocksContainer').innerHTML = '';
@@ -1809,9 +1855,6 @@
       blockResults = {};
       candidate.blocks.forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
       if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
-
-      proposedWodDismissed = true;
-      updateProposedWodCard();
     }
 
     function dismissProposedWod() {
