@@ -510,9 +510,18 @@ function getValidWhoopAccessToken_() {
 }
 
 // Chiama un endpoint "collection" di Whoop e concatena tutte le pagine (next_token).
+//
+// MAX_PAGINE ferma il ciclo anche se l'API restituisse un nextToken che non si esaurisce mai
+// (es. un cursore rimasto "incollato"): senza un tetto, un ciclo così può girare fino al limite
+// di 6 minuti di ogni esecuzione Apps Script e venire ucciso a metà, invece di fermarsi da solo
+// con un avviso chiaro nel log. 200 pagine da 25 = 5000 record, ben oltre quanto un singolo
+// account Whoop può avere in qualsiasi finestra sensata.
 function fetchWhoopCollection_(path, accessToken, startIso) {
+  var MAX_PAGINE = 200;
   var records = [];
   var nextToken = null;
+  var pagine = 0;
+
   do {
     var url = WHOOP_API_BASE + path + "?limit=25&start=" + encodeURIComponent(startIso)
       + (nextToken ? "&nextToken=" + encodeURIComponent(nextToken) : "");
@@ -520,10 +529,23 @@ function fetchWhoopCollection_(path, accessToken, startIso) {
       headers: { Authorization: "Bearer " + accessToken },
       muteHttpExceptions: true
     });
+
+    if (response.getResponseCode() !== 200) {
+      Logger.log('Errore da ' + path + ': HTTP ' + response.getResponseCode() + ' -> ' + response.getContentText().substring(0, 300));
+      break;
+    }
+
     var body = JSON.parse(response.getContentText());
     records = records.concat(body.records || []);
     nextToken = body.next_token || null;
+    pagine++;
+
+    if (pagine >= MAX_PAGINE && nextToken) {
+      Logger.log('Attenzione: ' + path + ' ha ancora altre pagine oltre il limite di sicurezza (' + MAX_PAGINE + '), fermato qui con ' + records.length + ' record.');
+      break;
+    }
   } while (nextToken);
+
   return records;
 }
 
