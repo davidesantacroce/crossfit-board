@@ -4,6 +4,12 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v45 — 2026-09-03
+- Restyling visivo (colori invariati): bagliore ambientale in alto dietro l'header, card più
+  arrotondate con un'ombra morbida per dare profondità, tasti principali con gradiente e
+  bagliore accent, stati attivi (tab in nav, RX/Scaled, giorno selezionato nel calendario, focus
+  sui campi) più marcati con un piccolo glow invece del solo cambio colore.
+
 ## v44 — 2026-09-03
 - Nuova card **📊 FOCUS ALLENAMENTO** nel tab ATLETA: un radar che mostra su cosa ti sei
   concentrato nelle ultime 4 settimane (Squat, Hinge & Carry, Weightlifting Olimpico, Trazioni,
