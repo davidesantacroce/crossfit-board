@@ -4,6 +4,12 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v36 — 2026-09-04
+- **Fix**: nella bacheca non comparivano i WOD caricati da te — vedevi quelli di tutti gli
+  altri tranne i tuoi, a meno di averli pubblicati col tasto apposito. Era un residuo di quando
+  la bacheca significava "cosa hanno caricato gli altri"; ora che mostra l'intera settimana come
+  vista d'insieme, ci sono anche i tuoi, etichettati "te" e con il pulsante "RIUSA QUESTO WOD".
+
 ## v35 — 2026-09-04
 - Nella bacheca dei WOD ogni proposta mostra ora anche il **giorno della settimana abbreviato**
   accanto alla data (es. "Gio 04/09/2026"): con le proposte di tutta la settimana, riconoscere
