@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v28 — 2026-09-02
+- La classifica di un **WOD del giorno** ora confronta solo chi lo ha fatto entro **3 giorni**
+  dalla data del WOD, invece di accomunare tutti quelli che hanno usato lo stesso titolo in
+  qualsiasi momento. La tolleranza include chi recupera l'allenamento qualche giorno dopo (o
+  lo anticipa): la finestra è simmetrica.
+- I **benchmark noti** (Fran, Murph, Cindy...) restano confrontabili di sempre: è il loro scopo.
+- La modale di confronto ora dichiara su cosa sta confrontando — finestra temporale con la
+  data di riferimento, oppure "risultati di sempre" per i benchmark.
+- Il badge col numero di atleti sul pulsante "Risultati Altri Atleti" usa lo stesso filtro
+  della modale, quindi il numero e l'elenco coincidono sempre.
+
 ## v27 — 2026-09-02
 - Si possono **programmare i WOD dei giorni futuri**: selezionando una data futura nel
   calendario, il form si apre in modalità programmazione e il WOD si pubblica in anticipo con
