@@ -102,3 +102,33 @@ test('il bottone precompila il peso nel profilo senza salvare da solo', async ({
   await expect(page.locator('#profileWeight')).toHaveValue('78.4');
   expect(state.wods).toHaveLength(0); // nessuna chiamata di salvataggio innescata dal solo click
 });
+
+test('il tasto ↻ ricarica i dati dal backend senza ricaricare la pagina', async ({ page }) => {
+  const state = await mockBackend(page, {
+    athletes: [{ name: 'Test Athlete', hasPin: false }],
+    health: [{ athlete: 'Test Athlete', date: daysAgo(1), weight: 78.4 }],
+  });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+  await apriAtleta(page);
+  await expect(page.locator('#healthContainer .health-stat-value').first()).toHaveText('78.4 kg');
+
+  // Il Comando iOS manda una nuova pesata mentre la pagina è già aperta.
+  state.health.push({ athlete: 'Test Athlete', date: daysAgo(0), weight: 77.2 });
+
+  await page.locator('#healthCard .btn-refresh-card').click();
+
+  await expect(page.locator('#healthContainer .health-stat-value').first()).toHaveText('77.2 kg');
+});
+
+test('anche la card Whoop ha il suo tasto di ricarica', async ({ page }) => {
+  await mockBackend(page, {
+    athletes: [{ name: 'Test Athlete', hasPin: false }],
+    whoop: [{ athlete: 'Test Athlete', type: 'recovery', date: daysAgo(1), recordId: 'r1', data: { recoveryScore: 70 } }],
+  });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+  await apriAtleta(page);
+
+  await expect(page.locator('#whoopCard .btn-refresh-card')).toBeVisible();
+});

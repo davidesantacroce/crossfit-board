@@ -322,12 +322,15 @@ function parseHealthNumber_(raw) {
     var decimalIsComma = s.lastIndexOf(',') > s.lastIndexOf('.');
     s = decimalIsComma ? s.split('.').join('').replace(',', '.') : s.split(',').join('');
   } else if (commas || dots) {
-    // Un separatore solo è ambiguo: "8.400" sono ottomilaquattrocento passi, "78.4" sono
-    // settantotto chili e quattro etti. Con ESATTAMENTE tre cifre dopo lo trattiamo da
-    // separatore delle migliaia: nessuna di queste metriche ha senso con tre decimali.
-    // Più separatori uguali sono per forza migliaia ("1.234.567").
+    // Un separatore solo: è SEMPRE il decimale.
+    //
+    // Qui prima c'era una regola che con esattamente tre cifre dopo il separatore assumeva le
+    // migliaia ("8.400" passi). Sbagliata: Comandi manda i valori di Salute senza raggruppare
+    // le migliaia e con parecchi decimali (il peso è arrivato come "78.100000001"), quindi
+    // "28.859" erano 28,859 kcal e quella regola le trasformava in 28859 — mille volte tanto,
+    // in silenzio. Più separatori uguali restano migliaia ("1.234.567"), lì non c'è ambiguità.
     var sep = commas ? ',' : '.';
-    var isThousands = (commas || dots) > 1 || new RegExp('^-?\\d+\\' + sep + '\\d{3}$').test(s);
+    var isThousands = (commas || dots) > 1;
     s = isThousands ? s.split(sep).join('') : s.split(sep).join('.');
   }
 
