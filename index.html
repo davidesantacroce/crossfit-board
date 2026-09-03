@@ -31,7 +31,12 @@
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-color);
+      /* Bagliore ambientale in alto, stesso accent dell'app: fisso (non scrolla con la pagina),
+         così la vista resta ancorata anche su una pagina lunga. */
+      background:
+        radial-gradient(ellipse 900px 520px at 50% -12%, rgba(230, 74, 25, 0.16), transparent 60%)
+        fixed,
+        var(--bg-color);
       color: var(--text);
       margin: 0;
       padding: 16px;
@@ -49,12 +54,12 @@
     .nav { display: flex; gap: 6px; margin-bottom: 20px; overflow-x: auto; }
     .nav button {
       flex: 1; background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted);
-      padding: 10px 6px; border-radius: 8px; font-weight: 700; font-size: 10px;
-      text-transform: uppercase; cursor: pointer; text-align: center; white-space: nowrap;
+      padding: 10px 6px; border-radius: 10px; font-weight: 700; font-size: 10px;
+      text-transform: uppercase; cursor: pointer; text-align: center; white-space: nowrap; transition: box-shadow 0.15s;
     }
-    .nav button.active { background: var(--accent); color: var(--text); border-color: var(--accent); }
+    .nav button.active { background: var(--accent); color: var(--text); border-color: var(--accent); box-shadow: 0 3px 14px -3px rgba(230, 74, 25, 0.55); }
 
-    .card { background: var(--card-bg); border-radius: 14px; padding: 18px; border: 1px solid var(--border); margin-bottom: 20px; }
+    .card { background: var(--card-bg); border-radius: 18px; padding: 18px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.5); }
     .card-title { font-size: 13px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 16px; }
 
     .form-group { margin-bottom: 16px; }
@@ -64,12 +69,12 @@
     label { display: block; font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
     input, select, textarea {
       width: 100%; background: var(--input-bg); border: 1px solid var(--border);
-      border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; box-sizing: border-box; outline: none;
-      font-family: inherit;
+      border-radius: 10px; padding: 12px; color: var(--text); font-size: 14px; box-sizing: border-box; outline: none;
+      font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s;
     }
     textarea { resize: vertical; min-height: 90px; }
     textarea.block-explanation { min-height: 160px; }
-    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(230, 74, 25, 0.18); }
 
     .time-score-row { display: flex; align-items: center; gap: 8px; }
     .time-score-row input { text-align: center; }
@@ -89,8 +94,8 @@
     .wod-explanation-box label { color: var(--accent); font-size: 12px; font-weight: 900; }
 
     .rx-scaled-toggle { display: flex; gap: 10px; margin-top: 10px; }
-    .rx-btn { flex: 1; padding: 12px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); font-weight: 800; border-radius: 8px; cursor: pointer; text-align: center; }
-    .rx-btn.active { background: #2e7d32; color: #fff; border-color: #2e7d32; }
+    .rx-btn { flex: 1; padding: 12px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); font-weight: 800; border-radius: 10px; cursor: pointer; text-align: center; transition: box-shadow 0.15s; }
+    .rx-btn.active { background: #2e7d32; color: #fff; border-color: #2e7d32; box-shadow: 0 3px 14px -3px rgba(46, 125, 50, 0.55); }
     .rx-scaled-toggle-block { display: flex; gap: 6px; margin-bottom: 12px; }
     .rx-scaled-toggle-block .rx-btn { padding: 6px; font-size: 11px; }
 
@@ -102,8 +107,13 @@
     .rm-row span { font-size: 13px; font-weight: 700; color: var(--text); padding: 10px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; }
     .rm-history-btn { width: 34px; height: 42px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 
-    .btn-main { width: 100%; background: var(--accent); color: var(--text); border: none; padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; margin-top: 10px; }
-    .btn-secondary { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; flex: 1; }
+    .btn-main {
+      width: 100%; background: linear-gradient(135deg, #ff6a3d, var(--accent)); color: var(--text); border: none;
+      padding: 14px; border-radius: 12px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer;
+      margin-top: 10px; box-shadow: 0 8px 20px -6px rgba(230, 74, 25, 0.55); transition: box-shadow 0.15s, transform 0.1s;
+    }
+    .btn-main:active { box-shadow: 0 3px 10px -4px rgba(230, 74, 25, 0.5); transform: translateY(1px); }
+    .btn-secondary { background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 12px; font-weight: 800; text-transform: uppercase; font-size: 14px; cursor: pointer; flex: 1; }
     .community-btn-wrap { position: relative; }
     .notification-badge {
       position: absolute; top: -7px; right: -7px; background: #ff3b30; color: #fff;
@@ -129,11 +139,11 @@
     .calendar-week-row { display: flex; align-items: center; gap: 2px; }
     .calendar-nav-btn { background: none; border: none; color: var(--text-muted); font-size: 20px; font-weight: 900; cursor: pointer; padding: 4px 2px; flex-shrink: 0; }
     .calendar-days { flex: 1; display: flex; justify-content: space-between; gap: 4px; }
-    .calendar-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border-radius: 8px; border: 1.5px solid transparent; cursor: pointer; }
+    .calendar-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border-radius: 10px; border: 1.5px solid transparent; cursor: pointer; transition: box-shadow 0.15s; }
     .calendar-day-name { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
     .calendar-day-num { font-size: 15px; font-weight: 800; color: var(--text); }
     .calendar-day.has-log .calendar-day-num::after { content: ''; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); margin: 3px auto 0; }
-    .calendar-day.selected { border-color: var(--accent); background: rgba(230, 74, 25, 0.12); }
+    .calendar-day.selected { border-color: var(--accent); background: rgba(230, 74, 25, 0.12); box-shadow: 0 0 0 3px rgba(230, 74, 25, 0.12); }
     .calendar-day.is-today .calendar-day-name { color: var(--accent); }
     /* Giorno futuro con un WOD gia' pubblicato: pallino vuoto, per distinguerlo da un allenamento svolto (pieno). */
     .calendar-day.has-programmed:not(.has-log) .calendar-day-num::after { content: ''; display: block; width: 5px; height: 5px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--accent); margin: 3px auto 0; }
@@ -159,6 +169,16 @@
     .active-days-labels.is-scrollable { min-width: max-content; }
     .active-days-label-col { flex: 1 0 34px; min-width: 34px; text-align: center; font-size: 8px; color: var(--text-muted); white-space: nowrap; }
     .active-days-empty { font-size: 13px; color: var(--text-muted); }
+
+    /* Card FOCUS ALLENAMENTO: radar SVG disegnato a mano (vedi renderTrainingFocusChart). */
+    .training-focus-svg { width: 100%; height: auto; display: block; margin: 0 auto; }
+    .training-focus-label { font-size: 10.5px; font-weight: 800; fill: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+    .training-focus-caption { font-size: 12px; color: var(--text-muted); text-align: center; margin: 10px 0 0; }
+    .training-focus-caption b { color: var(--text); }
+    .training-focus-list { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .training-focus-list-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 2px; color: var(--text-muted); }
+    .training-focus-list-row span:first-child { font-weight: 700; color: var(--text); }
+    .training-focus-top-value { color: var(--accent); font-weight: 800; }
 
     /* Card Whoop: metriche giornaliere (recovery/strain/sonno) + allenamenti registrati dalla fascia. */
     .whoop-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
@@ -401,6 +421,13 @@
       </div>
     </div>
 
+    <!-- Cosa hai allenato di più di recente (non quanto sei forte): conta i movimenti rilevati
+         nei blocchi salvati nelle ultime settimane, raggruppati per area. Vedi renderTrainingFocusChart. -->
+    <div class="card" id="trainingFocusCard" style="display: none;">
+      <div class="card-title">📊 FOCUS ALLENAMENTO (ultime 4 settimane)</div>
+      <div id="trainingFocusContainer"></div>
+    </div>
+
     <!-- Compare solo se l'atleta loggato ha dati Whoop sincronizzati (vedi renderWhoopCard). -->
     <div class="card" id="whoopCard" style="display: none;">
       <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
@@ -638,7 +665,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v43";
+    const APP_VERSION = "v45";
     const APP_VERSION_DATE = "03/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -661,6 +688,21 @@
       'Overhead Squat', 'Deadlift', 'Snatch', 'Clean', 'Jerk', 'Push Press', 'Push Jerk',
       'Split Jerk', 'Lunge', 'Sit-up', 'Toes to Bar', 'Muscle-up', 'Handstand Push-up',
       'Handstand Walk', 'Rope Climb', 'Bike', 'Ski Erg', 'Plank', 'Devil Press', 'Farmer Carry'
+    ];
+
+    // Raggruppa COMMON_MOVEMENTS in 7 aree, per il radar "FOCUS ALLENAMENTO" (vedi
+    // computeTrainingFocus): non un giudizio di livello, solo su cosa si sta concentrando
+    // l'atleta di recente. L'ordine qui è anche l'ordine degli assi nel radar.
+    // Etichetta breve per l'asse nel radar (una sola parola, sta in una riga): il nome completo
+    // resta nel tooltip del punto e nell'elenco sotto il grafico.
+    const TRAINING_FOCUS_CATEGORIES = [
+      { name: 'Squat & Affondi', label: 'SQUAT', movements: ['Air Squat', 'Front Squat', 'Back Squat', 'Overhead Squat', 'Lunge'] },
+      { name: 'Hinge & Carry', label: 'HINGE', movements: ['Deadlift', 'Kettlebell Swing', 'Farmer Carry'] },
+      { name: 'Weightlifting Olimpico', label: 'OLIMPICO', movements: ['Snatch', 'Clean', 'Jerk', 'Push Press', 'Push Jerk', 'Split Jerk', 'Thruster'] },
+      { name: 'Trazioni', label: 'TRAZIONI', movements: ['Pull-up', 'Chest-to-Bar', 'Muscle-up', 'Rope Climb'] },
+      { name: 'Spinta', label: 'SPINTA', movements: ['Push-up', 'Handstand Push-up', 'Handstand Walk', 'Devil Press'] },
+      { name: 'Core & Skill', label: 'CORE', movements: ['Sit-up', 'Toes to Bar', 'Plank', 'Double Under', 'Box Jump', 'Wall Ball', 'Burpee'] },
+      { name: 'Monostrutturale', label: 'CARDIO', movements: ['Row', 'Run', 'Bike', 'Ski Erg'] },
     ];
 
     function escapeHtml(str) {
@@ -1211,6 +1253,7 @@
           updateConnectionIndicator(true);
           renderHistory();
           renderActiveDaysChart();
+          renderTrainingFocusChart();
           renderWhoopCard();
           renderHealthCard();
           renderFunPhrases();
@@ -1477,6 +1520,135 @@
           <div class="active-days-chart ${scrollable ? 'is-scrollable' : ''}">${colsHtml}</div>
           <div class="active-days-labels ${scrollable ? 'is-scrollable' : ''}">${labelsHtml}</div>
         </div>
+      `;
+    }
+
+    // ===================== FOCUS ALLENAMENTO (radar) =====================
+
+    // Conta, per le sessioni salvate di un atleta nelle ultime `weeksBack` settimane, quante
+    // volte compare un movimento di ciascuna TRAINING_FOCUS_CATEGORIES (titolo+spiegazione di
+    // ogni blocco, stesso riconoscimento usato per "Confronta con la community"). Non è un
+    // giudizio di livello: il valore 0-100 di ogni asse è relativo al proprio massimo nel
+    // periodo, quindi mostra solo su cosa ci si sta concentrando, non quanto si è forti.
+    function computeTrainingFocus(athleteName, weeksBack) {
+      const windowStart = addDaysToDateString(getTodayDateString(), -(weeksBack || 4) * 7);
+      const counts = TRAINING_FOCUS_CATEGORIES.map(() => 0);
+      const categoryIdxByMovement = {};
+      TRAINING_FOCUS_CATEGORIES.forEach((cat, idx) => {
+        cat.movements.forEach(mv => { categoryIdxByMovement[mv] = idx; });
+      });
+
+      (globalData.wods || [])
+        .filter(w => w.athlete && athleteName && w.athlete.toLowerCase() === athleteName.toLowerCase()
+          && w.date && w.date >= windowStart && !isPublishedWod(w))
+        .forEach(w => {
+          (w.blocks || []).forEach(b => {
+            detectMovementsInText((b.title || '') + ' ' + (b.explanation || '')).forEach(mv => {
+              const idx = categoryIdxByMovement[mv];
+              if (idx !== undefined) counts[idx]++;
+            });
+          });
+        });
+
+      const maxCount = Math.max(...counts, 0);
+      return TRAINING_FOCUS_CATEGORIES.map((cat, idx) => ({
+        name: cat.name,
+        label: cat.label,
+        count: counts[idx],
+        value: maxCount > 0 ? Math.round((counts[idx] / maxCount) * 100) : 0,
+      }));
+    }
+
+    // Radar disegnato a mano in SVG inline (nessuna libreria di grafici nel bundle). Un solo
+    // asse/serie: niente legenda (il titolo della card dice già cosa si guarda), riempimento
+    // dell'area a ~10% di opacità con contorno pieno, etichetta numerica solo per la categoria
+    // più allenata (l'estremo) più un elenco compatto sotto con tutti i valori, che fa anche da
+    // "vista a tabella" per chi non legge bene il grafico.
+    function renderTrainingFocusChart() {
+      const card = document.getElementById('trainingFocusCard');
+      const container = document.getElementById('trainingFocusContainer');
+      if (!card || !container) return;
+
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      const hasAnyWod = activeAthlete && (globalData.wods || []).some(w =>
+        w.athlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && !isPublishedWod(w));
+      if (!hasAnyWod) { card.style.display = 'none'; return; }
+      card.style.display = '';
+
+      const focus = computeTrainingFocus(activeAthlete, 4);
+      const totalMentions = focus.reduce((sum, f) => sum + f.count, 0);
+
+      if (totalMentions === 0) {
+        container.innerHTML = '<p style="font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0;">Nessun movimento riconosciuto nelle sessioni delle ultime 4 settimane: prova a registrarne una con titolo/spiegazione più specifici (es. "Back Squat" invece di "Squat pesante").</p>';
+        return;
+      }
+
+      const n = focus.length;
+      // Tela più larga che alta: le etichette vicine all'orizzontale (ancorate a sinistra o a
+      // destra del loro punto, non centrate) sporgono più delle altre e serve margine extra
+      // perché non escano dal riquadro.
+      const width = 400, height = 320, centerX = width / 2, centerY = height / 2;
+      const maxRadius = 104, labelRadius = maxRadius + 22;
+      // Primo asse in cima (ore 12), il resto in senso orario: stessa lettura dell'immagine di
+      // riferimento da cui è nata l'idea.
+      const angleFor = (i) => (Math.PI * 2 * i / n) - Math.PI / 2;
+      const pointAt = (i, radius) => {
+        const a = angleFor(i);
+        return { x: centerX + radius * Math.cos(a), y: centerY + radius * Math.sin(a), a };
+      };
+
+      const ringPoints = (frac) => focus.map((_, i) => {
+        const p = pointAt(i, maxRadius * frac);
+        return `${p.x},${p.y}`;
+      }).join(' ');
+      const gridHtml = [0.2, 0.4, 0.6, 0.8, 1].map(frac =>
+        `<polygon points="${ringPoints(frac)}" fill="none" stroke="var(--border)" stroke-width="1"/>`
+      ).join('');
+
+      const spokesHtml = focus.map((_, i) => {
+        const p = pointAt(i, maxRadius);
+        return `<line x1="${centerX}" y1="${centerY}" x2="${p.x}" y2="${p.y}" stroke="var(--border)" stroke-width="1"/>`;
+      }).join('');
+
+      const dataPoints = focus.map((f, i) => Object.assign(pointAt(i, maxRadius * (f.value / 100)), { f }));
+      const dataPolygon = dataPoints.map(p => `${p.x},${p.y}`).join(' ');
+
+      const dotsHtml = dataPoints.map(p => `
+        <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--accent)" stroke="var(--card-bg)" stroke-width="2">
+          <title>${escapeHtml(p.f.name)}: ${p.f.value}/100 (${p.f.count} movimento/i rilevato/i)</title>
+        </circle>
+      `).join('');
+
+      const topCategory = focus.slice().sort((a, b) => b.value - a.value)[0];
+
+      const labelsHtml = focus.map((f, i) => {
+        const p = pointAt(i, labelRadius);
+        const cosA = Math.cos(p.a);
+        const anchor = cosA > 0.35 ? 'start' : (cosA < -0.35 ? 'end' : 'middle');
+        return `<text x="${p.x}" y="${p.y}" text-anchor="${anchor}" dominant-baseline="middle" class="training-focus-label">${escapeHtml(f.label)}</text>`;
+      }).join('');
+
+      const svg = `
+        <svg viewBox="0 0 ${width} ${height}" class="training-focus-svg">
+          ${gridHtml}
+          ${spokesHtml}
+          <polygon points="${dataPolygon}" fill="var(--accent)" fill-opacity="0.1" stroke="var(--accent)" stroke-width="2"/>
+          ${dotsHtml}
+          ${labelsHtml}
+        </svg>
+      `;
+
+      const listHtml = focus.map(f => `
+        <div class="training-focus-list-row">
+          <span>${escapeHtml(f.name)}</span>
+          <span class="${f === topCategory ? 'training-focus-top-value' : ''}">${f.value}</span>
+        </div>
+      `).join('');
+
+      container.innerHTML = `
+        ${svg}
+        <p class="training-focus-caption">Più allenato: <b>${escapeHtml(topCategory.name)}</b> — ${topCategory.count} movimento/i rilevato/i nelle ultime 4 settimane</p>
+        <div class="training-focus-list">${listHtml}</div>
       `;
     }
 
@@ -3178,18 +3350,27 @@
       }
     }
 
+    // Cerca in un testo libero (titolo+spiegazione di un blocco) quali COMMON_MOVEMENTS
+    // compaiono, senza toccare il DOM: usata sia per il suggerimento live in "Confronta con la
+    // community" (guessMovementsFromBlock) sia per scandire a posteriori tutte le sessioni
+    // salvate di un atleta (vedi computeTrainingFocus).
+    function detectMovementsInText(text) {
+      const lower = String(text || '').toLowerCase();
+      const found = [];
+      COMMON_MOVEMENTS.forEach(mv => {
+        if (lower.includes(mv.toLowerCase()) && !found.includes(mv)) found.push(mv);
+      });
+      return found;
+    }
+
     // Scandisce titolo e spiegazione del blocco per suggerire automaticamente i movimenti coinvolti.
     function guessMovementsFromBlock(blockId) {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return [];
       const titleEl = block.querySelector('.block-title');
       const explEl = block.querySelector('.block-explanation');
-      const text = ((titleEl ? titleEl.value : '') + ' ' + (explEl ? explEl.value : '')).toLowerCase();
-      const found = [];
-      COMMON_MOVEMENTS.forEach(mv => {
-        if (text.includes(mv.toLowerCase()) && !found.includes(mv)) found.push(mv);
-      });
-      return found;
+      const text = (titleEl ? titleEl.value : '') + ' ' + (explEl ? explEl.value : '');
+      return detectMovementsInText(text);
     }
 
     function openLogResultModal(blockId) {
@@ -3828,7 +4009,7 @@
       if (tab === 'storico') { renderHistory(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
       if (tab === 'bacheca') { renderBachecaTab(); }
-      if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderWhoopCard(); renderHealthCard(); }
+      if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderTrainingFocusChart(); renderWhoopCard(); renderHealthCard(); }
       if (tab === 'impostazioni') { renderFunPhrases(); }
     }
   </script>
