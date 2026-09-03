@@ -4,6 +4,11 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v35 — 2026-09-04
+- Nella bacheca dei WOD ogni proposta mostra ora anche il **giorno della settimana abbreviato**
+  accanto alla data (es. "Gio 04/09/2026"): con le proposte di tutta la settimana, riconoscere
+  il giorno è più immediato del numero.
+
 ## v34 — 2026-09-04
 - Tasto **↻** nell'intestazione delle card Whoop e Salute: ricarica i dati dal Foglio senza
   ricaricare la pagina. Utile perché quei dati arrivano da fuori (sync notturno Whoop, Comando

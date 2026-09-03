@@ -604,7 +604,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v34";
+    const APP_VERSION = "v35";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -658,6 +658,15 @@
       }
     }
 
+    // "Gio 04/09/2026": in bacheca le proposte sono di giorni diversi della settimana, e il
+    // giorno si riconosce a colpo d'occhio molto prima del numero.
+    function formatDateWithWeekday(dateStr) {
+      if (!dateStr) return '';
+      const parsed = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+      if (isNaN(parsed.getTime())) return formatDateForDisplay(dateStr);
+      return `${ITALIAN_WEEKDAY_ABBR[parsed.getDay()]} ${formatDateForDisplay(dateStr)}`;
+    }
+
     function formatDateForDisplay(dateStr) {
       if (!dateStr) return '';
 
@@ -709,6 +718,9 @@
     // ===================== CALENDARIO NAVIGABILE (Tab Registra) =====================
 
     const ITALIAN_DAY_LETTERS = ['D', 'L', 'M', 'M', 'G', 'V', 'S']; // Dom, Lun, Mar, Mer, Gio, Ven, Sab
+    // Abbreviazioni per esteso: nella bacheca le lettere singole non basterebbero, perché
+    // martedì e mercoledì sono entrambi 'M' e lì i giorni vanno distinti davvero.
+    const ITALIAN_WEEKDAY_ABBR = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 
     // Data attualmente selezionata nel calendario (default: oggi)
     let selectedRegistraDate = getTodayDateString();
@@ -2234,7 +2246,7 @@
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
             <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
-            <div style="font-size: 10px; font-weight: 800; white-space: nowrap; color: ${isSelectedDay ? 'var(--accent)' : 'var(--text-muted)'};">${escapeHtml(formatDateForDisplay(c.date))}</div>
+            <div style="font-size: 10px; font-weight: 800; white-space: nowrap; color: ${isSelectedDay ? 'var(--accent)' : 'var(--text-muted)'};">${escapeHtml(formatDateWithWeekday(c.date))}</div>
           </div>
           ${c.blocks.map(b => `
             <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
