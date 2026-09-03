@@ -595,7 +595,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v32";
+    const APP_VERSION = "v33";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3459,6 +3459,40 @@
     //
     // referenceDate è la data del WOD da cui si sta guardando il confronto: se manca, o se il
     // titolo è un benchmark noto, il confronto resta di sempre.
+    // In classifica un atleta deve comparire UNA volta sola, col suo risultato migliore. Chi
+    // logga lo stesso WOD due volte (per sbaglio, o perché l'ha davvero rifatto) altrimenti
+    // occupa due posizioni col proprio nome, facendo sembrare la classifica sbagliata.
+    function keepBestPerAthlete(results) {
+      const best = {};
+
+      results.forEach((r, i) => {
+        // Senza nome non possiamo dire che due righe siano della stessa persona: le teniamo
+        // separate invece di accorparle per errore sotto una chiave vuota.
+        const name = String(r.athlete || '').trim().toLowerCase();
+        const key = name || `__anonimo_${i}`;
+        const current = best[key];
+        if (!current) { best[key] = r; return; }
+
+        const candidate = scoreSortValue(r);
+        const champion = scoreSortValue(current);
+        const sameType = String(r.scoreType || '') === String(current.scoreType || '');
+
+        // Punteggi non confrontabili (tipi diversi, o non interpretabili): senza poter dire
+        // quale sia il migliore teniamo il più recente, che è l'unico criterio sensato.
+        if (!sameType || !candidate.confident || !champion.confident) {
+          if (String(r.date || '').localeCompare(String(current.date || '')) > 0) best[key] = r;
+          return;
+        }
+
+        const isBetter = candidate.higherIsBetter
+          ? candidate.value > champion.value
+          : candidate.value < champion.value;
+        if (isBetter) best[key] = r;
+      });
+
+      return Object.keys(best).map(k => best[k]);
+    }
+
     function getCommunityMatches(title, type, referenceDate) {
       const norm = (s) => String(s || '').trim().toLowerCase();
 
@@ -3492,8 +3526,13 @@
 
       // I benchmark famosi (Fran, Murph, Cindy...) restano confrontabili di sempre: è
       // esattamente il loro scopo. La finestra vale solo per i WOD del giorno.
-      if (!referenceDate || detectBenchmarkForBlock(title)) return all;
-      return all.filter(r => withinCommunityDateWindow(r.date, referenceDate));
+      const inWindow = (!referenceDate || detectBenchmarkForBlock(title))
+        ? all
+        : all.filter(r => withinCommunityDateWindow(r.date, referenceDate));
+
+      // La deduplica va DOPO il filtro sulla finestra: il "migliore" è il migliore fra i
+      // risultati che vengono davvero mostrati, non fra tutti quelli mai registrati.
+      return keepBestPerAthlete(inWindow);
     }
 
     // Pulsante "Risultati Altri Atleti" con il numero di persone che hanno già loggato quel WOD
