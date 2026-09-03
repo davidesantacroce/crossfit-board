@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v37 — 2026-09-04
+- Non si possono più creare **due atleti con lo stesso nome**: la registrazione viene rifiutata
+  con un messaggio che invita ad accedere col proprio PIN. Il confronto ignora maiuscole e
+  spaziatura, quindi "  mario   ROSSI " e "Mario Rossi" sono la stessa persona.
+- **Sicurezza**: registrarsi con il nome di un atleta esistente **sovrascriveva il suo PIN**,
+  di fatto permettendo di impossessarsi del suo profilo (storico, massimali, risultati). Ora il
+  backend rifiuta. Un profilo che non ha ancora un PIN resta rivendicabile, come già avveniva.
+- Il salvataggio del profilo ora **controlla la risposta del backend**: prima mostrava
+  "registrato!" anche in caso di errore e impostava comunque l'atleta attivo sul dispositivo,
+  lasciandolo "loggato" con un profilo mai creato.
+
 ## v36 — 2026-09-04
 - **Fix**: nella bacheca non comparivano i WOD caricati da te — vedevi quelli di tutti gli
   altri tranne i tuoi, a meno di averli pubblicati col tasto apposito. Era un residuo di quando

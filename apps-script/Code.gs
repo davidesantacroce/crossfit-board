@@ -74,7 +74,17 @@ function doPost(e) {
       var found = false;
 
       for (var i = 1; i < rows.length; i++) {
-        if (rows[i][0].toString().toLowerCase() === data.name.toLowerCase()) {
+        if (normalizeAthleteName_(rows[i][0]) === normalizeAthleteName_(data.name)) {
+          // Registrarsi con un nome già in uso non deve poter sovrascrivere il PIN di chi c'è
+          // già: sarebbe un modo per impossessarsi del profilo altrui (storico, massimali,
+          // risultati). Un profilo ancora SENZA PIN resta rivendicabile, com'è già per setPin.
+          var existingPin = pinColIndex > 0 ? String(rows[i][pinColIndex - 1] || "") : "";
+          if (data.pin && existingPin) {
+            return ContentService.createTextOutput(JSON.stringify({
+              "status": "error",
+              "message": "Esiste già un atleta con questo nome. Se sei tu, accedi con il tuo PIN invece di registrarti di nuovo."
+            })).setMimeType(ContentService.MimeType.JSON);
+          }
           sheet.getRange(i + 1, 2).setValue(data.age);
           sheet.getRange(i + 1, 3).setValue(data.weight);
           if (data.pin && pinColIndex > 0) {
@@ -87,7 +97,10 @@ function doPost(e) {
 
       if (!found) {
         var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-        var rowMap = { "name": data.name, "age": data.age, "weight": data.weight, "height": "", "pin": data.pin ? hashPin(data.pin) : "" };
+        // Salviamo il nome con gli spazi normalizzati (maiuscole originali intatte): così due
+        // registrazioni che differiscono solo per spaziatura non generano due atleti.
+        var nomePulito = String(data.name || '').replace(/\s+/g, ' ').trim();
+        var rowMap = { "name": nomePulito, "age": data.age, "weight": data.weight, "height": "", "pin": data.pin ? hashPin(data.pin) : "" };
         var newRow = headers.map(function(h) { return rowMap.hasOwnProperty(h) ? rowMap[h] : ""; });
         sheet.appendRow(newRow);
       }
@@ -104,7 +117,7 @@ function doPost(e) {
       var rows = sheet.getDataRange().getValues();
       var found = false;
       for (var i = 1; i < rows.length; i++) {
-        if (rows[i][0].toString().toLowerCase() === data.name.toLowerCase()) {
+        if (normalizeAthleteName_(rows[i][0]) === normalizeAthleteName_(data.name)) {
           var existingPin = String(rows[i][pinColIndex - 1] || "");
           if (existingPin) {
             return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "PIN già impostato: usa quello esistente."})).setMimeType(ContentService.MimeType.JSON);
@@ -134,7 +147,7 @@ function doPost(e) {
       var rows = sheet.getDataRange().getValues();
       var storedHash = "";
       for (var i = 1; i < rows.length; i++) {
-        if (rows[i][0].toString().toLowerCase() === data.name.toLowerCase()) {
+        if (normalizeAthleteName_(rows[i][0]) === normalizeAthleteName_(data.name)) {
           storedHash = pinColIndex > 0 ? String(rows[i][pinColIndex - 1] || "") : "";
           break;
         }
@@ -262,6 +275,13 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// Confronto fra nomi di atleta: senza distinzione di maiuscole e con gli spazi interni
+// normalizzati, così "mario  rossi " e "Mario Rossi" sono la stessa persona e non due profili
+// distinti che poi si dividono storico, classifiche e massimali.
+function normalizeAthleteName_(name) {
+  return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 // Calcola l'hash SHA-256 (esadecimale) di un PIN: non salviamo/confrontiamo mai il PIN in chiaro.
