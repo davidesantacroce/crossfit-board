@@ -1207,6 +1207,10 @@
       if (btn) { btn.disabled = true; btn.innerText = '…'; }
       try {
         await fetchCloudData();
+        // Assicura che i dati aggiornati vengono visualizzati (fetchCloudData li chiama già,
+        // ma lo facciamo esplicitamente qui per chiarezza e robustezza).
+        renderWhoopCard();
+        renderHealthCard();
       } finally {
         if (btn) { btn.disabled = false; btn.innerText = originale; }
       }
