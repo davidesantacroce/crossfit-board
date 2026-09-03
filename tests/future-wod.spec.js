@@ -97,7 +97,7 @@ test('la bacheca mostra ciò che è già programmato per quel giorno futuro', as
   await apriGiorno(page, DOMANI);
 
   await expect(page.locator('#proposedWodCard')).toBeVisible();
-  await expect(page.locator('#proposedWodTitle')).toContainText('GIÀ PROGRAMMATO');
+  await expect(page.locator('#proposedWodTitle')).toContainText('WOD DI QUESTA SETTIMANA');
   await expect(page.locator('#proposedWodContent')).toContainText('Murph');
 });
 

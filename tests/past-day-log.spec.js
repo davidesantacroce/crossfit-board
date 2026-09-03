@@ -96,7 +96,7 @@ test('cambiando giorno la modalità recupero si azzera, non resta appiccicata al
   await expect(page.locator('#registraDayView')).toBeVisible();
 });
 
-test('mentre si registra un recupero, la bacheca mostra cosa hanno già caricato altri per quel giorno', async ({ page }) => {
+test('la bacheca della settimana è visibile fin da subito su un giorno passato, senza dover prima cliccare "+ Registra"', async ({ page }) => {
   await mockBackend(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     wods: [{ id: 'w1', date: IERI, athlete: 'Mario Rossi', blocks: [{ title: 'Fran', type: 'For Time', explanation: '21-15-9 Thruster + Pull-up', result: '' }] }],
@@ -106,17 +106,15 @@ test('mentre si registra un recupero, la bacheca mostra cosa hanno già caricato
   await page.evaluate(() => fetchCloudData());
   await apriGiorno(page, IERI);
 
-  // La bacheca non compare finché non si è scelto esplicitamente di registrare un recupero.
-  await expect(page.locator('#proposedWodCard')).toBeHidden();
-
-  await page.getByRole('button', { name: '+ Registra un allenamento per questo giorno' }).click();
-
+  // Ancora nella vista di sola lettura (il form del recupero non è stato aperto), ma la
+  // bacheca della settimana è già visibile.
+  await expect(page.locator('#registraFormCard')).toBeHidden();
   await expect(page.locator('#proposedWodCard')).toBeVisible();
-  await expect(page.locator('#proposedWodTitle')).toContainText('GIÀ CARICATO');
+  await expect(page.locator('#proposedWodTitle')).toContainText('WOD DI QUESTA SETTIMANA');
   await expect(page.locator('#proposedWodContent')).toContainText('Fran');
 });
 
-test('usare il WOD già caricato da un altro popola il form, e si salva sulla data del giorno passato', async ({ page }) => {
+test('selezionare un WOD dalla bacheca, anche prima di aver cliccato "+ Registra", apre il form del recupero e lo popola', async ({ page }) => {
   const state = await mockBackend(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     wods: [{ id: 'w1', date: IERI, athlete: 'Mario Rossi', blocks: [{ title: 'Fran', type: 'For Time', explanation: '21-15-9 Thruster + Pull-up', result: '' }] }],
@@ -126,9 +124,11 @@ test('usare il WOD già caricato da un altro popola il form, e si salva sulla da
   page.on('dialog', (d) => d.accept());
   await page.evaluate(() => fetchCloudData());
   await apriGiorno(page, IERI);
-  await page.getByRole('button', { name: '+ Registra un allenamento per questo giorno' }).click();
 
+  // Nessun click su "+ Registra": si seleziona il WOD direttamente dalla bacheca.
   await page.evaluate(() => useProposedWod(0));
+
+  await expect(page.locator('#registraFormCard')).toBeVisible();
   await expect(page.locator('.block-title').first()).toHaveValue('Fran');
 
   await page.evaluate(() => saveWodSession());
@@ -137,4 +137,34 @@ test('usare il WOD già caricato da un altro popola il form, e si salva sulla da
   const mine = state.wods.find((w) => w.athlete === 'Test Athlete');
   expect(mine.date).toBe(IERI);
   expect(mine.blocks[0].title).toBe('Fran');
+});
+
+// Stesso algoritmo di getWeekStart() nell'app (settimana da domenica a sabato), calcolato qui
+// lato Node per scegliere date di test che ricadano garantite nella stessa settimana.
+function weekStartOf(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - d.getDay());
+  const pad = (v) => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+test('un WOD caricato in un altro giorno della stessa settimana resta comunque disponibile, con la sua data indicata', async ({ page }) => {
+  // Un giorno nella stessa settimana di IERI (domenica-sabato) ma non IERI stesso: il lunedì
+  // della settimana di IERI, spostato di +1 se coincidesse già con IERI.
+  let altroGiorno = weekStartOf(IERI);
+  if (altroGiorno === IERI) altroGiorno = addDaysToDateString(altroGiorno, 1);
+  expect(weekStartOf(altroGiorno)).toBe(weekStartOf(IERI)); // garanzia che il fixture sia corretto
+
+  await mockBackend(page, {
+    athletes: [{ name: 'Test Athlete', hasPin: false }],
+    wods: [{ id: 'w1', date: altroGiorno, athlete: 'Mario Rossi', blocks: [{ title: 'Grace', type: 'For Time', explanation: '', result: '' }] }],
+  });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+  await page.evaluate(() => fetchCloudData());
+  await apriGiorno(page, IERI);
+
+  const [y, m, d] = altroGiorno.split('-');
+  await expect(page.locator('#proposedWodContent')).toContainText('Grace');
+  await expect(page.locator('#proposedWodContent')).toContainText(`${d}/${m}/${y}`); // formatDateForDisplay
 });
