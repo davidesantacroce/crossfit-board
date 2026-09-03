@@ -287,6 +287,7 @@
 
   <div class="nav">
     <button class="active" onclick="switchTab('registra')">REGISTRA</button>
+    <button onclick="switchTab('bacheca')">BACHECA</button>
     <button onclick="switchTab('storico')">STORICO</button>
     <button onclick="switchTab('atleta')">ATLETA</button>
     <button onclick="switchTab('impostazioni')">IMPOSTAZIONI</button>
@@ -350,6 +351,23 @@
       <button class="btn-main" id="saveWodBtn" onclick="withButtonGuard(this, saveWodSession)">SALVA SESSIONE COMPLETA</button>
       <button type="button" class="btn-secondary" id="publishWodBtn" style="width: 100%; margin-top: 10px;" onclick="withButtonGuard(this, publishDailyWod)">📋 PUBBLICA SOLO IL WOD (senza risultato)</button>
       <p id="publishWodHint" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Condivide subito il lavoro qui sopra in bacheca per tutti, senza registrare un risultato tuo: lo fai/lo logghi dopo, quando vuoi.</p>
+    </div>
+  </div>
+
+  <!-- TAB BACHECA: sfoglia liberamente i WOD caricati/pubblicati da chiunque, settimana per
+       settimana, indipendentemente dal giorno che si sta registrando in REGISTRA. -->
+  <div id="tab-bacheca" class="tab-content">
+    <div class="card">
+      <div class="calendar-header" style="margin-bottom: 4px;">
+        <button type="button" class="calendar-nav-btn" onclick="shiftBachecaWeek(-1)">‹</button>
+        <div class="calendar-month-label" id="bachecaWeekLabel" style="flex: 1; text-align: center;"></div>
+        <button type="button" class="calendar-nav-btn" onclick="shiftBachecaWeek(1)">›</button>
+      </div>
+      <button type="button" class="btn-secondary" id="bachecaTodayBtn" style="width: 100%; padding: 8px; font-size: 11px; display: none;" onclick="jumpBachecaToToday()">Torna alla settimana corrente</button>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 WOD DELLA SETTIMANA</div>
+      <div id="bachecaContent"></div>
     </div>
   </div>
 
@@ -621,8 +639,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v39";
-    const APP_VERSION_DATE = "02/09/2026";
+    const APP_VERSION = "v40";
+    const APP_VERSION_DATE = "03/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -1191,6 +1209,7 @@
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
           updateRegistraDateView();
+          renderBachecaTab();
           refreshAllBlockHints();
         }
       } catch (err) {
@@ -1207,6 +1226,10 @@
       if (btn) { btn.disabled = true; btn.innerText = '…'; }
       try {
         await fetchCloudData();
+        // Assicura che i dati aggiornati vengono visualizzati (fetchCloudData li chiama già,
+        // ma lo facciamo esplicitamente qui per chiarezza e robustezza).
+        renderWhoopCard();
+        renderHealthCard();
       } finally {
         if (btn) { btn.disabled = false; btn.innerText = originale; }
       }
@@ -2403,17 +2426,16 @@
         .join('||');
     }
 
-    // Importa i blocchi (tipo/titolo/spiegazione) del WOD proposto in bacheca nel form
-    // corrente, come base da adattare: non copia risultati o modalità RX/Scaled, che restano
-    // personali. Non nasconde più la bacheca dopo l'uso, così resta possibile tornare indietro
-    // e riprendere lo stesso (o un altro) WOD se nel frattempo lo svuoti o lo cancelli.
-    function useProposedWod(idx) {
-      const candidate = proposedWodCandidates[idx];
-      if (!candidate || !candidate.blocks || candidate.blocks.length === 0) return;
+    // Importa i blocchi (tipo/titolo/spiegazione) di un WOD scelto nel form corrente, come base
+    // da adattare: non copia risultati o modalità RX/Scaled, che restano personali. Condivisa
+    // fra la bacheca settimanale dentro REGISTRA (useProposedWod) e il tab BACHECA dedicato
+    // (useWodFromBacheca): in entrambi i casi selectedRegistraDate è già quello giusto quando
+    // questa funzione viene chiamata.
+    function applyWodBlocksToRegistraForm(blocks) {
+      if (!blocks || blocks.length === 0) return;
 
-      // La bacheca ora è visibile anche nella vista di sola lettura di un giorno passato (prima
-      // ancora di aver scelto "+ Registra un allenamento"): scegliere un WOD da lì significa
-      // anche voler iniziare a registrarlo per il giorno selezionato.
+      // Scegliere un WOD per un giorno passato significa anche voler iniziare a registrarlo per
+      // quel giorno (vedi loggingPastDay / updateRegistraDateView).
       const isFuture = selectedRegistraDate > getTodayDateString();
       const isToday = selectedRegistraDate === getTodayDateString();
       if (!isToday && !isFuture && editingWodId === null) loggingPastDay = true;
@@ -2421,15 +2443,120 @@
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
-      candidate.blocks.forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
+      blocks.forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
       if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
 
       updateRegistraDateView();
     }
 
+    // Non nasconde più la bacheca dopo l'uso, così resta possibile tornare indietro e riprendere
+    // lo stesso (o un altro) WOD se nel frattempo lo svuoti o lo cancelli.
+    function useProposedWod(idx) {
+      const candidate = proposedWodCandidates[idx];
+      if (!candidate) return;
+      applyWodBlocksToRegistraForm(candidate.blocks);
+    }
+
     function dismissProposedWod() {
       proposedWodDismissed = true;
       updateProposedWodCard();
+    }
+
+    // ===================== TAB BACHECA (sfoglia libera, non legata al giorno di REGISTRA) =====
+
+    // Domenica (inizio settimana) attualmente mostrata nel tab BACHECA. Indipendente dal
+    // calendario di REGISTRA: qui si sfoglia liberamente avanti e indietro nel tempo, senza che
+    // farlo sposti anche il giorno che si sta eventualmente registrando.
+    let bachecaWeekStart = null;
+    let bachecaCandidates = [];
+
+    function renderBachecaTab() {
+      const label = document.getElementById('bachecaWeekLabel');
+      const content = document.getElementById('bachecaContent');
+      const todayBtn = document.getElementById('bachecaTodayBtn');
+      if (!label || !content) return;
+
+      const currentWeekStart = toDateString(getWeekStart(new Date()));
+      if (!bachecaWeekStart) bachecaWeekStart = currentWeekStart;
+      const weekStart = bachecaWeekStart;
+      const weekEnd = addDaysToDateString(weekStart, 6);
+      const isCurrentWeek = weekStart === currentWeekStart;
+
+      label.innerText = isCurrentWeek ? `Questa settimana (${formatActiveDaysLabel(weekStart)})` : formatActiveDaysLabel(weekStart);
+      if (todayBtn) todayBtn.style.display = isCurrentWeek ? 'none' : '';
+
+      // Stesso raggruppamento della bacheca settimanale dentro REGISTRA (updateProposedWodCard):
+      // per atleta+giorno prima, poi per WOD identico pubblicato da più persone lo stesso giorno.
+      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
+      const relevantSessions = (globalData.wods || []).filter(w =>
+        w.date && w.date >= weekStart && w.date <= weekEnd && w.athlete
+      );
+
+      const byAthleteDay = {};
+      relevantSessions.forEach(w => {
+        const key = w.athlete + '|' + w.date;
+        if (!byAthleteDay[key]) byAthleteDay[key] = { athlete: w.athlete, date: w.date, blocks: [], lastId: w.id };
+        byAthleteDay[key].blocks.push(...(w.blocks || []));
+        if (String(w.id).localeCompare(String(byAthleteDay[key].lastId)) > 0) byAthleteDay[key].lastId = w.id;
+      });
+
+      const bySignature = {};
+      Object.values(byAthleteDay).forEach(c => {
+        const sig = c.date + '|' + wodBlocksSignature(c.blocks);
+        if (!bySignature[sig]) bySignature[sig] = { athletes: [], date: c.date, blocks: c.blocks, lastId: c.lastId };
+        bySignature[sig].athletes.push(c.athlete);
+        if (String(c.lastId).localeCompare(String(bySignature[sig].lastId)) > 0) bySignature[sig].lastId = c.lastId;
+      });
+
+      bachecaCandidates = Object.values(bySignature).sort((a, b) =>
+        String(b.date).localeCompare(String(a.date)) || b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
+      );
+
+      if (bachecaCandidates.length === 0) {
+        content.innerHTML = `<p style="font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0 4px;">Nessun WOD caricato in questa settimana.</p>`;
+        return;
+      }
+
+      const todayStr = getTodayDateString();
+      content.innerHTML = bachecaCandidates.map((c, idx) => {
+        const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);
+        return `
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
+            <div style="font-size: 10px; font-weight: 800; white-space: nowrap; color: ${c.date === todayStr ? 'var(--accent)' : 'var(--text-muted)'};">${escapeHtml(formatDateWithWeekday(c.date))}</div>
+          </div>
+          ${c.blocks.map(b => `
+            <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
+              • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
+            </div>
+          `).join('')}
+          <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useWodFromBacheca(${idx})">USA QUESTO WOD</button>
+        </div>
+      `;
+      }).join('');
+    }
+
+    function shiftBachecaWeek(delta) {
+      const base = bachecaWeekStart || toDateString(getWeekStart(new Date()));
+      bachecaWeekStart = addDaysToDateString(base, delta * 7);
+      renderBachecaTab();
+    }
+
+    function jumpBachecaToToday() {
+      bachecaWeekStart = toDateString(getWeekStart(new Date()));
+      renderBachecaTab();
+    }
+
+    // Scegliere un WOD dal tab BACHECA porta subito su REGISTRA, con la data del WOD scelto già
+    // impostata (a differenza della bacheca dentro REGISTRA, qui il giorno può essere di una
+    // settimana qualsiasi, non necessariamente quella già selezionata).
+    function useWodFromBacheca(idx) {
+      const candidate = bachecaCandidates[idx];
+      if (!candidate) return;
+      switchTab('registra');
+      selectCalendarDate(candidate.date);
+      applyWodBlocksToRegistraForm(candidate.blocks);
     }
 
     async function deleteWod(id) {
@@ -3774,11 +3901,12 @@
       document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-      const map = { 'registra': 0, 'storico': 1, 'atleta': 2, 'impostazioni': 3 };
+      const map = { 'registra': 0, 'bacheca': 1, 'storico': 2, 'atleta': 3, 'impostazioni': 4 };
       document.querySelectorAll('.nav button')[map[tab]].classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'storico') { renderHistory(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
+      if (tab === 'bacheca') { renderBachecaTab(); }
       if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderWhoopCard(); renderHealthCard(); }
       if (tab === 'impostazioni') { renderFunPhrases(); }
     }
