@@ -24,13 +24,13 @@ test('la card Whoop resta nascosta per un atleta senza dati Whoop', async ({ pag
   await expect(page.locator('#whoopCard')).toBeHidden();
 });
 
-test('mostra recovery, strain e sonno dell\'ultimo giorno sincronizzato', async ({ page }) => {
+test('mostra tutte le metriche di recovery e ciclo, più il sonno, dell\'ultimo giorno sincronizzato', async ({ page }) => {
   await mockBackend(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     whoop: [
       { athlete: 'Test Athlete', type: 'recovery', date: daysAgo(3), recordId: 'r-old', data: { recoveryScore: 20, restingHeartRate: 60 } },
-      { athlete: 'Test Athlete', type: 'recovery', date: daysAgo(1), recordId: 'r-new', data: { recoveryScore: 82, restingHeartRate: 48 } },
-      { athlete: 'Test Athlete', type: 'cycle', date: daysAgo(1), recordId: 'c1', data: { strain: 14.26 } },
+      { athlete: 'Test Athlete', type: 'recovery', date: daysAgo(1), recordId: 'r-new', data: { recoveryScore: 82, restingHeartRate: 48, hrvMilli: 65, spo2Percentage: 97, skinTempCelsius: 33.4 } },
+      { athlete: 'Test Athlete', type: 'cycle', date: daysAgo(1), recordId: 'c1', data: { strain: 14.26, averageHeartRate: 78, maxHeartRate: 145, kilojoule: 9000 } },
       { athlete: 'Test Athlete', type: 'sleep', date: daysAgo(1), recordId: 's1', data: { sleepPerformancePercentage: 91 } },
     ],
   });
@@ -40,8 +40,10 @@ test('mostra recovery, strain e sonno dell\'ultimo giorno sincronizzato', async 
 
   await expect(page.locator('#whoopCard')).toBeVisible();
   const values = await page.locator('#whoopContainer .whoop-stat-value').allInnerTexts();
-  expect(values).toEqual(['82%', '14.3', '91%']); // vince il recovery più recente, non quello di 3 giorni fa
+  // Ordine: Recovery, HRV, SpO2, Temp. cutanea, Strain, FC media, FC max, Calorie, Sonno.
+  expect(values).toEqual(['82%', '65 ms', '97%', '33.4°C', '14.3', '78 bpm', '145 bpm', '2151 kcal', '91%']);
   await expect(page.locator('#whoopContainer .whoop-stat-value').first()).toHaveClass(/whoop-recovery-high/);
+  // Vince il recovery più recente, non quello di 3 giorni fa.
   await expect(page.locator('#whoopContainer')).toContainText('48 bpm a riposo');
 });
 
@@ -55,7 +57,7 @@ test('una metrica mancante mostra il trattino invece di sparire', async ({ page 
   await openAtletaTab(page);
 
   const values = await page.locator('#whoopContainer .whoop-stat-value').allInnerTexts();
-  expect(values).toEqual(['30%', '—', '—']);
+  expect(values).toEqual(['30%', '—', '—', '—', '—', '—', '—', '—', '—']);
   await expect(page.locator('#whoopContainer .whoop-stat-value').first()).toHaveClass(/whoop-recovery-low/);
 });
 

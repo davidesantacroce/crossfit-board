@@ -149,8 +149,8 @@
     .active-days-empty { font-size: 13px; color: var(--text-muted); }
 
     /* Card Whoop: metriche giornaliere (recovery/strain/sonno) + allenamenti registrati dalla fascia. */
-    .whoop-stats { display: flex; gap: 10px; margin-bottom: 4px; }
-    .whoop-stat { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; text-align: center; }
+    .whoop-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
+    .whoop-stat { flex: 1 1 30%; min-width: 80px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; text-align: center; }
     .whoop-stat-label { font-size: 9px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .whoop-stat-value { font-size: 22px; font-weight: 900; margin: 6px 0 2px; line-height: 1; }
     .whoop-stat-sub { font-size: 9px; color: var(--text-muted); }
@@ -626,7 +626,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v41";
+    const APP_VERSION = "v42";
     const APP_VERSION_DATE = "03/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1520,7 +1520,13 @@
       const workouts = whoopRecordsFor(activeAthlete, 'workout').slice(0, 5);
 
       const recoveryScore = recovery && Number.isFinite(recovery.data.recoveryScore) ? Math.round(recovery.data.recoveryScore) : null;
+      const hrv = recovery && Number.isFinite(recovery.data.hrvMilli) ? Math.round(recovery.data.hrvMilli) : null;
+      const spo2 = recovery && Number.isFinite(recovery.data.spo2Percentage) ? Math.round(recovery.data.spo2Percentage) : null;
+      const skinTemp = recovery && Number.isFinite(recovery.data.skinTempCelsius) ? recovery.data.skinTempCelsius.toFixed(1) : null;
       const strain = cycle && Number.isFinite(cycle.data.strain) ? cycle.data.strain.toFixed(1) : null;
+      const cycleAvgHr = cycle && Number.isFinite(cycle.data.averageHeartRate) ? Math.round(cycle.data.averageHeartRate) : null;
+      const cycleMaxHr = cycle && Number.isFinite(cycle.data.maxHeartRate) ? Math.round(cycle.data.maxHeartRate) : null;
+      const cycleKcal = cycle && Number.isFinite(cycle.data.kilojoule) ? Math.round(cycle.data.kilojoule * 0.239) : null;
       const sleepPerf = sleep && Number.isFinite(sleep.data.sleepPerformancePercentage) ? Math.round(sleep.data.sleepPerformancePercentage) : null;
 
       const statsHtml = `
@@ -1528,7 +1534,13 @@
           ${whoopStatTile('Recovery', recoveryScore === null ? null : recoveryScore + '%',
               recovery && Number.isFinite(recovery.data.restingHeartRate) ? `${recovery.data.restingHeartRate} bpm a riposo` : 'recupero',
               recoveryScore === null ? '' : whoopRecoveryClass(recoveryScore))}
+          ${whoopStatTile('HRV', hrv === null ? null : hrv + ' ms', 'variabilità cardiaca')}
+          ${whoopStatTile('SpO2', spo2 === null ? null : spo2 + '%', 'ossigenazione del sangue')}
+          ${whoopStatTile('Temp. cutanea', skinTemp === null ? null : skinTemp + '°C', 'temperatura della pelle')}
           ${whoopStatTile('Strain', strain, 'sforzo giornaliero')}
+          ${whoopStatTile('FC media', cycleAvgHr === null ? null : cycleAvgHr + ' bpm', 'frequenza media del giorno')}
+          ${whoopStatTile('FC max', cycleMaxHr === null ? null : cycleMaxHr + ' bpm', 'frequenza massima del giorno')}
+          ${whoopStatTile('Calorie', cycleKcal === null ? null : cycleKcal + ' kcal', 'consumo del giorno')}
           ${whoopStatTile('Sonno', sleepPerf === null ? null : sleepPerf + '%', 'qualità del sonno')}
         </div>
       `;
