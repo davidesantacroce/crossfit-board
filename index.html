@@ -595,7 +595,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v31";
+    const APP_VERSION = "v32";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -2139,31 +2139,32 @@
 
     // ===================== WOD PROPOSTO DA ALTRI ATLETI (stesso giorno) =====================
 
+    // Bacheca settimanale: mostra i WOD caricati durante l'intera settimana del giorno
+    // selezionato (la stessa mostrata nella striscia del calendario), non solo quel giorno
+    // preciso. Serve a poter scegliere un lavoro già caricato da qualcun altro anche quando non
+    // è dello stesso identico giorno che si sta guardando — es. si registra un recupero del 3
+    // settembre ma il WOD interessante l'ha caricato qualcuno il 5: resta comunque a portata.
     function updateProposedWodCard() {
       const card = document.getElementById('proposedWodCard');
       if (!card) return;
 
-      // La bacheca segue il giorno selezionato: su una data futura mostra i WOD già
-      // programmati per quel giorno (così non se ne pubblicano due uguali), e mentre si
-      // registra un recupero mostra cosa hanno già caricato altri per quel giorno passato —
-      // es. oggi 4 settembre, recupero del WOD di ieri: vedere cosa hanno scritto gli altri il
-      // 3 evita di doverlo ritrascrivere da zero.
-      const isFuture = selectedRegistraDate > getTodayDateString();
-      const isToday = selectedRegistraDate === getTodayDateString();
-      const isPastLogging = !isToday && !isFuture && loggingPastDay && editingWodId === null;
-      if ((!isToday && !isFuture && !isPastLogging) || editingWodId !== null || proposedWodDismissed) {
+      if (editingWodId !== null || proposedWodDismissed) {
         card.style.display = 'none';
         proposedWodCandidates = [];
         return;
       }
 
-      // Bacheca del giorno: include le sessioni complete di ALTRI atleti (come prima, per
-      // riprendere un lavoro già fatto da qualcuno) e in più i WOD "pubblicati" da chiunque
-      // (te compreso) con l'apposito tasto — quelli non hanno ancora un risultato, sono lì solo
-      // per essere condivisi prima che qualcuno li faccia.
+      const weekStart = toDateString(getWeekStart(new Date(selectedRegistraDate + 'T00:00:00')));
+      const weekEnd = addDaysToDateString(weekStart, 6);
+
+      // Include le sessioni complete di ALTRI atleti (per riprendere un lavoro già fatto da
+      // qualcuno) e i WOD "pubblicati" da chiunque (te compreso) con l'apposito tasto — quelli
+      // non hanno ancora un risultato, sono lì solo per essere condivisi prima che qualcuno li
+      // faccia.
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const relevantSessions = (globalData.wods || []).filter(w =>
-        w.date === selectedRegistraDate && w.athlete && (w.athlete.toLowerCase() !== activeAthlete || isPublishedWod(w))
+        w.date && w.date >= weekStart && w.date <= weekEnd
+        && w.athlete && (w.athlete.toLowerCase() !== activeAthlete || isPublishedWod(w))
       );
 
       if (relevantSessions.length === 0) {
@@ -2174,43 +2175,44 @@
 
       // Un atleta può aver salvato più sessioni separate nello stesso giorno (es. ha premuto
       // "Salva" più volte invece di aggiungere un secondo blocco alla stessa sessione, o ha sia
-      // pubblicato il WOD sia salvato la propria sessione completa): raggruppiamo per atleta
-      // unendo tutti i blocchi, così non ne perdiamo nessuno.
-      const byAthlete = {};
+      // pubblicato il WOD sia salvato la propria sessione completa): raggruppiamo per
+      // atleta+giorno, unendo tutti i blocchi, così non ne perdiamo nessuno.
+      const byAthleteDay = {};
       relevantSessions.forEach(w => {
-        if (!byAthlete[w.athlete]) byAthlete[w.athlete] = { athlete: w.athlete, blocks: [], lastId: w.id };
-        byAthlete[w.athlete].blocks.push(...(w.blocks || []));
-        if (String(w.id).localeCompare(String(byAthlete[w.athlete].lastId)) > 0) byAthlete[w.athlete].lastId = w.id;
+        const key = w.athlete + '|' + w.date;
+        if (!byAthleteDay[key]) byAthleteDay[key] = { athlete: w.athlete, date: w.date, blocks: [], lastId: w.id };
+        byAthleteDay[key].blocks.push(...(w.blocks || []));
+        if (String(w.id).localeCompare(String(byAthleteDay[key].lastId)) > 0) byAthleteDay[key].lastId = w.id;
       });
 
-      // Se più atleti hanno pubblicato/salvato lo STESSO identico WOD (es. tutti trascrivono la
-      // stessa lavagna), li accorpiamo in un'unica card con tutti i nomi, invece di ripetere N
-      // volte lo stesso contenuto in bacheca. WOD DIVERSI restano invece separati: la scelta di
-      // quale usare spetta all'atleta, non la facciamo noi al posto suo scegliendone uno solo.
+      // Se più atleti hanno pubblicato/salvato lo STESSO identico WOD nello STESSO giorno (es.
+      // tutti trascrivono la stessa lavagna), li accorpiamo in un'unica card con tutti i nomi,
+      // invece di ripetere N volte lo stesso contenuto. Lo stesso titolo in giorni diversi resta
+      // invece separato: sono due proposte diverse, anche se il testo coincidesse per caso.
       const bySignature = {};
-      Object.values(byAthlete).forEach(c => {
-        const sig = wodBlocksSignature(c.blocks);
-        if (!bySignature[sig]) bySignature[sig] = { athletes: [], blocks: c.blocks, lastId: c.lastId };
+      Object.values(byAthleteDay).forEach(c => {
+        const sig = c.date + '|' + wodBlocksSignature(c.blocks);
+        if (!bySignature[sig]) bySignature[sig] = { athletes: [], date: c.date, blocks: c.blocks, lastId: c.lastId };
         bySignature[sig].athletes.push(c.athlete);
         if (String(c.lastId).localeCompare(String(bySignature[sig].lastId)) > 0) bySignature[sig].lastId = c.lastId;
       });
 
       proposedWodCandidates = Object.values(bySignature).sort((a, b) =>
-        b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
+        String(b.date).localeCompare(String(a.date)) || b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
       );
 
-      document.getElementById('proposedWodTitle').innerText = isFuture
-        ? `📋 GIÀ PROGRAMMATO PER IL ${formatDateForDisplay(selectedRegistraDate)} (${proposedWodCandidates.length})`
-        : (isPastLogging
-            ? `📋 GIÀ CARICATO IL ${formatDateForDisplay(selectedRegistraDate)} (${proposedWodCandidates.length})`
-            : `📋 BACHECA WOD DI OGGI (${proposedWodCandidates.length})`);
+      document.getElementById('proposedWodTitle').innerText = `📋 WOD DI QUESTA SETTIMANA (${proposedWodCandidates.length})`;
 
       document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map((c, idx) => {
         const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);
         const isSelfOnly = names.length === 1 && names[0] === 'te';
+        const isSelectedDay = c.date === selectedRegistraDate;
         return `
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
-          <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
+            <div style="font-size: 10px; font-weight: 800; white-space: nowrap; color: ${isSelectedDay ? 'var(--accent)' : 'var(--text-muted)'};">${escapeHtml(formatDateForDisplay(c.date))}</div>
+          </div>
           ${c.blocks.map(b => `
             <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
               • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
@@ -2241,11 +2243,20 @@
       const candidate = proposedWodCandidates[idx];
       if (!candidate || !candidate.blocks || candidate.blocks.length === 0) return;
 
+      // La bacheca ora è visibile anche nella vista di sola lettura di un giorno passato (prima
+      // ancora di aver scelto "+ Registra un allenamento"): scegliere un WOD da lì significa
+      // anche voler iniziare a registrarlo per il giorno selezionato.
+      const isFuture = selectedRegistraDate > getTodayDateString();
+      const isToday = selectedRegistraDate === getTodayDateString();
+      if (!isToday && !isFuture && editingWodId === null) loggingPastDay = true;
+
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
       candidate.blocks.forEach(b => addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || ''));
       if (document.getElementById('workoutBlocksContainer').children.length === 0) addWorkoutBlock();
+
+      updateRegistraDateView();
     }
 
     function dismissProposedWod() {

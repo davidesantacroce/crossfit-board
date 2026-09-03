@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v32 — 2026-09-03
+- La bacheca "WOD già caricati" ora copre **l'intera settimana** (domenica-sabato) del giorno
+  selezionato nel calendario, non solo quel giorno preciso — visibile su qualunque giorno si
+  stia guardando (oggi, futuro, un giorno passato), anche prima di scegliere di registrare un
+  recupero. Ogni proposta mostra la data a cui appartiene.
+- Selezionare un WOD dalla bacheca su un giorno passato apre da solo il form del recupero e lo
+  popola, senza dover prima cliccare "+ Registra un allenamento per questo giorno".
+- WOD identici caricati da atleti diversi si accorpano ancora in un'unica card, ma solo se
+  dello stesso giorno: lo stesso titolo in giorni diversi resta separato (sono due proposte
+  diverse).
+
 ## v31 — 2026-09-03
 - **Fix**: registrando un recupero (es. oggi 4 settembre il WOD di ieri 3 settembre), la
   bacheca "già caricato" restava vuota anche se altri atleti avevano già scritto quel WOD per
