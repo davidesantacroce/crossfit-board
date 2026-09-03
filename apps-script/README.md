@@ -71,12 +71,17 @@ devono stare) nel repo.
    pagina di login Whoop rifiuta di essere incorniciata (`X-Frame-Options`), quindi senza
    aprire una nuova scheda il browser mostra "connessione negata".
 3. A consenso dato, i token finiscono nelle Script Properties.
-4. `syncWhoopData` scarica gli ultimi 14 giorni; `installDailyWhoopSyncTrigger` (da eseguire
-   una volta sola) installa la sincronizzazione automatica giornaliera.
+4. Se l'account ha già mesi di dati storici (verificabile con `diagnosiWhoop`), esegui **una
+   volta sola** `backfillWhoopHistory` per recuperare tutto (fino a 3 anni fa): altrimenti
+   `syncWhoopData` (14 giorni per volta) ci metterebbe mesi a raggiungerli.
+5. `installDailyWhoopSyncTrigger` (da eseguire una volta sola) installa `syncWhoopData` come
+   sincronizzazione automatica giornaliera. Rieseguila se rinomini la funzione di sync: ripulisce
+   anche un eventuale vecchio trigger rimasto puntato al nome precedente.
 
 Nota: le funzioni con l'underscore finale (`nomeFunzione_`) sono private per convenzione di
 Apps Script e **non compaiono** nel menù a tendina dell'editor, quindi non si possono lanciare
-a mano. Per questo `syncWhoopData` non ce l'ha.
+a mano. Per questo `syncWhoopData`, `backfillWhoopHistory` e `installDailyWhoopSyncTrigger`
+non ce l'hanno; `syncWhoopSince_` invece sì (è il motore comune alle prime due).
 
 ## Fogli usati
 
