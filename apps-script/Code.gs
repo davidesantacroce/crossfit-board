@@ -552,9 +552,32 @@ function upsertWhoopRow_(sheet, athlete, type, recordId, dateStr, dataObj) {
   sheet.appendRow(newRow);
 }
 
-// Sincronizza recovery/cicli(strain)/sonno/allenamenti Whoop degli ultimi 14 giorni.
-// Per il primo test: selezionala nel menu a tendina in alto ed esegui ▶ a mano.
+// Sincronizza recovery/cicli(strain)/sonno/allenamenti Whoop dagli ultimi 14 giorni: pensata
+// per il trigger giornaliero (vedi installDailyWhoopSyncTrigger), non per recuperare storico
+// vecchio (per quello vedi backfillWhoopHistory più sotto).
 function syncWhoopData() {
+  var since = new Date();
+  since.setDate(since.getDate() - 14);
+  syncWhoopSince_(since);
+}
+
+// Backfill una tantum di TUTTO lo storico disponibile sull'account (fino a 3 anni fa, lo
+// stesso orizzonte usato da diagnosiWhoop): utile la prima volta che si collega un account
+// che ha già mesi di dati, così l'app ha subito qualcosa da mostrare invece di aspettare che
+// il trigger giornaliero li accumuli 14 giorni alla volta. Eseguila UNA VOLTA a mano
+// dall'editor (selezionala nel menu a tendina in alto -> Esegui ▶), poi non serve più:
+// il trigger giornaliero da qui in poi tiene tutto aggiornato da solo.
+function backfillWhoopHistory() {
+  var since = new Date();
+  since.setFullYear(since.getFullYear() - 3);
+  syncWhoopSince_(since);
+}
+
+// Motore comune: scarica recovery/cicli/sonno/allenamenti da 'since' a oggi e li scrive
+// (upsert, senza duplicare) nel foglio Whoop. Condiviso da syncWhoopData (14 giorni, uso
+// quotidiano) e backfillWhoopHistory (storico completo, una tantum) così restano sempre
+// allineate sulla stessa logica invece di rischiare di divergere nel tempo.
+function syncWhoopSince_(since) {
   var accessToken = getValidWhoopAccessToken_();
   if (!accessToken) {
     Logger.log('Nessun token Whoop valido: collega prima da SCRIPT_URL?whoopConnect=1');
@@ -583,9 +606,8 @@ function syncWhoopData() {
     sheet.getRange(1, dateColIndex, sheet.getMaxRows(), 1).setNumberFormat("@");
   }
 
-  var since = new Date();
-  since.setDate(since.getDate() - 14);
   var startIso = Utilities.formatDate(since, "UTC", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+  var counts = { recovery: 0, cycle: 0, sleep: 0, workout: 0 };
 
   fetchWhoopCollection_("/v2/recovery", accessToken, startIso).forEach(function(r) {
     if (r.score_state !== 'SCORED' || !r.score) return;
@@ -594,16 +616,21 @@ function syncWhoopData() {
       restingHeartRate: r.score.resting_heart_rate,
       hrvMilli: r.score.hrv_rmssd_milli
     });
+    counts.recovery++;
   });
 
   fetchWhoopCollection_("/v2/cycle", accessToken, startIso).forEach(function(c) {
-    if (c.score_state !== 'SCORED' || !c.score) return;
+    // 'end' è null per il ciclo ancora in corso: se la fascia è ferma, resta per sempre il
+    // "ciclo corrente" con punteggio azzerato (SCORED ma strain/HR/kilojoule tutti a 0), non
+    // un vero giorno di riposo. Lo saltiamo per non mostrare un dato falso.
+    if (c.score_state !== 'SCORED' || !c.score || !c.end) return;
     upsertWhoopRow_(sheet, athlete, 'cycle', c.id, formatWhoopDate_(c.start, timeZone), {
       strain: c.score.strain,
       averageHeartRate: c.score.average_heart_rate,
       maxHeartRate: c.score.max_heart_rate,
       kilojoule: c.score.kilojoule
     });
+    counts.cycle++;
   });
 
   fetchWhoopCollection_("/v2/activity/sleep", accessToken, startIso).forEach(function(s) {
@@ -611,6 +638,7 @@ function syncWhoopData() {
     upsertWhoopRow_(sheet, athlete, 'sleep', s.id, formatWhoopDate_(s.end, timeZone), {
       sleepPerformancePercentage: s.score.sleep_performance_percentage
     });
+    counts.sleep++;
   });
 
   fetchWhoopCollection_("/v2/activity/workout", accessToken, startIso).forEach(function(w) {
@@ -623,9 +651,11 @@ function syncWhoopData() {
       kilojoule: w.score.kilojoule,
       zoneDurations: w.score.zone_durations
     });
+    counts.workout++;
   });
 
-  Logger.log('Sync Whoop completata.');
+  Logger.log('Sync Whoop completata: ' + counts.recovery + ' recovery, ' + counts.cycle
+    + ' cicli, ' + counts.sleep + ' notti di sonno, ' + counts.workout + ' allenamenti.');
 }
 
 // Esegui UNA VOLTA (Esegui ▶ con questa funzione selezionata) per installare la sincronizzazione
