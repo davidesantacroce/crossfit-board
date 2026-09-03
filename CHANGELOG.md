@@ -4,6 +4,15 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v44 — 2026-09-03
+- Nuova card **📊 FOCUS ALLENAMENTO** nel tab ATLETA: un radar che mostra su cosa ti sei
+  concentrato nelle ultime 4 settimane (Squat, Hinge & Carry, Weightlifting Olimpico, Trazioni,
+  Spinta, Core & Skill, Monostrutturale), non quanto sei forte. Ogni asse conta quante volte un
+  movimento di quella categoria compare nelle sessioni salvate (stesso riconoscimento già usato
+  in "Confronta con la community"), normalizzato rispetto alla categoria più allenata nel
+  periodo = 100.
+- Disegnato a mano in SVG inline, nessuna libreria di grafici aggiunta al bundle.
+
 ## v43 — 2026-09-03
 - L'app è ora **installabile come PWA**: icona in home screen su Android/iOS, avvio a schermo
   intero senza barra del browser (`manifest.json`, icone in `icons/`, service worker minimo in
