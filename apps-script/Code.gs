@@ -332,7 +332,12 @@ function parseHealthNumber_(raw) {
   }
 
   var n = Number(s);
-  return isNaN(n) ? '' : n;
+  if (isNaN(n)) return '';
+
+  // Apple Health converte le unità internamente e restituisce valori con code in virgola
+  // mobile ("78.100000001" per 78,1 kg). Tre decimali sono ben oltre la precisione utile di
+  // qualunque metrica qui (peso, percentuale, bpm, passi, kcal) e tolgono il rumore.
+  return Math.round(n * 1000) / 1000;
 }
 
 // Scrive una misurazione di salute nel foglio "Health", una riga per giorno+atleta.
