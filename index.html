@@ -604,7 +604,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v36";
+    const APP_VERSION = "v37";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1622,9 +1622,16 @@
       renderMovementInputRows('benchmarkContainer', CROSSFIT_BENCHMARK_WODS.map(b => b.name), savedMaxs);
     }
 
+    // Due atleti con lo stesso nome condividerebbero storico, massimali e classifiche: il
+    // nome è di fatto la chiave con cui tutto il resto è collegato. Confrontiamo ignorando
+    // maiuscole e spaziatura, come fa il backend (normalizeAthleteName_).
+    function normalizeAthleteName(name) {
+      return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
     async function saveProfile() {
       const url = getScriptUrl();
-      const name = document.getElementById('profileName').value.trim();
+      const name = document.getElementById('profileName').value.replace(/\s+/g, ' ').trim();
       if (!name) { alert('Inserisci un nome valido'); return; }
 
       // Il PIN va creato solo per una registrazione nuova (nessun atleta ancora loggato su
@@ -1632,6 +1639,12 @@
       const isNewRegistration = !localStorage.getItem('activeAthlete');
       let pin = null;
       if (isNewRegistration) {
+        const giaEsistente = (globalData.athletes || []).some(a => normalizeAthleteName(a.name) === normalizeAthleteName(name));
+        if (giaEsistente) {
+          alert('Esiste già un atleta con questo nome.\n\nSe sei tu, torna al login e accedi con il tuo PIN invece di registrarti di nuovo. Se siete due persone diverse, aggiungi qualcosa che vi distingua (es. l\'iniziale del cognome).');
+          return;
+        }
+
         pin = document.getElementById('profilePin').value.trim();
         const pinConfirm = document.getElementById('profilePinConfirm').value.trim();
         if (!/^\d{4}$/.test(pin)) { alert('Scegli un PIN di 4 cifre per proteggere il tuo profilo.'); return; }
@@ -1647,16 +1660,27 @@
       };
       if (pin) payload.pin = pin;
 
-      localStorage.setItem('activeAthlete', name);
+      if (!url) return;
 
-      if (url) {
-        await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
+      // L'atleta attivo si imposta solo DOPO un salvataggio riuscito: prima veniva impostato
+      // comunque, e un errore lasciava il dispositivo "loggato" con un profilo mai creato.
+      try {
+        const response = await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
+        const esito = await response.json().catch(() => ({}));
+        if (esito.status === 'error') {
+          alert(esito.message || 'Errore durante il salvataggio del profilo.');
+          return;
+        }
+
+        localStorage.setItem('activeAthlete', name);
         alert('Atleta registrato e salvato sul cloud!');
-        fetchCloudData().then(() => {
-          document.getElementById('loginOverlay').style.display = 'none';
-          loadActiveAthlete();
-          renderHistory();
-        });
+        await fetchCloudData();
+        document.getElementById('loginOverlay').style.display = 'none';
+        loadActiveAthlete();
+        renderHistory();
+      } catch (err) {
+        console.error('Errore salvataggio profilo:', err);
+        alert('Errore di connessione durante il salvataggio del profilo.');
       }
     }
 
