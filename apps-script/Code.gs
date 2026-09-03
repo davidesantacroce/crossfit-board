@@ -883,7 +883,9 @@ function syncWhoopSince_(since) {
     upsertWhoopRow_(sheet, athlete, 'recovery', r.cycle_id, formatWhoopDate_(r.created_at, timeZone), {
       recoveryScore: r.score.recovery_score,
       restingHeartRate: r.score.resting_heart_rate,
-      hrvMilli: r.score.hrv_rmssd_milli
+      hrvMilli: r.score.hrv_rmssd_milli,
+      spo2Percentage: r.score.spo2_percentage,
+      skinTempCelsius: r.score.skin_temp_celsius
     });
     counts.recovery++;
   });
