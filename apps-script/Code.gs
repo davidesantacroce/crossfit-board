@@ -632,7 +632,10 @@ function syncWhoopData() {
 // automatica giornaliera.
 function installDailyWhoopSyncTrigger() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'syncWhoopData') ScriptApp.deleteTrigger(t);
+    // Il prefisso invece del nome esatto ripulisce anche un vecchio trigger registrato su
+    // 'syncWhoopData_' (il nome privato usato prima della rinomina): altrimenti resterebbe
+    // attivo puntando a una funzione che non esiste più, fallendo ogni notte in silenzio.
+    if (t.getHandlerFunction().indexOf('syncWhoopData') === 0) ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('syncWhoopData').timeBased().everyDays(1).atHour(6).create();
   Logger.log('Trigger di sync giornaliero Whoop installato.');
