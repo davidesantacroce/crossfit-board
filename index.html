@@ -604,7 +604,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v35";
+    const APP_VERSION = "v36";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -2192,14 +2192,14 @@
       const weekStart = toDateString(getWeekStart(new Date(selectedRegistraDate + 'T00:00:00')));
       const weekEnd = addDaysToDateString(weekStart, 6);
 
-      // Include le sessioni complete di ALTRI atleti (per riprendere un lavoro già fatto da
-      // qualcuno) e i WOD "pubblicati" da chiunque (te compreso) con l'apposito tasto — quelli
-      // non hanno ancora un risultato, sono lì solo per essere condivisi prima che qualcuno li
-      // faccia.
+      // Include TUTTE le sessioni della settimana, comprese le tue: prima le proprie venivano
+      // escluse (a meno di essere pubblicate con l'apposito tasto), perché la bacheca voleva
+      // dire "cosa hanno caricato gli altri, da riprendere". Ora che mostra l'intera settimana
+      // come vista d'insieme da cui scegliere il lavoro, nasconderti i tuoi WOD è incoerente:
+      // vedresti quelli di tutti tranne i tuoi, anche a distanza di giorni.
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const relevantSessions = (globalData.wods || []).filter(w =>
-        w.date && w.date >= weekStart && w.date <= weekEnd
-        && w.athlete && (w.athlete.toLowerCase() !== activeAthlete || isPublishedWod(w))
+        w.date && w.date >= weekStart && w.date <= weekEnd && w.athlete
       );
 
       if (relevantSessions.length === 0) {
