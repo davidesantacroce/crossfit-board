@@ -252,75 +252,10 @@ function doPost(e) {
 
     // Riceve una misurazione di salute (peso/composizione dalla bilancia, frequenza cardiaca a
     // riposo/passi/calorie dall'Apple Watch) inviata da un Comando iOS che legge da Salute.
-    // Endpoint pubblico: richiede un segreto condiviso (HEALTH_INGEST_SECRET nelle Script
-    // Properties) per evitare che chiunque conosca l'URL possa scrivere dati falsi.
     if (data.action === 'saveHealthData') {
-      var props = PropertiesService.getScriptProperties();
-      var expectedSecret = props.getProperty('HEALTH_INGEST_SECRET');
-      if (!expectedSecret || data.secret !== expectedSecret) {
-        return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "Non autorizzato."})).setMimeType(ContentService.MimeType.JSON);
-      }
-
-      var athlete = props.getProperty('HEALTH_ATHLETE_NAME');
-      if (!athlete) {
-        return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "Manca HEALTH_ATHLETE_NAME nelle Script Properties."})).setMimeType(ContentService.MimeType.JSON);
-      }
-
-      var sheet = ss.getSheetByName("Health") || ss.insertSheet("Health");
-      if (sheet.getLastRow() === 0) {
-        sheet.appendRow(["athlete", "date", "weight", "bodyFatPercentage", "restingHeartRate", "steps", "activeEnergy", "updatedAt"]);
-      }
-
-      var dateColIndex = getColumnIndex(sheet, "date");
-      if (dateColIndex > 0) {
-        sheet.getRange(1, dateColIndex, sheet.getMaxRows(), 1).setNumberFormat("@");
-      }
-
-      var dateStr = String(data.date || Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd"));
-      var athleteColIndex = getColumnIndex(sheet, "athlete");
-      var rows = sheet.getDataRange().getValues();
-      var foundRow = -1;
-      for (var i = 1; i < rows.length; i++) {
-        if (String(rows[i][dateColIndex - 1]) === dateStr && rows[i][athleteColIndex - 1] === athlete) {
-          foundRow = i;
-          break;
-        }
-      }
-      var existingRow = foundRow >= 0 ? rows[foundRow] : null;
-
-      // Un giorno può ricevere più chiamate separate (es. il peso da un Comando al mattino, i
-      // passi da un altro alla sera): aggiorniamo solo i campi presenti in QUESTA chiamata,
-      // senza cancellare quelli già scritti in precedenza per lo stesso giorno.
-      var fieldValue = function(key) {
-        if (data.hasOwnProperty(key) && data[key] !== null && data[key] !== undefined && data[key] !== '') return data[key];
-        if (existingRow) {
-          var idx = getColumnIndex(sheet, key);
-          if (idx > 0) return existingRow[idx - 1];
-        }
-        return "";
-      };
-
-      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      var rowMap = {
-        "athlete": athlete,
-        "date": dateStr,
-        "weight": fieldValue('weight'),
-        "bodyFatPercentage": fieldValue('bodyFatPercentage'),
-        "restingHeartRate": fieldValue('restingHeartRate'),
-        "steps": fieldValue('steps'),
-        "activeEnergy": fieldValue('activeEnergy'),
-        "updatedAt": new Date()
-      };
-      var newRow = headers.map(function(h) { return rowMap.hasOwnProperty(h) ? rowMap[h] : ""; });
-
-      if (foundRow >= 0) {
-        sheet.getRange(foundRow + 1, 1, 1, newRow.length).setValues([newRow]);
-      } else {
-        sheet.appendRow(newRow);
-      }
-
-      return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify(saveHealthPayload_(data, ss))).setMimeType(ContentService.MimeType.JSON);
     }
+
 
   } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": error.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -367,6 +302,119 @@ function formatDateValue(value, timeZone) {
   return match ? match[1] : str;
 }
 
+// I valori che arrivano da un Comando iOS possono includere l'unità di misura e usare la
+// virgola come separatore decimale ("78,4 kg", "8.400 passi", "540 kcal"): li normalizziamo
+// qui, così il Comando può limitarsi a passare il campione di Salute così com'è invece di
+// dover contenere un'azione "Numero" per ogni singola metrica.
+function parseHealthNumber_(raw) {
+  if (raw === null || raw === undefined || raw === '') return '';
+  if (typeof raw === 'number') return isNaN(raw) ? '' : raw;
+
+  var s = String(raw).replace(/[^0-9,.\-]/g, ''); // via unità di misura, spazi, testo
+  if (!s) return '';
+
+  var commas = (s.match(/,/g) || []).length;
+  var dots = (s.match(/\./g) || []).length;
+
+  if (commas && dots) {
+    // Entrambi presenti: l'ULTIMO è il separatore decimale ("1.234,5" all'italiana,
+    // "1,234.5" all'inglese), l'altro separa le migliaia.
+    var decimalIsComma = s.lastIndexOf(',') > s.lastIndexOf('.');
+    s = decimalIsComma ? s.split('.').join('').replace(',', '.') : s.split(',').join('');
+  } else if (commas || dots) {
+    // Un separatore solo è ambiguo: "8.400" sono ottomilaquattrocento passi, "78.4" sono
+    // settantotto chili e quattro etti. Con ESATTAMENTE tre cifre dopo lo trattiamo da
+    // separatore delle migliaia: nessuna di queste metriche ha senso con tre decimali.
+    // Più separatori uguali sono per forza migliaia ("1.234.567").
+    var sep = commas ? ',' : '.';
+    var isThousands = (commas || dots) > 1 || new RegExp('^-?\\d+\\' + sep + '\\d{3}$').test(s);
+    s = isThousands ? s.split(sep).join('') : s.split(sep).join('.');
+  }
+
+  var n = Number(s);
+  return isNaN(n) ? '' : n;
+}
+
+// Scrive una misurazione di salute nel foglio "Health", una riga per giorno+atleta.
+// Condivisa da doPost (corpo JSON) e doGet (valori nei parametri dell'URL): quest'ultima
+// permette a un Comando iOS di mandare i dati con una sola azione "Ottieni contenuto di URL",
+// senza costruire un JSON sul telefono.
+// L'endpoint è pubblico, quindi richiede il segreto condiviso HEALTH_INGEST_SECRET.
+function saveHealthPayload_(data, ss) {
+  var props = PropertiesService.getScriptProperties();
+  var expectedSecret = props.getProperty('HEALTH_INGEST_SECRET');
+  if (!expectedSecret || data.secret !== expectedSecret) {
+    return { status: "error", message: "Non autorizzato." };
+  }
+
+  var athlete = props.getProperty('HEALTH_ATHLETE_NAME');
+  if (!athlete) {
+    return { status: "error", message: "Manca HEALTH_ATHLETE_NAME nelle Script Properties." };
+  }
+
+  var sheet = ss.getSheetByName("Health") || ss.insertSheet("Health");
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["athlete", "date", "weight", "bodyFatPercentage", "restingHeartRate", "steps", "activeEnergy", "updatedAt"]);
+  }
+
+  var dateColIndex = getColumnIndex(sheet, "date");
+  if (dateColIndex > 0) {
+    sheet.getRange(1, dateColIndex, sheet.getMaxRows(), 1).setNumberFormat("@");
+  }
+
+  var dateStr = String(data.date || Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "yyyy-MM-dd"));
+  var athleteColIndex = getColumnIndex(sheet, "athlete");
+  var rows = sheet.getDataRange().getValues();
+  var foundRow = -1;
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][dateColIndex - 1]) === dateStr && rows[i][athleteColIndex - 1] === athlete) {
+      foundRow = i;
+      break;
+    }
+  }
+  var existingRow = foundRow >= 0 ? rows[foundRow] : null;
+
+  // Un giorno può ricevere più chiamate separate (es. il peso da un Comando al mattino, i
+  // passi da un altro alla sera): aggiorniamo solo i campi presenti in QUESTA chiamata,
+  // senza cancellare quelli già scritti in precedenza per lo stesso giorno.
+  var saved = [];
+  var fieldValue = function(key) {
+    var parsed = parseHealthNumber_(data[key]);
+    if (parsed !== '') {
+      saved.push(key);
+      return parsed;
+    }
+    if (existingRow) {
+      var idx = getColumnIndex(sheet, key);
+      if (idx > 0) return existingRow[idx - 1];
+    }
+    return "";
+  };
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var rowMap = {
+    "athlete": athlete,
+    "date": dateStr,
+    "weight": fieldValue('weight'),
+    "bodyFatPercentage": fieldValue('bodyFatPercentage'),
+    "restingHeartRate": fieldValue('restingHeartRate'),
+    "steps": fieldValue('steps'),
+    "activeEnergy": fieldValue('activeEnergy'),
+    "updatedAt": new Date()
+  };
+  var newRow = headers.map(function(h) { return rowMap.hasOwnProperty(h) ? rowMap[h] : ""; });
+
+  if (foundRow >= 0) {
+    sheet.getRange(foundRow + 1, 1, 1, newRow.length).setValues([newRow]);
+  } else {
+    sheet.appendRow(newRow);
+  }
+
+  // 'saved' elenca cosa è stato effettivamente scritto: eseguendo il Comando a mano, la
+  // risposta dice subito se il valore è arrivato o se il campo era vuoto.
+  return { status: "success", date: dateStr, saved: saved };
+}
+
 // Funzione doGet aggiornata per raggruppare i blocchi dello stesso WOD
 function doGet(e) {
   // --- Instradamento Whoop: separato dalle chiamate normali dell'app, che non passano mai
@@ -376,6 +424,25 @@ function doGet(e) {
   }
   if (e && e.parameter && (e.parameter.code || e.parameter.error)) {
     return handleWhoopCallback_(e);
+  }
+
+  // --- Dati salute anche via GET, con i valori nei parametri dell'URL ---
+  // Serve a tenere il Comando iOS a DUE sole azioni: leggere il campione da Salute e chiamare
+  // questo URL con la variabile dentro. Costruire un JSON sul telefono richiedeva invece
+  // azioni Numero/Data/Testo/Dizionario per ogni metrica, troppo lavoro manuale.
+  // Il segreto viaggia nella query string invece che nel corpo: un po' più esposto (gli URL
+  // finiscono nei log più facilmente), ma difende dalla stessa cosa — che chi conosce l'URL
+  // /exec possa scriverci dentro. L'operazione è idempotente (upsert per giorno+atleta),
+  // quindi una GET ripetuta non fa danni.
+  if (e && e.parameter && e.parameter.action === 'saveHealthData') {
+    var healthLock = LockService.getScriptLock();
+    healthLock.tryLock(10000);
+    try {
+      var healthResult = saveHealthPayload_(e.parameter, SpreadsheetApp.getActiveSpreadsheet());
+      return ContentService.createTextOutput(JSON.stringify(healthResult)).setMimeType(ContentService.MimeType.JSON);
+    } finally {
+      healthLock.releaseLock();
+    }
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
