@@ -163,4 +163,5 @@ la riga del giorno invece di accodarne una nuova.
 ## Fogli usati
 
 `Wods`, `Athletes`, `Massimali`, `Results`, `Whoop` (creato al primo sync), `Health` (creato
-alla prima chiamata `saveHealthData`).
+alla prima chiamata `saveHealthData`), `Frasi` (creato alla prima frase di caricamento aggiunta
+dall'app, tab Impostazioni).

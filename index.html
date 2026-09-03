@@ -183,6 +183,11 @@
     /* Tastino ↻ nell'intestazione delle card alimentate da fonti esterne (Whoop, Salute). */
     .btn-refresh-card { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; height: 26px; min-width: 30px; padding: 0 8px; font-size: 13px; font-weight: 800; cursor: pointer; }
     .btn-refresh-card:disabled { opacity: 0.5; cursor: default; }
+    /* Elenco delle frasi di caricamento aggiunte dagli atleti (tab Impostazioni). */
+    .fun-phrase-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .fun-phrase-row:last-of-type { border-bottom: none; }
+    .fun-phrase-text { font-size: 13px; font-weight: 700; }
+    .fun-phrase-author { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
     .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
     .result-summary-box { background: rgba(46, 125, 50, 0.12); border: 1px solid #2e7d32; border-radius: 10px; padding: 12px; }
@@ -453,6 +458,18 @@
     </div>
 
     <div class="card">
+      <div class="card-title">😄 FRASI DI CARICAMENTO</div>
+      <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;">
+        Le frasi che compaiono mentre l'app carica. Quelle che aggiungi qui le vedono <strong>tutti</strong> gli atleti, e chiunque può eliminarle.
+      </p>
+      <div id="funPhrasesList"></div>
+      <div class="form-group" style="margin-top: 14px; margin-bottom: 8px;">
+        <input type="text" id="newFunPhrase" maxlength="120" placeholder="Es. Questi 100kg pesano una tonnellata">
+      </div>
+      <button class="btn-main" onclick="withButtonGuard(this, addFunPhrase)">AGGIUNGI FRASE</button>
+    </div>
+
+    <div class="card">
       <div class="card-title">VERSIONE APP</div>
       <div style="background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
         <div id="appVersionInfo" style="font-size: 15px; font-weight: 800;"></div>
@@ -560,7 +577,7 @@
 
   <script>
     let cropper = null;
-    let globalData = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [] };
+    let globalData = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], funPhrases: [] };
 
     // Un WOD "pubblicato in bacheca" è una riga della stessa tabella Wods, distinta solo dal
     // valore speciale di "mode" qui sotto (nessun campo/tabella nuova sul backend): niente
@@ -604,7 +621,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v38";
+    const APP_VERSION = "v39";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1014,6 +1031,8 @@
 
     // Messaggini simpatici mostrati mentre si caricano le sessioni dal cloud (all'avvio
     // dell'app e subito dopo il login), giusto per rendere l'attesa un po' più divertente.
+    // Queste sono quelle incluse nell'app; altre si aggiungono dall'app stessa (tab
+    // Impostazioni) e vivono nel Foglio, condivise fra tutti gli atleti — vedi allFunPhrases().
     const FUN_LOADING_MESSAGES = [
       "Ha il booster",
       "Brilli come Armando",
@@ -1031,12 +1050,98 @@
       "Questi 100kg pesano una tonnellata"
     ];
 
+    // Le frasi incluse nel codice più quelle aggiunte dagli atleti. Le prime restano come
+    // rete di sicurezza: se il Foglio è vuoto o irraggiungibile, l'overlay ha comunque qualcosa
+    // da mostrare invece di restare muto.
+    function allFunPhrases() {
+      const aggiunte = (globalData.funPhrases || [])
+        .map(f => String(f.text || '').trim())
+        .filter(Boolean);
+      return FUN_LOADING_MESSAGES.concat(aggiunte);
+    }
+
     function showFunLoadingOverlay() {
       const overlay = document.getElementById('funLoadingOverlay');
       const msgEl = document.getElementById('funLoadingMessage');
       if (!overlay || !msgEl) return;
-      msgEl.innerText = FUN_LOADING_MESSAGES[Math.floor(Math.random() * FUN_LOADING_MESSAGES.length)];
+      const frasi = allFunPhrases();
+      msgEl.innerText = frasi[Math.floor(Math.random() * frasi.length)];
       overlay.classList.add('active');
+    }
+
+    // ===================== FRASI DI CARICAMENTO (aggiunte dagli atleti) =====================
+
+    function renderFunPhrases() {
+      const container = document.getElementById('funPhrasesList');
+      if (!container) return;
+
+      const aggiunte = globalData.funPhrases || [];
+      if (aggiunte.length === 0) {
+        container.innerHTML = '<p style="font-size: 13px; color: var(--text-muted);">Nessuna frase aggiunta finora. Le ' + FUN_LOADING_MESSAGES.length + ' incluse nell\'app ci sono comunque.</p>';
+        return;
+      }
+
+      container.innerHTML = aggiunte.map(f => `
+        <div class="fun-phrase-row">
+          <div>
+            <div class="fun-phrase-text">${escapeHtml(f.text || '')}</div>
+            ${f.athlete ? `<div class="fun-phrase-author">aggiunta da ${escapeHtml(f.athlete)}</div>` : ''}
+          </div>
+          <button type="button" class="btn-delete-history" onclick="withButtonGuard(this, () => deleteFunPhrase('${String(f.id).replace(/'/g, "\\'")}'))">✕</button>
+        </div>
+      `).join('') + `<p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">Più le ${FUN_LOADING_MESSAGES.length} incluse nell'app, che restano sempre.</p>`;
+    }
+
+    async function addFunPhrase() {
+      const input = document.getElementById('newFunPhrase');
+      const url = getScriptUrl();
+      if (!input || !url) return;
+
+      const testo = input.value.replace(/\s+/g, ' ').trim();
+      if (!testo) { alert('Scrivi prima la frase.'); return; }
+      if (testo.length > 120) { alert('La frase è troppo lunga (massimo 120 caratteri).'); return; }
+
+      // Il controllo sui doppioni c'è anche nel backend, ma qui possiamo confrontare anche con
+      // le frasi incluse nell'app, che il backend non conosce.
+      const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (allFunPhrases().some(f => norm(f) === norm(testo))) {
+        alert('Questa frase c\'è già.');
+        return;
+      }
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'saveFunPhrase',
+            id: String(Date.now()),
+            text: testo,
+            athlete: localStorage.getItem('activeAthlete') || ''
+          })
+        });
+        const esito = await res.json().catch(() => ({}));
+        if (esito.status === 'error') { alert(esito.message || 'Errore durante il salvataggio della frase.'); return; }
+
+        input.value = '';
+        await fetchCloudData();
+      } catch (err) {
+        console.error('Errore salvataggio frase:', err);
+        alert('Errore di connessione durante il salvataggio della frase.');
+      }
+    }
+
+    async function deleteFunPhrase(id) {
+      const url = getScriptUrl();
+      if (!url) return;
+      if (!confirm('Eliminare questa frase per tutti?')) return;
+
+      try {
+        await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'deleteFunPhrase', id: String(id) }) });
+        await fetchCloudData();
+      } catch (err) {
+        console.error('Errore eliminazione frase:', err);
+        alert('Errore di connessione durante l\'eliminazione.');
+      }
     }
 
     function hideFunLoadingOverlay() {
@@ -1076,11 +1181,13 @@
           globalData.results = globalData.results || [];
           globalData.whoop = globalData.whoop || [];
           globalData.health = globalData.health || [];
+          globalData.funPhrases = globalData.funPhrases || [];
           updateConnectionIndicator(true);
           renderHistory();
           renderActiveDaysChart();
           renderWhoopCard();
           renderHealthCard();
+          renderFunPhrases();
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
           updateRegistraDateView();
@@ -3673,6 +3780,7 @@
       if (tab === 'storico') { renderHistory(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
       if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderWhoopCard(); renderHealthCard(); }
+      if (tab === 'impostazioni') { renderFunPhrases(); }
     }
   </script>
 </body>
