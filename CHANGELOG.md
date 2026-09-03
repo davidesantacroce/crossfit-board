@@ -4,6 +4,10 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v38 — 2026-09-04
+- Due nuovi messaggini nella schermata di caricamento: "Sei un finto modesto" e "Questi 100kg
+  pesano una tonnellata".
+
 ## v37 — 2026-09-04
 - Non si possono più creare **due atleti con lo stesso nome**: la registrazione viene rifiutata
   con un messaggio che invita ad accedere col proprio PIN. Il confronto ignora maiuscole e
