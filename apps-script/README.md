@@ -61,6 +61,8 @@ devono stare) nel repo.
 | `WHOOP_CLIENT_SECRET` | Client secret della stessa app. **Segreto**: non condividerlo e non metterlo nel repo. |
 | `WHOOP_ATHLETE_NAME` | Nome dell'atleta a cui associare i dati Whoop, scritto esattamente come nel foglio `Athletes` (es. `Davide Santacroce`). |
 | `WHOOP_ACCESS_TOKEN`, `WHOOP_REFRESH_TOKEN`, `WHOOP_TOKEN_EXPIRES_AT` | Scritte automaticamente dal codice dopo l'autorizzazione: non impostarle a mano. |
+| `HEALTH_INGEST_SECRET` | Segreto condiviso richiesto da `saveHealthData` (peso/Apple Watch, vedi sotto). **Segreto**: generane uno lungo e casuale, non condividerlo e non metterlo nel repo. |
+| `HEALTH_ATHLETE_NAME` | Nome dell'atleta a cui associare i dati salute, come nel foglio `Athletes` (es. `Davide Santacroce`). |
 
 ## Collegare Whoop
 
@@ -83,6 +85,49 @@ Apps Script e **non compaiono** nel menù a tendina dell'editor, quindi non si p
 a mano. Per questo `syncWhoopData`, `backfillWhoopHistory` e `installDailyWhoopSyncTrigger`
 non ce l'hanno; `syncWhoopSince_` invece sì (è il motore comune alle prime due).
 
+## Collegare Apple Watch / bilancia (Renpho o altra) via Salute
+
+Non c'è un'API cloud per questi dati: HealthKit vive solo sul telefono. Il ponte è un
+**Comando (Shortcuts) su iPhone** che legge da Salute e manda i dati al nostro endpoint —
+funziona per qualsiasi sorgente scriva su Salute (Apple Watch, bilancia Renpho via la sua app,
+altre app fitness), con un unico Comando.
+
+1. Genera un segreto lungo e casuale (es. con un password manager) e mettilo in
+   `HEALTH_INGEST_SECRET` nelle Script Properties. Imposta anche `HEALTH_ATHLETE_NAME`.
+2. Sul telefono, app **Comandi** → **Automazione** → **Crea automazione personale** →
+   **Ora del giorno** (es. ogni sera alle 22, dopo l'allenamento/la pesata).
+3. Aggiungi le azioni per leggere da Salute: cerca "Salute" nella libreria delle azioni e usa
+   "Trova campioni sanitari" (il nome esatto varia leggermente tra versioni di iOS) una volta
+   per ciascun tipo di dato che vuoi inviare — Peso corporeo, Percentuale di grasso corporeo,
+   Frequenza cardiaca a riposo, Passi, Energia attiva — impostando "più recente" o "somma di
+   oggi" per passi/energia. Manda tutti quelli che vuoi: i campi omessi in una chiamata non
+   cancellano quelli già salvati per lo stesso giorno (vedi `saveHealthData` in `Code.gs`).
+4. Aggiungi un'azione **Dizionario** con queste chiavi (lascia fuori quelle che non hai letto
+   al passo 3):
+   ```json
+   {
+     "action": "saveHealthData",
+     "secret": "<IL_TUO_HEALTH_INGEST_SECRET>",
+     "date": "2026-01-01",
+     "weight": 78.4,
+     "bodyFatPercentage": 15.2,
+     "restingHeartRate": 52,
+     "steps": 8400,
+     "activeEnergy": 540
+   }
+   ```
+   Per `date` usa un'azione "Data e ora attuale" formattata `AAAA-MM-GG`; per i valori numerici
+   trascina dentro il risultato delle azioni Salute del passo 3 (Comandi li converte in numero
+   in automatico se il campo del Dizionario è impostato su "Numero").
+5. Aggiungi **Ottieni contenuto di URL**: metodo `POST`, URL = l'URL `/exec`, Corpo della
+   richiesta = **Contenuto JSON**, e passa il Dizionario del passo 4.
+6. Disattiva "Chiedi prima di eseguire" sull'automazione, altrimenti non parte da sola.
+
+Non serve toccare il codice per aggiungere/togliere un tipo di dato dal Comando: `saveHealthData`
+accetta qualunque sottoinsieme dei campi (`weight`, `bodyFatPercentage`, `restingHeartRate`,
+`steps`, `activeEnergy`) — un giorno con solo il peso e uno con tutto sono entrambi validi.
+
 ## Fogli usati
 
-`Wods`, `Athletes`, `Massimali`, `Results`, `Whoop` (quest'ultimo creato al primo sync).
+`Wods`, `Athletes`, `Massimali`, `Results`, `Whoop` (creato al primo sync), `Health` (creato
+alla prima chiamata `saveHealthData`).
