@@ -87,45 +87,55 @@ non ce l'hanno; `syncWhoopSince_` invece sì (è il motore comune alle prime due
 
 ## Collegare Apple Watch / bilancia (Renpho o altra) via Salute
 
-Non c'è un'API cloud per questi dati: HealthKit vive solo sul telefono. Il ponte è un
-**Comando (Shortcuts) su iPhone** che legge da Salute e manda i dati al nostro endpoint —
-funziona per qualsiasi sorgente scriva su Salute (Apple Watch, bilancia Renpho via la sua app,
-altre app fitness), con un unico Comando.
+Non c'è un'API cloud per questi dati: HealthKit vive solo sul telefono e non è raggiungibile
+da una pagina web (nemmeno aprendo l'app dal telefono stesso: Safari non ha accesso a Salute).
+Il ponte è un **Comando (Shortcuts) su iPhone** che legge da Salute e chiama il nostro
+endpoint — e copre in un colpo solo qualsiasi sorgente scriva su Salute: Apple Watch, bilancia
+Renpho tramite la sua app, altre app fitness.
+
+Il Comando è volutamente ridotto a **due azioni per metrica**: i valori viaggiano nei parametri
+dell'URL, e il backend si occupa di interpretarli. Niente azioni Dizionario/Testo/Numero/Data
+da montare a mano sul telefono.
 
 1. Genera un segreto lungo e casuale (es. con un password manager) e mettilo in
    `HEALTH_INGEST_SECRET` nelle Script Properties. Imposta anche `HEALTH_ATHLETE_NAME`.
 2. Sul telefono, app **Comandi** → **Automazione** → **Crea automazione personale** →
    **Ora del giorno** (es. ogni sera alle 22, dopo l'allenamento/la pesata).
-3. Aggiungi le azioni per leggere da Salute: cerca "Salute" nella libreria delle azioni e usa
-   "Trova campioni sanitari" (il nome esatto varia leggermente tra versioni di iOS) una volta
-   per ciascun tipo di dato che vuoi inviare — Peso corporeo, Percentuale di grasso corporeo,
-   Frequenza cardiaca a riposo, Passi, Energia attiva — impostando "più recente" o "somma di
-   oggi" per passi/energia. Manda tutti quelli che vuoi: i campi omessi in una chiamata non
-   cancellano quelli già salvati per lo stesso giorno (vedi `saveHealthData` in `Code.gs`).
-4. Aggiungi un'azione **Dizionario** con queste chiavi (lascia fuori quelle che non hai letto
-   al passo 3):
-   ```json
-   {
-     "action": "saveHealthData",
-     "secret": "<IL_TUO_HEALTH_INGEST_SECRET>",
-     "date": "2026-01-01",
-     "weight": 78.4,
-     "bodyFatPercentage": 15.2,
-     "restingHeartRate": 52,
-     "steps": 8400,
-     "activeEnergy": 540
-   }
+3. **Azione 1**: cerca "Salute" nella libreria e aggiungi "Trova campioni di dati sanitari"
+   (il nome esatto varia tra versioni di iOS) → Tipo: **Peso corporeo**, Ordina per: **più
+   recente**, Limita a: **1**.
+4. **Azione 2**: aggiungi **Ottieni contenuto di URL** e scrivi nel campo URL:
    ```
-   Per `date` usa un'azione "Data e ora attuale" formattata `AAAA-MM-GG`; per i valori numerici
-   trascina dentro il risultato delle azioni Salute del passo 3 (Comandi li converte in numero
-   in automatico se il campo del Dizionario è impostato su "Numero").
-5. Aggiungi **Ottieni contenuto di URL**: metodo `POST`, URL = l'URL `/exec`, Corpo della
-   richiesta = **Contenuto JSON**, e passa il Dizionario del passo 4.
-6. Disattiva "Chiedi prima di eseguire" sull'automazione, altrimenti non parte da sola.
+   <URL_EXEC>?action=saveHealthData&secret=<IL_TUO_SEGRETO>&weight=
+   ```
+   poi, senza spazi dopo `=`, inserisci la **variabile** del campione letto al passo 3
+   (toccando la barra sopra la tastiera). Metodo `GET`, nessun corpo da configurare.
+5. Disattiva "Chiedi prima di eseguire" sull'automazione, altrimenti non parte da sola.
 
-Non serve toccare il codice per aggiungere/togliere un tipo di dato dal Comando: `saveHealthData`
-accetta qualunque sottoinsieme dei campi (`weight`, `bodyFatPercentage`, `restingHeartRate`,
-`steps`, `activeEnergy`) — un giorno con solo il peso e uno con tutto sono entrambi validi.
+**Per aggiungere altre metriche**: una "Trova campioni di dati sanitari" in più per ciascuna, e
+in fondo all'URL `&nomeCampo=` seguito dalla sua variabile. I campi accettati sono `weight`,
+`bodyFatPercentage`, `restingHeartRate`, `steps`, `activeEnergy` — tutti facoltativi, in
+qualunque combinazione. I campi omessi in una chiamata **non cancellano** quelli già salvati
+per lo stesso giorno, quindi si possono anche spezzare in automazioni diverse a orari diversi.
+
+**Perché non serve convertire i valori**: `parseHealthNumber_` in `Code.gs` normalizza quello
+che manda Comandi, unità di misura e separatori compresi — `78,4 kg` → `78.4`, `8.400 passi` →
+`8400`, `15,2%` → `15.2`. Un separatore singolo seguito da esattamente tre cifre è trattato da
+separatore delle migliaia (nessuna di queste metriche ha senso con tre decimali).
+
+**La data non serve passarla**: se manca, il backend usa il giorno corrente nel fuso del
+Foglio. Passala (`&date=AAAA-MM-GG`) solo se il Comando gira a cavallo della mezzanotte o se
+vuoi scrivere su un giorno diverso.
+
+**Per verificare**: esegui il Comando a mano col tasto ▶. La risposta dice cosa è stato
+scritto, es. `{"status":"success","date":"2026-09-04","saved":["weight"]}`. Se `saved` è vuoto
+il valore non è arrivato (variabile non inserita nell'URL); se leggi `Non autorizzato` il
+segreto non corrisponde.
+
+Nota: l'ingestione funziona anche in `POST` con un corpo JSON (stessi campi più `action` e
+`secret`), che è la forma più corretta per una scrittura. La `GET` esiste perché rende il
+Comando enormemente più semplice da costruire, e l'operazione è comunque idempotente: riscrive
+la riga del giorno invece di accodarne una nuova.
 
 ## Fogli usati
 
