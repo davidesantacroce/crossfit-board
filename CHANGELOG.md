@@ -4,6 +4,16 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v33 — 2026-09-04
+- **Fix**: nella classifica di un WOD, un atleta che aveva loggato lo stesso lavoro due volte
+  (per sbaglio, o perché l'aveva davvero rifatto) compariva due volte col proprio nome. Ora
+  ogni atleta compare una sola volta, col **suo risultato migliore**.
+- "Migliore" segue il tipo di punteggio: il tempo più basso per un For Time, il valore più alto
+  per AMRAP/Reps/Peso. Se i due risultati non sono confrontabili (tipi di punteggio diversi o
+  non interpretabili) resta il più recente.
+- Anche il badge col numero sul pulsante "Risultati Altri Atleti" ora conta le **persone**,
+  non i caricamenti, coerente con quello che si vede aprendo la classifica.
+
 ## v32 — 2026-09-03
 - La bacheca "WOD già caricati" ora copre **l'intera settimana** (domenica-sabato) del giorno
   selezionato nel calendario, non solo quel giorno preciso — visibile su qualunque giorno si
