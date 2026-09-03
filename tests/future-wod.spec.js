@@ -86,7 +86,7 @@ test('rifiuta di registrare un risultato su un giorno futuro', async ({ page }) 
   expect(state.wods).toHaveLength(0);
 });
 
-test('la bacheca mostra ciò che è già programmato per quel giorno futuro', async ({ page }) => {
+test('il tab BACHECA mostra ciò che è già programmato per un giorno futuro', async ({ page }) => {
   await mockBackend(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     wods: [{ id: 'w1', date: DOMANI, athlete: 'Coach', mode: 'PUBLISHED', blocks: [{ title: 'Murph', type: 'For Time', explanation: '', result: '' }] }],
@@ -94,11 +94,15 @@ test('la bacheca mostra ciò che è già programmato per quel giorno futuro', as
   await gotoApp(page);
   await loginAs(page, 'Test Athlete');
   await page.evaluate(() => fetchCloudData());
-  await apriGiorno(page, DOMANI);
+  // Si posiziona esplicitamente sulla settimana di DOMANI: se il test gira di sabato, domani
+  // cadrebbe nella settimana successiva rispetto a quella corrente mostrata di default.
+  await page.evaluate((d) => {
+    switchTab('bacheca');
+    bachecaWeekStart = toDateString(getWeekStart(new Date(d + 'T00:00:00')));
+    renderBachecaTab();
+  }, DOMANI);
 
-  await expect(page.locator('#proposedWodCard')).toBeVisible();
-  await expect(page.locator('#proposedWodTitle')).toContainText('WOD DI QUESTA SETTIMANA');
-  await expect(page.locator('#proposedWodContent')).toContainText('Murph');
+  await expect(page.locator('#bachecaContent')).toContainText('Murph');
 });
 
 test('il calendario segnala i giorni futuri con un WOD già programmato', async ({ page }) => {
