@@ -4,6 +4,19 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v29 — 2026-09-03
+- Nuova card **🩺 SALUTE** nella tab Atleta: peso, % grasso corporeo, frequenza cardiaca a
+  riposo, passi ed energia attiva. I dati arrivano da un Comando (Shortcuts) su iPhone che
+  legge da Salute — copre sia l'Apple Watch sia qualunque bilancia collegata a Salute (Renpho
+  inclusa), senza un'integrazione separata per dispositivo.
+- Ogni metrica mostra il suo giorno più recente disponibile, non necessariamente lo stesso per
+  tutte: un Comando può inviare solo il peso al mattino e i passi la sera.
+- Il peso mostra il trend rispetto alla pesata precedente (non alla primissima mai registrata),
+  e un bottone "Usa ... kg nel profilo" precompila il campo peso senza salvare da solo.
+- Backend: nuova azione `saveHealthData`, protetta da un segreto condiviso (l'endpoint `/exec`
+  è pubblico) perché non essendoci un'API cloud per HealthKit i dati arrivano in push dal
+  telefono, non recuperati con un sync come per Whoop.
+
 ## v28 — 2026-09-02
 - La classifica di un **WOD del giorno** ora confronta solo chi lo ha fatto entro **3 giorni**
   dalla data del WOD, invece di accomunare tutti quelli che hanno usato lo stesso titolo in

@@ -169,6 +169,18 @@
     .whoop-workout-strain { color: var(--accent); font-weight: 800; }
     .whoop-empty { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 
+    /* Card Salute: peso/composizione (bilancia) + Apple Watch (FC a riposo, passi, energia). */
+    .health-stats { display: flex; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+    .health-stat { flex: 1 1 30%; min-width: 80px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; text-align: center; }
+    .health-stat-label { font-size: 9px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .health-stat-value { font-size: 20px; font-weight: 900; margin: 6px 0 2px; line-height: 1; }
+    .health-stat-sub { font-size: 9px; color: var(--text-muted); }
+    .health-stat-value.is-empty { color: var(--text-muted); font-size: 16px; }
+    .health-weight-trend-up { color: #dc2626; }
+    .health-weight-trend-down { color: #16a34a; }
+    .health-date { font-size: 10px; color: var(--text-muted); margin-top: 12px; }
+    .health-use-weight-btn { margin-top: 10px; width: 100%; }
+
     .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
     .result-summary-box { background: rgba(46, 125, 50, 0.12); border: 1px solid #2e7d32; border-radius: 10px; padding: 12px; }
     .result-summary-score { font-size: 15px; font-weight: 900; color: #4caf50; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -360,6 +372,12 @@
       <div id="whoopContainer"></div>
     </div>
 
+    <!-- Compare solo se l'atleta loggato ha dati salute inviati da un Comando iOS (vedi renderHealthCard). -->
+    <div class="card" id="healthCard" style="display: none;">
+      <div class="card-title">🩺 SALUTE</div>
+      <div id="healthContainer"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">PROFILO ATLETA</div>
       <div class="form-group">
@@ -527,7 +545,7 @@
 
   <script>
     let cropper = null;
-    let globalData = { wods: [], athletes: [], massimali: [], results: [], whoop: [] };
+    let globalData = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [] };
 
     // Un WOD "pubblicato in bacheca" è una riga della stessa tabella Wods, distinta solo dal
     // valore speciale di "mode" qui sotto (nessun campo/tabella nuova sul backend): niente
@@ -564,7 +582,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v28";
+    const APP_VERSION = "v29";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -985,10 +1003,12 @@
           globalData = await res.json();
           globalData.results = globalData.results || [];
           globalData.whoop = globalData.whoop || [];
+          globalData.health = globalData.health || [];
           updateConnectionIndicator(true);
           renderHistory();
           renderActiveDaysChart();
           renderWhoopCard();
+          renderHealthCard();
           loadLocalMassimaliAndProfile();
           renderRegistraCalendar();
           updateRegistraDateView();
@@ -1345,6 +1365,106 @@
       }
 
       container.innerHTML = statsHtml + dateHtml + workoutsHtml;
+    }
+
+    function healthRecordsFor(athlete) {
+      if (!athlete) return [];
+      return (globalData.health || [])
+        .filter(h => h.athlete && h.athlete.toLowerCase() === athlete.toLowerCase() && h.date)
+        .slice()
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    }
+
+    // Solo le voci con un valore numerico valido per quel campo, più recenti prima: i giorni
+    // possono avere solo alcuni campi compilati (es. un Comando manda solo il peso), quindi
+    // "l'ultimo dato" per ogni metrica non è necessariamente la stessa riga.
+    function healthNumericSeries(records, field) {
+      return records
+        .filter(r => r[field] !== null && r[field] !== undefined && r[field] !== '')
+        .map(r => ({ value: Number(r[field]), date: r.date }))
+        .filter(r => Number.isFinite(r.value));
+    }
+
+    function healthStatTile(label, value, sub, valueClass) {
+      const isEmpty = value === null || value === undefined || value === '';
+      return `
+        <div class="health-stat">
+          <div class="health-stat-label">${label}</div>
+          <div class="health-stat-value ${isEmpty ? 'is-empty' : (valueClass || '')}">${isEmpty ? '—' : value}</div>
+          <div class="health-stat-sub">${isEmpty ? 'nessun dato' : sub}</div>
+        </div>
+      `;
+    }
+
+    // Mostra peso/composizione (bilancia) e i dati Apple Watch, ciascuna metrica presa dal suo
+    // giorno più recente disponibile (non necessariamente lo stesso per tutte). La card resta
+    // nascosta per gli atleti senza dati salute inviati dal Comando iOS.
+    function renderHealthCard() {
+      const card = document.getElementById('healthCard');
+      const container = document.getElementById('healthContainer');
+      if (!card || !container) return;
+
+      const activeAthlete = localStorage.getItem('activeAthlete');
+      const records = healthRecordsFor(activeAthlete);
+      if (records.length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = '';
+
+      const weightSeries = healthNumericSeries(records, 'weight');
+      const bodyFatSeries = healthNumericSeries(records, 'bodyFatPercentage');
+      const restingHrSeries = healthNumericSeries(records, 'restingHeartRate');
+      const stepsSeries = healthNumericSeries(records, 'steps');
+      const activeEnergySeries = healthNumericSeries(records, 'activeEnergy');
+
+      const weight = weightSeries[0] || null;
+      const bodyFat = bodyFatSeries[0] || null;
+      const restingHr = restingHrSeries[0] || null;
+      const steps = stepsSeries[0] || null;
+      const activeEnergy = activeEnergySeries[0] || null;
+
+      let weightTrendClass = '';
+      let weightSub = 'peso corporeo';
+      if (weight && weightSeries[1]) {
+        const delta = weight.value - weightSeries[1].value;
+        if (Math.abs(delta) >= 0.1) {
+          weightTrendClass = delta > 0 ? 'health-weight-trend-up' : 'health-weight-trend-down';
+          weightSub = `${delta > 0 ? '+' : ''}${delta.toFixed(1)} kg dall'ultima pesata`;
+        }
+      }
+
+      const statsHtml = `
+        <div class="health-stats">
+          ${healthStatTile('Peso', weight ? weight.value.toFixed(1) + ' kg' : null, weightSub, weightTrendClass)}
+          ${healthStatTile('Grasso corp.', bodyFat ? bodyFat.value.toFixed(1) + '%' : null, 'composizione corporea')}
+          ${healthStatTile('FC riposo', restingHr ? Math.round(restingHr.value) + ' bpm' : null, 'frequenza cardiaca')}
+          ${healthStatTile('Passi', steps ? Math.round(steps.value).toLocaleString('it-IT') : null, 'nel giorno')}
+          ${healthStatTile('Energia attiva', activeEnergy ? Math.round(activeEnergy.value) + ' kcal' : null, 'nel giorno')}
+        </div>
+      `;
+
+      const lastDay = records[0].date;
+      const daysAgo = Math.round((new Date(getTodayDateString()) - new Date(lastDay)) / 86400000);
+      const staleHint = daysAgo > 7
+        ? ' — nessun nuovo dato da un po\', controlla che il Comando su iPhone sia ancora attivo'
+        : '';
+      const dateHtml = `<div class="health-date">Ultimo dato: ${formatDateForDisplay(lastDay)}${staleHint}</div>`;
+
+      const weightButtonHtml = weight
+        ? `<button type="button" class="btn-secondary health-use-weight-btn" onclick="useHealthWeightInProfile(${weight.value})">Usa ${weight.value.toFixed(1)} kg nel profilo</button>`
+        : '';
+
+      container.innerHTML = statsHtml + dateHtml + weightButtonHtml;
+    }
+
+    // Precompila il peso nel form PROFILO ATLETA con l'ultima pesata sincronizzata: non salva
+    // da solo, resta una scelta esplicita dell'atleta premere "REGISTRA/SALVA ATLETA" dopo.
+    function useHealthWeightInProfile(weightValue) {
+      const input = document.getElementById('profileWeight');
+      if (!input) return;
+      input.value = weightValue.toFixed(1);
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     // Il campo per creare un PIN nella tab ATLETA serve solo per una registrazione nuova
@@ -3384,7 +3504,7 @@
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'storico') { renderHistory(); }
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
-      if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderWhoopCard(); }
+      if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderWhoopCard(); renderHealthCard(); }
     }
   </script>
 </body>
