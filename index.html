@@ -4,6 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BICOCCA CROSSFIT</title>
+
+  <!-- PWA: rende l'app installabile (icona in home screen, avvio a schermo intero) su
+       Android/Chrome e iOS/Safari. Percorsi relativi (niente "/" iniziale) perché il sito è
+       pubblicato sotto un sottopercorso (github.io/<repo>/), non alla radice del dominio. -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#121316">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bicocca CF">
+
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
@@ -626,7 +638,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v42";
+    const APP_VERSION = "v43";
     const APP_VERSION_DATE = "03/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1032,6 +1044,16 @@
       // Lavoro" come primo passo (la bacheca WOD del giorno resta comunque visibile sopra
       // se qualcuno ha già pubblicato/salvato qualcosa oggi).
     };
+
+    // Service worker: serve solo a rendere l'app installabile (icona in home screen) e a farla
+    // aprire offline con l'ultima versione vista, non tocca le chiamate API (vedi sw.js). Il
+    // .catch silenzioso è voluto: su un'origine non sicura (es. file:// nei test Playwright)
+    // register() rifiuta, e non deve essere un errore bloccante.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
 
     // Messaggini simpatici mostrati mentre si caricano le sessioni dal cloud (all'avvio
     // dell'app e subito dopo il login), giusto per rendere l'attesa un po' più divertente.
