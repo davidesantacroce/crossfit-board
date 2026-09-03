@@ -4,6 +4,16 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v30 — 2026-09-03
+- **Fix**: un giorno passato senza nessun allenamento ancora registrato non offriva alcun modo
+  di loggarne uno — utile per un recupero (es. fatto oggi il WOD di ieri). Ora, aprendo un
+  giorno passato dal calendario, compare "+ Registra un allenamento per questo giorno": salva
+  la sessione con la data di quel giorno, non con quella odierna.
+- Il pulsante "PUBBLICA SOLO IL WOD" resta nascosto mentre si registra un recupero: non ha
+  senso proporre in bacheca il WOD di un giorno già passato.
+- Disponibile anche se quel giorno ha già una o più sessioni salvate ("+ Registra un altro
+  allenamento"), per chi si allena due volte lo stesso giorno.
+
 ## v29 — 2026-09-03
 - Nuova card **🩺 SALUTE** nella tab Atleta: peso, % grasso corporeo, frequenza cardiaca a
   riposo, passi ed energia attiva. I dati arrivano da un Comando (Shortcuts) su iPhone che

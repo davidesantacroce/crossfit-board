@@ -328,6 +328,12 @@
         <p style="font-size: 11px; color: var(--text-muted); margin: 6px 0 0;">Pubblicalo in anticipo: comparirà in bacheca quel giorno. Il tuo risultato lo registrerai quando avrai fatto l'allenamento.</p>
       </div>
 
+      <!-- Recupero: registrare oggi l'allenamento di un giorno passato, tenendo la data giusta. -->
+      <div id="pastDayBanner" style="display: none; align-items: center; justify-content: space-between; background: rgba(230, 74, 25, 0.08); border: 1px dashed var(--accent); border-radius: 8px; padding: 10px 12px; margin-bottom: 16px;">
+        <span id="pastDayBannerText" style="font-size: 12px; font-weight: 800; color: var(--accent);"></span>
+        <button type="button" class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="cancelLoggingPastDay()">Annulla</button>
+      </div>
+
       <button type="button" class="btn-secondary" style="width: 100%; padding: 14px; font-size: 14px; margin-bottom: 16px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
 
       <!-- Contenitore Dinamico Blocchi Multipli -->
@@ -576,13 +582,20 @@
     let editingWodId = null;
     let editingWodDate = null;
 
+    // Registrazione di un allenamento su un giorno PASSATO senza sessioni ancora salvate (es.
+    // recupero: fatto oggi il WOD di ieri). Diverso da editingWodId: qui si crea una sessione
+    // nuova con la data passata, non se ne modifica una esistente. Va esplicitamente attivata
+    // dal bottone nella vista di sola lettura (vedi renderRegistraDayView), altrimenti un
+    // giorno passato mostra di default solo quanto già registrato.
+    let loggingPastDay = false;
+
     // WOD già caricato oggi da un altro atleta, proposto come base da adattare.
     let proposedWodDismissed = false;
     let proposedWodCandidates = []; // [{ athlete, blocks }] — uno per ogni atleta con lavoro caricato oggi
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v29";
+    const APP_VERSION = "v30";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -751,7 +764,20 @@
     function selectCalendarDate(dateStr) {
       selectedRegistraDate = dateStr;
       calendarAnchorDate = new Date(dateStr + 'T00:00:00');
+      loggingPastDay = false; // cambiando giorno si torna alla vista di sola lettura di default
       renderRegistraCalendar();
+      updateRegistraDateView();
+    }
+
+    // Bottone "+ Registra un allenamento per questo giorno" nella vista di sola lettura di un
+    // giorno passato (vedi renderRegistraDayView).
+    function startLoggingPastDay() {
+      loggingPastDay = true;
+      updateRegistraDateView();
+    }
+
+    function cancelLoggingPastDay() {
+      loggingPastDay = false;
       updateRegistraDateView();
     }
 
@@ -783,25 +809,38 @@
       const isToday = selectedRegistraDate === getTodayDateString();
       // Confronto fra stringhe YYYY-MM-DD: ordinamento lessicografico e cronologico coincidono.
       const isFuture = selectedRegistraDate > getTodayDateString();
+      const isPast = !isToday && !isFuture;
       // Mentre si modifica una sessione passata, il form resta visibile anche se la data
-      // selezionata nel calendario non è quella odierna.
-      const showForm = isToday || isFuture || editingWodId !== null;
+      // selezionata nel calendario non è quella odierna. Su un giorno passato SENZA modifica in
+      // corso, il form compare solo se richiesto esplicitamente (recupero: vedi loggingPastDay).
+      const showForm = isToday || isFuture || editingWodId !== null || (isPast && loggingPastDay);
       formCard.style.display = showForm ? '' : 'none';
       dayView.style.display = showForm ? 'none' : '';
 
       // Su un giorno futuro si può solo PROGRAMMARE il WOD: l'allenamento non è ancora stato
       // fatto, quindi non ha senso salvare una sessione con un risultato.
       const isProgramming = isFuture && editingWodId === null;
+      // Recupero: si sta registrando ORA un allenamento di un giorno passato (es. fatto oggi il
+      // WOD di ieri). Qui invece il risultato ha senso eccome; è "pubblica il WOD" a non averne,
+      // perché un giorno già passato non ha più senso proporlo in bacheca ad altri.
+      const isPastLogging = isPast && loggingPastDay && editingWodId === null;
+
       const banner = document.getElementById('futureDayBanner');
       const bannerText = document.getElementById('futureDayBannerText');
+      const pastBanner = document.getElementById('pastDayBanner');
+      const pastBannerText = document.getElementById('pastDayBannerText');
       const saveBtn = document.getElementById('saveWodBtn');
       const publishBtn = document.getElementById('publishWodBtn');
       const publishHint = document.getElementById('publishWodHint');
+
       if (banner) banner.style.display = isProgramming ? '' : 'none';
       if (bannerText && isProgramming) bannerText.innerText = `📅 STAI PROGRAMMANDO IL WOD DI ${formatDateForDisplay(selectedRegistraDate)}`;
+      if (pastBanner) pastBanner.style.display = isPastLogging ? 'flex' : 'none';
+      if (pastBannerText && isPastLogging) pastBannerText.innerText = `📝 STAI REGISTRANDO L'ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
       if (saveBtn) saveBtn.style.display = isProgramming ? 'none' : '';
-      if (publishHint) publishHint.style.display = isProgramming ? 'none' : '';
-      if (publishBtn) {
+      if (publishBtn) publishBtn.style.display = isPastLogging ? 'none' : '';
+      if (publishHint) publishHint.style.display = (isProgramming || isPastLogging) ? 'none' : '';
+      if (publishBtn && !isPastLogging) {
         publishBtn.innerText = isProgramming
           ? `📋 PUBBLICA IL WOD DEL ${formatDateForDisplay(selectedRegistraDate)}`
           : '📋 PUBBLICA SOLO IL WOD (senza risultato)';
@@ -823,8 +862,18 @@
         w.date === selectedRegistraDate && w.athlete && w.athlete.toLowerCase() === activeAthlete
       );
 
+      // Bottone per il recupero: registrare ORA (con un risultato) l'allenamento di questo
+      // giorno passato, es. fatto oggi il WOD di ieri. Questa vista è di sola lettura per
+      // default (vedi updateRegistraDateView), quindi senza questo bottone non c'era alcun modo
+      // di loggare un giorno passato che non avesse già una sessione salvata.
+      const logPastBtnHtml = `
+        <button type="button" class="btn-secondary" style="width: 100%; margin-top: ${sessions.length ? '12px' : '0'};" onclick="startLoggingPastDay()">
+          + Registra ${sessions.length ? 'un altro' : 'un'} allenamento per questo giorno
+        </button>
+      `;
+
       if (sessions.length === 0) {
-        contentEl.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento registrato per questo giorno.</p>';
+        contentEl.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 4px;">Nessun allenamento registrato per questo giorno.</p>' + logPastBtnHtml;
         return;
       }
 
@@ -867,7 +916,7 @@
             ${blocksHtml}
           </div>
         `;
-      }).join('');
+      }).join('') + logPastBtnHtml;
     }
 
     const CROSSFIT_STANDARD_RMS = [
@@ -1905,6 +1954,7 @@
             alert(isEditing ? 'Modifiche salvate!' : 'Sessione multi-blocco salvata sul Foglio Google!');
             editingWodId = null;
             editingWodDate = null;
+            loggingPastDay = false;
 
             document.getElementById('workoutBlocksContainer').innerHTML = '';
             blockCounter = 0;
@@ -2062,6 +2112,7 @@
     function cancelEditWod() {
       editingWodId = null;
       editingWodDate = null;
+      loggingPastDay = false;
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
       blockResults = {};
