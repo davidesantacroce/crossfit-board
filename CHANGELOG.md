@@ -4,6 +4,33 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v43 — 2026-09-03
+- L'app è ora **installabile come PWA**: icona in home screen su Android/iOS, avvio a schermo
+  intero senza barra del browser (`manifest.json`, icone in `icons/`, service worker minimo in
+  `sw.js`).
+- Il service worker mette in cache solo la "shell" statica della pagina (per aprirla anche
+  offline con l'ultima versione vista): non tocca mai le chiamate all'API di Google Apps Script
+  né le POST di salvataggio, che restano sempre in rete come prima.
+
+## v42 — 2026-09-03
+- La card Whoop mostra ora **tutte** le metriche di recovery e ciclo fisiologico fornite
+  dall'API, non solo recovery/strain/sonno: HRV, SpO2, temperatura cutanea, FC media e max del
+  giorno, calorie. La card passa da 3 a 9 tile.
+- SpO2 e temperatura cutanea sono nuovi campi aggiunti alla sincronizzazione in `Code.gs`
+  (richiede di ridistribuire il backend per avere effetto — vedi `apps-script/README.md`).
+
+## v41 — 2026-09-03
+- Rimossa la card "WOD di questa settimana" duplicata dentro REGISTRA: era una copia esatta di
+  quanto ora vive nel tab BACHECA (v40). REGISTRA torna a mostrare solo quanto già registrato
+  per il giorno selezionato.
+
+## v40 — 2026-09-03
+- Il tasto ↻ di ricarica sulle card Salute e Whoop ora aggiorna davvero la card, non solo i dati
+  in memoria: prima serviva un refresh manuale della pagina per vedere il risultato.
+- Nuovo tab **BACHECA**: sfoglia liberamente i WOD caricati/pubblicati da chiunque, settimana
+  per settimana (frecce avanti/indietro), indipendentemente dal giorno selezionato in REGISTRA.
+  Scegliere un WOD da lì porta su REGISTRA con la data giusta e il form già popolato.
+
 ## v39 — 2026-09-04
 - Nuova sezione **😄 FRASI DI CARICAMENTO** in Impostazioni: le frasi si aggiungono e si
   eliminano dall'app, senza più passare dal codice. Sono **condivise** con tutti gli atleti
