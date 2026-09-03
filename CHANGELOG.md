@@ -4,6 +4,15 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v39 — 2026-09-04
+- Nuova sezione **😄 FRASI DI CARICAMENTO** in Impostazioni: le frasi si aggiungono e si
+  eliminano dall'app, senza più passare dal codice. Sono **condivise** con tutti gli atleti
+  (vivono nel Foglio, nuovo foglio "Frasi") e mostrano chi le ha aggiunte.
+- Le 14 frasi incluse nell'app restano sempre come base: se il Foglio è vuoto o irraggiungibile
+  la schermata di caricamento ha comunque qualcosa da mostrare.
+- Rifiutate le frasi vuote, quelle oltre 120 caratteri e i doppioni (confronto che ignora
+  maiuscole e spaziatura, e tiene conto anche delle frasi incluse nell'app).
+
 ## v38 — 2026-09-04
 - Due nuovi messaggini nella schermata di caricamento: "Sei un finto modesto" e "Questi 100kg
   pesano una tonnellata".

@@ -14,6 +14,12 @@ function applyPost(state, body) {
     state.wods = state.wods.filter((w) => String(w.id) !== String(body.id));
   } else if (body.action === 'saveMassimale') {
     state.massimali.push({ athlete: body.athlete, movement: body.movement, weight: body.weight, date: body.date });
+  } else if (body.action === 'saveFunPhrase') {
+    const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (state.funPhrases.some((f) => norm(f.text) === norm(body.text))) return { status: 'error', message: "Questa frase c'è già." };
+    state.funPhrases.push({ id: body.id, text: String(body.text).replace(/\s+/g, ' ').trim(), athlete: body.athlete });
+  } else if (body.action === 'deleteFunPhrase') {
+    state.funPhrases = state.funPhrases.filter((f) => String(f.id) !== String(body.id));
   } else if (body.action === 'logResult') {
     const idx = state.results.findIndex((r) => String(r.id) === String(body.id));
     const entry = {
@@ -29,12 +35,18 @@ function applyPost(state, body) {
 // Intercetta le chiamate all'endpoint Apps Script. Ritorna lo stato in memoria (wods/athletes/
 // massimali/results), utile per fare assert su cosa è stato effettivamente "salvato".
 async function mockBackend(page, initialData = {}) {
-  const state = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], ...initialData };
+  const state = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], funPhrases: [], ...initialData };
 
   await page.route('**/macros/**', async (route) => {
     const req = route.request();
     if (req.method() === 'POST') {
-      applyPost(state, JSON.parse(req.postData()));
+      // applyPost può rifiutare (es. una frase duplicata): in quel caso rispondiamo con
+      // l'errore, come farebbe il backend vero.
+      const esito = applyPost(state, JSON.parse(req.postData()));
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify(esito || { status: 'success' }),
+      });
     }
     if (req.url().includes('getData')) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state) });

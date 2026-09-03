@@ -248,6 +248,58 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // Frasi divertenti mostrate durante il caricamento: sono battute interne alla palestra,
+    // quindi vanno condivise fra tutti e aggiungibili dall'app, senza passare dal codice.
+    if (data.action === 'saveFunPhrase') {
+      var sheet = ss.getSheetByName("Frasi") || ss.insertSheet("Frasi");
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(["id", "text", "athlete", "createdAt"]);
+      }
+
+      var testo = String(data.text || '').replace(/\s+/g, ' ').trim();
+      if (!testo) {
+        return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "La frase è vuota."})).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (testo.length > 120) {
+        return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "La frase è troppo lunga (massimo 120 caratteri)."})).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      // Niente doppioni: la frase comparirebbe due volte nell'estrazione casuale, con il
+      // risultato di sembrare "uscita di nuovo" più spesso delle altre.
+      var righeEsistenti = sheet.getDataRange().getValues();
+      var testoColIndex = getColumnIndex(sheet, "text");
+      for (var i = 1; i < righeEsistenti.length; i++) {
+        if (String(righeEsistenti[i][testoColIndex - 1] || '').trim().toLowerCase() === testo.toLowerCase()) {
+          return ContentService.createTextOutput(JSON.stringify({"status": "error", "message": "Questa frase c'è già."})).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+
+      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      var rowMap = {
+        "id": String(data.id || Date.now()),
+        "text": testo,
+        "athlete": data.athlete || "",
+        "createdAt": new Date()
+      };
+      sheet.appendRow(headers.map(function(h) { return rowMap.hasOwnProperty(h) ? rowMap[h] : ""; }));
+
+      return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'deleteFunPhrase') {
+      var sheet = ss.getSheetByName("Frasi");
+      if (sheet) {
+        var idColIndex = getColumnIndex(sheet, "id");
+        var rows = sheet.getDataRange().getValues();
+        for (var i = rows.length - 1; i >= 1; i--) {
+          if (String(rows[i][idColIndex - 1]) === String(data.id)) {
+            sheet.deleteRow(i + 1);
+          }
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({"status": "success"})).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // Gestione eliminazione WOD
     if (data.action === 'deleteWod') {
       var sheet = ss.getSheetByName("Wods");
@@ -577,6 +629,9 @@ function doGet(e) {
       var parsed = {};
       try { parsed = w.data ? JSON.parse(w.data) : {}; } catch (err) {}
       return { athlete: w.athlete, type: w.type, date: w.date, recordId: w.recordid, data: parsed };
+    }),
+    funPhrases: getSheetData("Frasi").map(function(f) {
+      return { id: f.id, text: f.text, athlete: f.athlete };
     }),
     health: getSheetData("Health").map(function(h) {
       return {
