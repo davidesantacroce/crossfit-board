@@ -95,3 +95,46 @@ test('cambiando giorno la modalità recupero si azzera, non resta appiccicata al
   await expect(page.locator('#registraFormCard')).toBeHidden();
   await expect(page.locator('#registraDayView')).toBeVisible();
 });
+
+test('mentre si registra un recupero, la bacheca mostra cosa hanno già caricato altri per quel giorno', async ({ page }) => {
+  await mockBackend(page, {
+    athletes: [{ name: 'Test Athlete', hasPin: false }],
+    wods: [{ id: 'w1', date: IERI, athlete: 'Mario Rossi', blocks: [{ title: 'Fran', type: 'For Time', explanation: '21-15-9 Thruster + Pull-up', result: '' }] }],
+  });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+  await page.evaluate(() => fetchCloudData());
+  await apriGiorno(page, IERI);
+
+  // La bacheca non compare finché non si è scelto esplicitamente di registrare un recupero.
+  await expect(page.locator('#proposedWodCard')).toBeHidden();
+
+  await page.getByRole('button', { name: '+ Registra un allenamento per questo giorno' }).click();
+
+  await expect(page.locator('#proposedWodCard')).toBeVisible();
+  await expect(page.locator('#proposedWodTitle')).toContainText('GIÀ CARICATO');
+  await expect(page.locator('#proposedWodContent')).toContainText('Fran');
+});
+
+test('usare il WOD già caricato da un altro popola il form, e si salva sulla data del giorno passato', async ({ page }) => {
+  const state = await mockBackend(page, {
+    athletes: [{ name: 'Test Athlete', hasPin: false }],
+    wods: [{ id: 'w1', date: IERI, athlete: 'Mario Rossi', blocks: [{ title: 'Fran', type: 'For Time', explanation: '21-15-9 Thruster + Pull-up', result: '' }] }],
+  });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+  page.on('dialog', (d) => d.accept());
+  await page.evaluate(() => fetchCloudData());
+  await apriGiorno(page, IERI);
+  await page.getByRole('button', { name: '+ Registra un allenamento per questo giorno' }).click();
+
+  await page.evaluate(() => useProposedWod(0));
+  await expect(page.locator('.block-title').first()).toHaveValue('Fran');
+
+  await page.evaluate(() => saveWodSession());
+  await page.waitForFunction(() => (globalData.wods || []).length > 1);
+
+  const mine = state.wods.find((w) => w.athlete === 'Test Athlete');
+  expect(mine.date).toBe(IERI);
+  expect(mine.blocks[0].title).toBe('Fran');
+});
