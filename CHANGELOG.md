@@ -4,6 +4,15 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v34 — 2026-09-04
+- Tasto **↻** nell'intestazione delle card Whoop e Salute: ricarica i dati dal Foglio senza
+  ricaricare la pagina. Utile perché quei dati arrivano da fuori (sync notturno Whoop, Comando
+  iOS per Salute) e capita di volerli rivedere subito dopo averli mandati.
+- Backend: corretta l'interpretazione dei valori inviati da Salute. `28.859` kcal venivano letti
+  come 28859 (mille volte tanto) per via di una regola sul separatore delle migliaia rivelatasi
+  sbagliata: Comandi manda i valori senza raggruppare le migliaia e con molti decimali, quindi
+  un separatore singolo è sempre decimale.
+
 ## v33 — 2026-09-04
 - **Fix**: nella classifica di un WOD, un atleta che aveva loggato lo stesso lavoro due volte
   (per sbaglio, o perché l'aveva davvero rifatto) compariva due volte col proprio nome. Ora
