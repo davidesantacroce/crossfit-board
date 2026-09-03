@@ -29,7 +29,7 @@ function applyPost(state, body) {
 // Intercetta le chiamate all'endpoint Apps Script. Ritorna lo stato in memoria (wods/athletes/
 // massimali/results), utile per fare assert su cosa è stato effettivamente "salvato".
 async function mockBackend(page, initialData = {}) {
-  const state = { wods: [], athletes: [], massimali: [], results: [], ...initialData };
+  const state = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], ...initialData };
 
   await page.route('**/macros/**', async (route) => {
     const req = route.request();
