@@ -382,18 +382,32 @@ function saveHealthPayload_(data, ss) {
   // Un giorno può ricevere più chiamate separate (es. il peso da un Comando al mattino, i
   // passi da un altro alla sera): aggiorniamo solo i campi presenti in QUESTA chiamata,
   // senza cancellare quelli già scritti in precedenza per lo stesso giorno.
+  // Passi ed energia attiva sono totali che durante la giornata possono solo crescere: se
+  // arriva un valore più basso di quello già salvato per lo stesso giorno è quasi certamente
+  // un totale parziale (Comando eseguito prima, o configurato per leggere l'ultimo campione
+  // invece della somma di oggi), e sovrascriverlo peggiorerebbe il dato. Teniamo il massimo,
+  // così si può anche far girare l'automazione più volte al giorno.
+  // Peso, percentuale di grasso e FC a riposo NON sono cumulativi: lì l'ultima misurazione
+  // è la più giusta e deve poter sostituire la precedente, anche verso il basso.
+  var CUMULATIVI = { steps: true, activeEnergy: true };
+
   var saved = [];
   var fieldValue = function(key) {
     var parsed = parseHealthNumber_(data[key]);
-    if (parsed !== '') {
-      saved.push(key);
-      return parsed;
-    }
+    var precedente = "";
     if (existingRow) {
       var idx = getColumnIndex(sheet, key);
-      if (idx > 0) return existingRow[idx - 1];
+      if (idx > 0) precedente = existingRow[idx - 1];
     }
-    return "";
+
+    if (parsed === '') return precedente;
+
+    if (CUMULATIVI[key] && precedente !== "" && Number(precedente) > parsed) {
+      return precedente;
+    }
+
+    saved.push(key);
+    return parsed;
   };
 
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];

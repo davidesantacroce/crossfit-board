@@ -118,6 +118,29 @@ in fondo all'URL `&nomeCampo=` seguito dalla sua variabile. I campi accettati so
 qualunque combinazione. I campi omessi in una chiamata **non cancellano** quelli già salvati
 per lo stesso giorno, quindi si possono anche spezzare in automazioni diverse a orari diversi.
 
+**Come impostare l'azione Salute, metrica per metrica**: alcune grandezze in Salute sono un
+singolo campione al giorno, altre sono decine di campioni sparsi nella giornata. Sbagliare qui
+è la causa più probabile di valori che "ballano".
+
+| Campo | Tipo in Salute | Impostazione dell'azione |
+|---|---|---|
+| `weight` | una pesata | Ordina per **più recente**, Limite **1** |
+| `bodyFatPercentage` | una pesata | Ordina per **più recente**, Limite **1** |
+| `restingHeartRate` | uno al giorno | Ordina per **più recente**, Limite **1** |
+| `steps` | tanti campioni | Filtro **data di inizio = oggi**, nessun limite, poi **Calcola statistiche → Somma** |
+| `activeEnergy` | tanti campioni | Filtro **data di inizio = oggi**, nessun limite, poi **Calcola statistiche → Somma** |
+
+Con "più recente" su passi o energia attiva si prende solo l'ultimo frammento registrato (es.
+le poche kcal degli ultimi minuti), non il totale del giorno.
+
+**Protezione lato server**: `steps` e `activeEnergy` sono trattati come cumulativi — un valore
+più basso di quello già salvato per lo stesso giorno viene ignorato, perché è quasi certamente
+un totale parziale. Questo permette di far girare l'automazione più volte al giorno tenendo
+sempre il totale più alto, e protegge dal caso in cui l'azione sia rimasta configurata su "più
+recente". Peso, grasso corporeo e FC a riposo non sono cumulativi: lì l'ultima misurazione
+sostituisce sempre la precedente, anche verso il basso. Per correggere a mano un cumulativo
+sbagliato si modifica la cella nel foglio `Health`.
+
 **Perché non serve convertire i valori**: `parseHealthNumber_` in `Code.gs` normalizza quello
 che manda Comandi, unità di misura e separatori compresi — `78,4 kg` → `78.4`, `8.400 passi` →
 `8400`, `15,2%` → `15.2`. Un separatore singolo seguito da esattamente tre cifre è trattato da
