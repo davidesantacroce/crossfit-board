@@ -4,6 +4,20 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v46 — 2026-09-03
+- Fix: un WOD a set scritto una riga per set (es. "1x 3 Position Back Squat @60-65% 1RM"
+  ripetuta N volte) veniva riconosciuto come **1 solo set**, perché il primo "1x" a inizio riga
+  veniva scambiato per l'intero schema set×reps prima ancora di arrivare a contare le righe
+  ripetute. Corretto l'ordine di rilevamento: le righe ripetute con percentuale ora vincono
+  sempre sul pattern "NxM" generico.
+- Aggiunto anche il supporto ai **range di percentuale** ("60-65%" invece di un solo numero,
+  frequente nei programmi di forza): il peso proposto usa la media degli estremi. Prima un
+  range del genere non veniva riconosciuto affatto (né per contare i set né per calcolare il
+  peso), quindi né il numero di set né il massimale/peso proposto comparivano.
+- **CARICO PER SET** nel Log Result ora ha sempre **+ Aggiungi Set** e un tasto rimuovi per
+  riga: il numero di set rilevato automaticamente resta un punto di partenza, modificabile a
+  mano se il WOD è ambiguo o se in pratica se ne fanno di più/meno.
+
 ## v45 — 2026-09-03
 - Restyling visivo (colori invariati): bagliore ambientale in alto dietro l'header, card più
   arrotondate con un'ombra morbida per dare profondità, tasti principali con gradiente e
