@@ -564,7 +564,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v27";
+    const APP_VERSION = "v28";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -822,7 +822,8 @@
             ` : `
               <div style="font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px;">Nessun risultato loggato.</div>
             `;
-            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')`, b.title, b.type);
+            const itemDate = String(item.date || '').slice(0, 10);
+            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate);
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
                 <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
@@ -2158,7 +2159,8 @@
               scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${escapeHtml(b.result)}</div>`;
             }
 
-            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}')`, b.title, b.type);
+            const itemDate = String(item.date || '').slice(0, 10);
+            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate);
 
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
@@ -3146,7 +3148,7 @@
       const block = document.getElementById(`workout-block-${blockId}`);
       const liveTitle = block ? block.querySelector('.block-title').value : '';
       const liveType = block ? block.querySelector('.block-type').value : '';
-      const communityBtn = renderCommunityButton(`openCommunityResultsModal(${blockId})`, liveTitle, liveType);
+      const communityBtn = renderCommunityButton(`openCommunityResultsModal(${blockId})`, liveTitle, liveType, communityReferenceDateForForm());
       if (!r) {
         box.innerHTML = `<button type="button" class="btn-log-result" onclick="openLogResultModal(${blockId})">🏆 Log Result</button>${communityBtn}`;
         return;
@@ -3233,19 +3235,43 @@
       return results.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
     }
 
+    // Data a cui riferire il confronto dal form di Registra: quella della sessione che si sta
+    // modificando, altrimenti il giorno selezionato nel calendario.
+    function communityReferenceDateForForm() {
+      return editingWodId !== null ? editingWodDate : selectedRegistraDate;
+    }
+
     // Wrapper usato dal form di Registra: legge titolo/tipo dal blocco live nel DOM.
     function openCommunityResultsModal(blockId) {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
       const title = (block.querySelector('.block-title').value || '').trim();
       const type = block.querySelector('.block-type').value;
-      openCommunityResultsModalFor(title, type);
+      openCommunityResultsModalFor(title, type, communityReferenceDateForForm());
+    }
+
+    // Finestra di confronto per i WOD NON benchmark. Un "WOD del giorno" ha senso confrontarlo
+    // con chi l'ha fatto in quei giorni, non con chi mesi dopo ha usato lo stesso titolo (il
+    // rischio è concreto con titoli generici tipo "Metcon"). La tolleranza serve a includere
+    // comunque chi recupera l'allenamento qualche giorno dopo.
+    const COMMUNITY_DATE_TOLERANCE_DAYS = 3;
+
+    // Le date sono YYYY-MM-DD (o un timestamp ISO che inizia così): interpretate entrambe come
+    // UTC, la differenza è esatta e non risente del fuso.
+    function withinCommunityDateWindow(dateStr, referenceDate) {
+      const a = new Date(String(dateStr || '').slice(0, 10));
+      const b = new Date(String(referenceDate || '').slice(0, 10));
+      if (isNaN(a.getTime()) || isNaN(b.getTime())) return true; // data illeggibile: non escludiamo nessuno
+      return Math.abs(a - b) <= COMMUNITY_DATE_TOLERANCE_DAYS * 86400000;
     }
 
     // Tutti i risultati (di qualunque atleta, te compreso) per un dato titolo+tipo di blocco:
     // usata sia per popolare la modale di confronto sia per il numero sul badge del pulsante
     // "Risultati Altri Atleti" (vedi renderCommunityButton).
-    function getCommunityMatches(title, type) {
+    //
+    // referenceDate è la data del WOD da cui si sta guardando il confronto: se manca, o se il
+    // titolo è un benchmark noto, il confronto resta di sempre.
+    function getCommunityMatches(title, type, referenceDate) {
       const norm = (s) => String(s || '').trim().toLowerCase();
 
       // 1) Risultati "ricchi" salvati con Log Result (tipo/dettaglio strutturato, permette
@@ -3274,13 +3300,18 @@
         });
       });
 
-      return richMatches.concat(fallbackMatches);
+      const all = richMatches.concat(fallbackMatches);
+
+      // I benchmark famosi (Fran, Murph, Cindy...) restano confrontabili di sempre: è
+      // esattamente il loro scopo. La finestra vale solo per i WOD del giorno.
+      if (!referenceDate || detectBenchmarkForBlock(title)) return all;
+      return all.filter(r => withinCommunityDateWindow(r.date, referenceDate));
     }
 
     // Pulsante "Risultati Altri Atleti" con il numero di persone che hanno già loggato quel WOD
     // in un badge in stile notifica iOS, in alto a destra sul pulsante (assente se nessuno).
-    function renderCommunityButton(onclickAttr, title, type) {
-      const count = title ? getCommunityMatches(title, type).length : 0;
+    function renderCommunityButton(onclickAttr, title, type, referenceDate) {
+      const count = title ? getCommunityMatches(title, type, referenceDate).length : 0;
       return `
         <div class="community-btn-wrap" style="margin-top: 6px;">
           <button type="button" class="btn-secondary" style="width: 100%; padding: 6px 10px; font-size: 11px;" onclick="${onclickAttr}">👥 Risultati Altri Atleti</button>
@@ -3291,16 +3322,25 @@
 
     // Versione principale, usata anche dalle viste di sola lettura (Storico, giorno passato nel
     // calendario di Registra) dove non esiste un blocco form da cui leggere titolo/tipo.
-    function openCommunityResultsModalFor(title, type) {
+    function openCommunityResultsModalFor(title, type, referenceDate) {
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
 
       document.getElementById('communityResultsTitle').innerText = title ? `RISULTATI: ${title.toUpperCase()}` : 'RISULTATI ALTRI ATLETI';
 
-      const matches = getCommunityMatches(title, type);
+      const matches = getCommunityMatches(title, type, referenceDate);
+
+      // Spieghiamo su cosa si sta confrontando: un benchmark è di sempre, un WOD del giorno no.
+      const isBenchmarkWod = !!detectBenchmarkForBlock(title);
+      const windowed = !!referenceDate && !isBenchmarkWod;
+      const scopeNote = isBenchmarkWod
+        ? '<p style="font-size: 11px; color: var(--text-muted); margin: 0 0 12px;">🏆 Benchmark: confronto su tutti i risultati di sempre.</p>'
+        : (windowed
+            ? `<p style="font-size: 11px; color: var(--text-muted); margin: 0 0 12px;">Confronto con chi ha fatto questo WOD entro ${COMMUNITY_DATE_TOLERANCE_DAYS} giorni dal ${formatDateForDisplay(referenceDate)}, così chi recupera l'allenamento dopo rientra comunque in classifica.</p>`
+            : '');
 
       const content = document.getElementById('communityResultsContent');
       if (matches.length === 0) {
-        content.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nessun altro atleta ha ancora loggato un risultato per questo WOD (il confronto si basa sul titolo del blocco: assicurati che sia lo stesso usato dagli altri).</p>';
+        content.innerHTML = scopeNote + `<p style="color: var(--text-muted); font-size: 13px;">Nessun altro atleta ha loggato un risultato per questo WOD${windowed ? ' in questi giorni' : ''} (il confronto si basa sul titolo del blocco: assicurati che sia lo stesso usato dagli altri).</p>`;
         document.getElementById('communityResultsModal').classList.add('active');
         return;
       }
@@ -3308,7 +3348,7 @@
       const sorted = sortCommunityResults(matches);
       const rankable = new Set(matches.map(r => r.scoreType)).size === 1 && matches.every(r => scoreSortValue(r).confident);
 
-      content.innerHTML = sorted.map((r, i) => {
+      content.innerHTML = scopeNote + sorted.map((r, i) => {
         const isMe = r.athlete && r.athlete.toLowerCase() === activeAthlete;
         const movementsArr = Array.isArray(r.movements) ? r.movements : (r.movements ? String(r.movements).split(',').map(s => s.trim()).filter(Boolean) : []);
         return `
