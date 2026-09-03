@@ -168,3 +168,31 @@ test('un WOD caricato in un altro giorno della stessa settimana resta comunque d
   await expect(page.locator('#proposedWodContent')).toContainText('Grace');
   await expect(page.locator('#proposedWodContent')).toContainText(`${d}/${m}/${y}`); // formatDateForDisplay
 });
+
+test('la bacheca mostra il giorno della settimana abbreviato oltre alla data', async ({ page }) => {
+  await mockBackend(page, {
+    athletes: [{ name: 'Test Athlete', hasPin: false }],
+    wods: [{ id: 'w1', date: IERI, athlete: 'Mario Rossi', blocks: [{ title: 'Fran', type: 'For Time', explanation: '', result: '' }] }],
+  });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+  await page.evaluate(() => fetchCloudData());
+  await apriGiorno(page, IERI);
+
+  const abbrev = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'][new Date(IERI + 'T00:00:00').getDay()];
+  const [y, m, d] = IERI.split('-');
+  await expect(page.locator('#proposedWodContent')).toContainText(`${abbrev} ${d}/${m}/${y}`);
+});
+
+test('martedì e mercoledì restano distinguibili (non la sola lettera M)', async ({ page }) => {
+  await mockBackend(page, { athletes: [{ name: 'Test Athlete', hasPin: false }] });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+
+  const [martedi, mercoledi] = await page.evaluate(() => [
+    formatDateWithWeekday('2026-09-01'), // martedì
+    formatDateWithWeekday('2026-09-02'), // mercoledì
+  ]);
+  expect(martedi).toBe('Mar 01/09/2026');
+  expect(mercoledi).toBe('Mer 02/09/2026');
+});
