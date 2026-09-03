@@ -595,7 +595,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v30";
+    const APP_VERSION = "v31";
     const APP_VERSION_DATE = "02/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -2144,10 +2144,14 @@
       if (!card) return;
 
       // La bacheca segue il giorno selezionato: su una data futura mostra i WOD già
-      // programmati per quel giorno, così non se ne pubblicano due uguali.
+      // programmati per quel giorno (così non se ne pubblicano due uguali), e mentre si
+      // registra un recupero mostra cosa hanno già caricato altri per quel giorno passato —
+      // es. oggi 4 settembre, recupero del WOD di ieri: vedere cosa hanno scritto gli altri il
+      // 3 evita di doverlo ritrascrivere da zero.
       const isFuture = selectedRegistraDate > getTodayDateString();
       const isToday = selectedRegistraDate === getTodayDateString();
-      if ((!isToday && !isFuture) || editingWodId !== null || proposedWodDismissed) {
+      const isPastLogging = !isToday && !isFuture && loggingPastDay && editingWodId === null;
+      if ((!isToday && !isFuture && !isPastLogging) || editingWodId !== null || proposedWodDismissed) {
         card.style.display = 'none';
         proposedWodCandidates = [];
         return;
@@ -2197,7 +2201,9 @@
 
       document.getElementById('proposedWodTitle').innerText = isFuture
         ? `📋 GIÀ PROGRAMMATO PER IL ${formatDateForDisplay(selectedRegistraDate)} (${proposedWodCandidates.length})`
-        : `📋 BACHECA WOD DI OGGI (${proposedWodCandidates.length})`;
+        : (isPastLogging
+            ? `📋 GIÀ CARICATO IL ${formatDateForDisplay(selectedRegistraDate)} (${proposedWodCandidates.length})`
+            : `📋 BACHECA WOD DI OGGI (${proposedWodCandidates.length})`);
 
       document.getElementById('proposedWodContent').innerHTML = proposedWodCandidates.map((c, idx) => {
         const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);

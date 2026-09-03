@@ -4,6 +4,13 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v31 — 2026-09-03
+- **Fix**: registrando un recupero (es. oggi 4 settembre il WOD di ieri 3 settembre), la
+  bacheca "già caricato" restava vuota anche se altri atleti avevano già scritto quel WOD per
+  quel giorno — bisognava ritrascriverlo da zero. Ora, aprendo un giorno passato con "+
+  Registra un allenamento", compare "📋 GIÀ CARICATO IL ..." con quanto già inserito da altri
+  quel giorno, riusabile con lo stesso pulsante "USA QUESTO WOD" della bacheca di oggi.
+
 ## v30 — 2026-09-03
 - **Fix**: un giorno passato senza nessun allenamento ancora registrato non offriva alcun modo
   di loggarne uno — utile per un recupero (es. fatto oggi il WOD di ieri). Ora, aprendo un
