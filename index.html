@@ -668,8 +668,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v46";
-    const APP_VERSION_DATE = "03/09/2026";
+    const APP_VERSION = "v47";
+    const APP_VERSION_DATE = "04/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -1825,15 +1825,9 @@
 
       const weightSeries = healthNumericSeries(records, 'weight');
       const bodyFatSeries = healthNumericSeries(records, 'bodyFatPercentage');
-      const restingHrSeries = healthNumericSeries(records, 'restingHeartRate');
-      const stepsSeries = healthNumericSeries(records, 'steps');
-      const activeEnergySeries = healthNumericSeries(records, 'activeEnergy');
 
       const weight = weightSeries[0] || null;
       const bodyFat = bodyFatSeries[0] || null;
-      const restingHr = restingHrSeries[0] || null;
-      const steps = stepsSeries[0] || null;
-      const activeEnergy = activeEnergySeries[0] || null;
 
       let weightTrendClass = '';
       let weightSub = 'peso corporeo';
@@ -1845,13 +1839,16 @@
         }
       }
 
+      // FC riposo/Passi/Energia attiva non si mostrano più qui: quella parte del gruppo li
+      // segue già su Whoop (recovery/FC/calorie), quindi qui restano solo peso e composizione
+      // corporea, gli unici due dati che arrivano solo da una bilancia via Salute. Il backend
+      // continua ad accettare tutti e 5 i campi (vedi apps-script/README.md): un atleta che
+      // manda ancora FC/passi/energia attiva dal proprio Comando non perde nulla, restano solo
+      // non mostrati in questa card.
       const statsHtml = `
         <div class="health-stats">
           ${healthStatTile('Peso', weight ? weight.value.toFixed(1) + ' kg' : null, weightSub, weightTrendClass)}
           ${healthStatTile('Grasso corp.', bodyFat ? bodyFat.value.toFixed(1) + '%' : null, 'composizione corporea')}
-          ${healthStatTile('FC riposo', restingHr ? Math.round(restingHr.value) + ' bpm' : null, 'frequenza cardiaca')}
-          ${healthStatTile('Passi', steps ? Math.round(steps.value).toLocaleString('it-IT') : null, 'nel giorno')}
-          ${healthStatTile('Energia attiva', activeEnergy ? Math.round(activeEnergy.value) + ' kcal' : null, 'nel giorno')}
         </div>
       `;
 

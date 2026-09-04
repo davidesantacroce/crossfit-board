@@ -4,6 +4,12 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v47 — 2026-09-04
+- La card SALUTE ora mostra solo **peso** e **grasso corporeo**: FC a riposo, passi ed energia
+  attiva sono stati tolti dalla card (chi li segue lo fa già dalla card Whoop). Il backend
+  continua ad accettare tutti e 5 i campi come prima — un atleta che manda ancora FC/passi/
+  energia attiva dal proprio Comando non perde nulla, restano solo non mostrati qui.
+
 ## v46 — 2026-09-03
 - Fix: un WOD a set scritto una riga per set (es. "1x 3 Position Back Squat @60-65% 1RM"
   ripetuta N volte) veniva riconosciuto come **1 solo set**, perché il primo "1x" a inizio riga
