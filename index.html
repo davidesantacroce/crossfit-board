@@ -252,6 +252,9 @@
     .lr-perset-reps-hint { font-size: 11px; color: var(--text-muted); white-space: nowrap; font-weight: 700; }
     .lr-perset-done-toggle { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text-muted); font-size: 14px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
     .lr-perset-done-toggle.done { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .lr-perset-remove-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text-muted); font-size: 13px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .lr-perset-remove-btn:disabled { opacity: 0.35; cursor: default; }
+    .lr-perset-remove-btn:not(:disabled):active { border-color: #c62828; color: #c62828; }
 
     .fun-loading-overlay {
       display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-color);
@@ -665,7 +668,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v45";
+    const APP_VERSION = "v46";
     const APP_VERSION_DATE = "03/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -2781,10 +2784,36 @@
 
     // ===================== LOG RESULT (risultato per singolo workout) =====================
 
+    // Frammento di regex per una percentuale singola ("70%", "62,5%") o un range ("60-65%"):
+    // condiviso fra detectSetsInfo (per contare le righe) e detectPercentagesForSets (per
+    // estrarre il valore, con la media del range).
+    const PCT_TOKEN_SRC = '\\d{1,3}(?:[.,]\\d+)?\\s*(?:[-–]\\s*\\d{1,3}(?:[.,]\\d+)?)?\\s*%';
+
     // Cerca nel testo del blocco (titolo + spiegazione) un pattern aggregato tipo
     // "N sets x M reps" / "N serie x M" / "NxM" e restituisce { numSets, reps } se trovato.
     function detectSetsInfo(text) {
       if (!text) return null;
+
+      // 0) Priorità massima: righe ripetute con percentuale di carico, una per set — tipiche di
+      //    prescrizioni tipo "1 Power Snatch + 1 Snatch @55% 1RM Snatch" o "1x 3 Position Back
+      //    Squat @60-65% 1RM" ripetuta N volte. Va controllato PRIMA del pattern "NxM" qui sotto,
+      //    altrimenti un "1x" a inizio riga (che qui significa "una volta", non "1 set totale")
+      //    verrebbe scambiato per l'intero schema set x reps, fermando la ricerca al primo set
+      //    invece di contare tutte le righe.
+      const pctLineMatches = text.match(new RegExp(`(?:^|\\n)[^\\n@]*@\\s*${PCT_TOKEN_SRC}[^\\n]*`, 'gim'));
+      if (pctLineMatches && pctLineMatches.length >= 2 && pctLineMatches.length <= 30) {
+        const numSets = pctLineMatches.length;
+        let reps = null;
+        // Un eventuale "1x "/"2x " a inizio riga è un moltiplicatore ("ripeti una volta"), non
+        // un reps da sommare: lo togliamo prima di cercare i numeri veri (es. "3 Position...").
+        const beforePct = pctLineMatches[0].split('@')[0].replace(/^\s*\d+\s*x\s+/i, '');
+        const segmentNums = beforePct.match(/\d{1,3}(?=\s*[A-Za-z\u00C0-\u017F])/g);
+        if (segmentNums && segmentNums.length) {
+          const sum = segmentNums.reduce((a, b) => a + parseInt(b, 10), 0);
+          if (sum > 0 && sum <= 999) reps = sum;
+        }
+        return { numSets, reps };
+      }
 
       // 1) Pattern combinato: "N sets x M reps" / "N serie di M" / "NxM"
       const combinedPatterns = [
@@ -2834,23 +2863,7 @@
         }
       }
 
-      // 4) Fallback: righe ripetute con percentuale di carico, tipiche di
-      //    prescrizioni tipo "1 Power Snatch + 1 Snatch @55% 1RM Snatch"
-      //    (una riga per set; i reps sono la somma dei numeri prima di "@")
-      if (!numSets) {
-        const pctLineMatches = text.match(/(?:^|\n)[^\n@]*@\s*\d{1,3}\s*%[^\n]*/gim);
-        if (pctLineMatches && pctLineMatches.length >= 2 && pctLineMatches.length <= 30) {
-          numSets = pctLineMatches.length;
-          const beforePct = pctLineMatches[0].split('@')[0];
-          const segmentNums = beforePct.match(/\d{1,3}(?=\s*[A-Za-z\u00C0-\u017F])/g);
-          if (segmentNums && segmentNums.length) {
-            const sum = segmentNums.reduce((a, b) => a + parseInt(b, 10), 0);
-            if (sum > 0 && sum <= 999) reps = sum;
-          }
-        }
-      }
-
-      // 5) Fallback: conta le righe tipo "Set 1", "1)", "1." (una per set)
+      // 4) Fallback: conta le righe tipo "Set 1", "1)", "1." (una per set)
       if (!numSets) {
         const setLineMatches = text.match(/(?:^|\n)\s*(?:set\s*\d{1,2}\b|\d{1,2}[.)]\s)/gim);
         if (setLineMatches && setLineMatches.length >= 2 && setLineMatches.length <= 30) {
@@ -2929,12 +2942,16 @@
     // Estrae dal testo tutte le percentuali (es. "70%", "@ 82,5%") e le abbina ai set:
     // se il numero di percentuali trovate coincide col numero di set, una per set;
     // se ne trova una sola, la applica a tutti i set. Altrimenti (ambiguo) non propone nulla.
+    // Un range ("60-65%") conta come una sola percentuale, il valore è la media degli estremi.
     function detectPercentagesForSets(text, numSets) {
       if (!text || !numSets) return null;
-      const matches = text.match(/(\d{1,3}(?:[.,]\d+)?)\s*%/g);
+      const matches = text.match(new RegExp(PCT_TOKEN_SRC, 'g'));
       if (!matches || matches.length === 0) return null;
 
-      const values = matches.map(m => parseFloat(m.replace(',', '.').replace('%', '')));
+      const values = matches.map(m => {
+        const nums = m.match(/\d{1,3}(?:[.,]\d+)?/g).map(n => parseFloat(n.replace(',', '.')));
+        return nums.length > 1 ? (nums[0] + nums[1]) / 2 : nums[0];
+      });
       if (!values.every(v => v > 0 && v <= 100)) return null;
 
       if (values.length === numSets) return values;
@@ -3499,6 +3516,11 @@
       }
     }
 
+    // Hint "x3 reps" mostrato accanto a ogni riga: calcolato una volta in renderLrPerSetFields
+    // e riusato da renderLrPerSetList quando si aggiunge/rimuove un set, perché aggiungere o
+    // togliere una riga non cambia quante reps ha ciascun set.
+    let lrPerSetRepsHint = '';
+
     function renderLrPerSetFields(setsInfo, prefill) {
       prefill = prefill || {};
       const container = document.getElementById('lrScoreFields');
@@ -3519,7 +3541,7 @@
         });
       }
 
-      const repsHint = setsInfo.reps ? `x${setsInfo.reps} reps` : '';
+      lrPerSetRepsHint = setsInfo.reps ? `x${setsInfo.reps} reps` : '';
 
       let suggestionHintHtml = '';
       if (suggestion && suggestion.weights) {
@@ -3529,7 +3551,7 @@
       }
 
       container.innerHTML = `
-        <label>CARICO PER SET${repsHint ? ' (' + repsHint + ')' : ''}</label>
+        <label>CARICO PER SET${lrPerSetRepsHint ? ' (' + lrPerSetRepsHint + ')' : ''}</label>
         ${suggestionHintHtml}
         <div class="form-row" style="margin-bottom: 8px;">
           <div class="form-group" style="max-width: 110px;">
@@ -3539,19 +3561,43 @@
             </select>
           </div>
         </div>
-        <div class="lr-perset-list" id="lrPerSetList">
-          ${lrPerSetScores.map((s, i) => `
-            <div class="lr-perset-row">
-              <div class="lr-perset-label">Set ${i + 1}</div>
-              <div class="lr-perset-input-wrap">
-                <input type="text" inputmode="decimal" placeholder="Es. 80" value="${escapeHtml(s.weight)}" oninput="updateLrPerSetWeight(${i}, this.value)">
-                ${repsHint ? `<span class="lr-perset-reps-hint">${repsHint}</span>` : ''}
-              </div>
-              <button type="button" class="lr-perset-done-toggle ${s.done ? 'done' : ''}" onclick="toggleLrPerSetDone(${i})" title="Set completato">${s.done ? '✓' : '✕'}</button>
-            </div>
-          `).join('')}
-        </div>
+        <div class="lr-perset-list" id="lrPerSetList"></div>
+        <button type="button" class="btn-add" onclick="addLrPerSetRow()">+ Aggiungi Set</button>
       `;
+      renderLrPerSetList();
+    }
+
+    // Ridisegna solo l'elenco dei set (non l'intera card, che include anche l'hint del peso
+    // proposto): usata dal primo render di renderLrPerSetFields e da add/removeLrPerSetRow, così
+    // aggiungere o togliere una riga non fa perdere i pesi già inseriti nelle altre.
+    function renderLrPerSetList() {
+      const list = document.getElementById('lrPerSetList');
+      if (!list) return;
+      list.innerHTML = lrPerSetScores.map((s, i) => `
+        <div class="lr-perset-row">
+          <div class="lr-perset-label">Set ${i + 1}</div>
+          <div class="lr-perset-input-wrap">
+            <input type="text" inputmode="decimal" placeholder="Es. 80" value="${escapeHtml(s.weight)}" oninput="updateLrPerSetWeight(${i}, this.value)">
+            ${lrPerSetRepsHint ? `<span class="lr-perset-reps-hint">${lrPerSetRepsHint}</span>` : ''}
+          </div>
+          <button type="button" class="lr-perset-done-toggle ${s.done ? 'done' : ''}" onclick="toggleLrPerSetDone(${i})" title="Set completato">${s.done ? '✓' : '✕'}</button>
+          <button type="button" class="lr-perset-remove-btn" onclick="removeLrPerSetRow(${i})" title="Rimuovi set" ${lrPerSetScores.length <= 1 ? 'disabled' : ''}>🗑</button>
+        </div>
+      `).join('');
+    }
+
+    // + Aggiungi/Rimuovi Set nel Log Result: il WOD scritto (spesso via OCR) a volte prescrive
+    // set in modo ambiguo o l'atleta ne fa un numero diverso da quello rilevato, quindi la lista
+    // resta sempre modificabile a mano invece di essere fissata da detectSetsInfo.
+    function addLrPerSetRow() {
+      lrPerSetScores.push({ weight: '', done: true });
+      renderLrPerSetList();
+    }
+
+    function removeLrPerSetRow(idx) {
+      if (lrPerSetScores.length <= 1) return; // resta sempre almeno un set
+      lrPerSetScores.splice(idx, 1);
+      renderLrPerSetList();
     }
 
     function updateLrPerSetWeight(idx, value) {
