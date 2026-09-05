@@ -4,6 +4,30 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v50 — 2026-09-05
+- **🏆 Log Result** e **👥 Results** ora stanno **affiancati**, metà riga a testa, con misure
+  identiche: erano uno sopra l'altro e di dimensioni diverse, pur essendo le due azioni gemelle
+  del blocco. Il secondo si chiamava "Risultati Altri Atleti" e andava a capo su due righe:
+  ora è solo "Results" e sta su una riga sola come il gemello.
+- Tolto il **tratteggio** dal bordo di Log Result: bordo pieno da 1 px e stesso raggio degli
+  angoli dell'altro, così i due bottoni sono davvero identici (resta il colore accent a
+  distinguere l'azione principale).
+- Il bottone **📷 Carica Foto** (e la ✕ accanto) sono un po' più grandi: da 28 a 36 px di
+  altezza, testo da 10 a 12 px, più facili da centrare col dito.
+- Nelle viste di sola lettura (Storico, giorno del calendario) il bottone resta com'era: lì sta
+  da solo sotto la card, non affiancato a nulla.
+
+## v49 — 2026-09-05
+- Il calendario di REGISTRA è ora una **finestra scorrevole centrata su oggi** (da 3 giorni fa a
+  3 giorni avanti) invece della settimana fissa domenica-sabato. Prima, di **domenica** non si
+  vedeva **ieri** e di **sabato** non si vedeva **domani** senza prima spostare la settimana con
+  ‹ / ›: proprio i due giorni che servono più spesso per registrare un allenamento o recuperare
+  quello del giorno prima.
+- Toccando un giorno già visibile la riga **resta ferma** invece di riscorrere sotto il dito: si
+  ricentra solo quando la data scelta (es. dal picker 📅) è fuori dai giorni mostrati.
+- La lettera sotto ogni giorno ora segue la data vera e non la posizione nella riga, e
+  l'etichetta in alto nomina entrambi i mesi quando la finestra è a cavallo di due (es. "ago - set").
+
 ## v48 — 2026-09-05
 - **Un allenamento alla volta in REGISTRA**: sia OGGI sia un giorno passato mostrano ora di
   default la vista di sola lettura di quanto già registrato, invece del form sempre aperto.
