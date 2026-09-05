@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v54 — 2026-09-05
+- **Fix del timer (v53): chiudere la modale a metà WOD faceva perdere il tempo.** Bastava
+  chiuderla per rileggere il WOD, o toccarla per sbaglio: riaprendola si trovava 00:00, fermo.
+  Il timer intanto continuava a girare invisibile, e la riapertura lo azzerava comunque. Ora
+  chiudere la modale non ferma niente e riaprendola si ritrova il timer com'era, che stia
+  contando o sia in pausa. Su una Parte diversa riparte da capo, con le impostazioni di quel WOD.
+- **Lo schermo resta acceso mentre il timer conta** (wake lock): durante un WOD nessuno tocca il
+  telefono per svegliarlo, e un timer che sparisce a metà non serve a niente. Si libera in pausa,
+  a tempo scaduto e chiudendo la modale, e viene richiesto di nuovo tornando sull'app se il timer
+  sta ancora contando. Dove il wake lock non c'è o viene negato, il timer funziona come prima.
+
 ## v53 — 2026-09-05
 **Timer integrato nel blocco.** Nuovo tasto **⏱ Timer** su ogni Parte, sopra la coppia Log
 Result / Results, con tre modalità:
