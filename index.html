@@ -739,7 +739,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v53";
+    const APP_VERSION = "v54";
     const APP_VERSION_DATE = "05/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3819,6 +3819,36 @@
     let timerFinished = false;
     let timerLastBeepRound = 0;
     let timerAudioCtx = null;
+    let timerWakeLock = null;
+
+    // Mentre il timer conta, lo schermo deve restare acceso: durante un WOD nessuno tocca il
+    // telefono per svegliarlo, e un timer che sparisce a metà non serve a niente. Dove il wake
+    // lock non c'è (o viene negato) il timer funziona esattamente come prima.
+    async function requestTimerWakeLock() {
+      try {
+        if (!navigator.wakeLock || timerWakeLock) return;
+        timerWakeLock = await navigator.wakeLock.request('screen');
+        if (timerWakeLock.addEventListener) {
+          timerWakeLock.addEventListener('release', () => { timerWakeLock = null; });
+        }
+      } catch (err) {
+        timerWakeLock = null;
+      }
+    }
+
+    function releaseTimerWakeLock() {
+      if (!timerWakeLock) return;
+      try { timerWakeLock.release(); } catch (err) {}
+      timerWakeLock = null;
+    }
+
+    // Il browser rilascia da sé il wake lock quando la pagina va in secondo piano: tornando
+    // sull'app, se il timer sta ancora contando lo si richiede.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && timerRunning() && document.getElementById('timerModal')?.classList.contains('active')) {
+        requestTimerWakeLock();
+      }
+    });
 
     function timerElapsedMs() {
       return timerAccumulatedMs + (timerStartedAt !== null ? Date.now() - timerStartedAt : 0);
@@ -3877,6 +3907,19 @@
     function openTimerModal(blockId) {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
+
+      // Un timer già avviato su questa stessa Parte si riprende com'era: chiudere la modale a
+      // metà WOD (per rileggere il testo, o per sbaglio) non deve far perdere il tempo fatto.
+      // Su una Parte diversa invece si riparte da capo, con le impostazioni di quel WOD.
+      const stessaParte = timerBlockId === blockId;
+      const timerInCorso = timerRunning() || timerAccumulatedMs > 0;
+      if (stessaParte && timerInCorso) {
+        document.getElementById('timerModal').classList.add('active');
+        if (timerRunning()) { startTimerTicking(); requestTimerWakeLock(); }
+        renderTimer();
+        return;
+      }
+
       timerBlockId = blockId;
 
       const tipo = block.querySelector('.block-type').value;
@@ -3896,8 +3939,12 @@
       document.getElementById('timerModal').classList.add('active');
     }
 
+    // Chiudere la modale non ferma il timer (lo si ritrova riaprendo, vedi openTimerModal):
+    // smette solo di ridisegnare, e lascia che lo schermo si spenga visto che non c'è più
+    // niente da guardare.
     function closeTimerModal() {
       stopTimerTicking();
+      releaseTimerWakeLock();
       document.getElementById('timerModal').classList.remove('active');
     }
 
@@ -3926,15 +3973,18 @@
         timerAccumulatedMs = timerElapsedMs();
         timerStartedAt = null;
         stopTimerTicking();
+        releaseTimerWakeLock();
       } else {
         timerStartedAt = Date.now();
         startTimerTicking();
+        requestTimerWakeLock();
       }
       renderTimer();
     }
 
     function resetTimer() {
       stopTimerTicking();
+      releaseTimerWakeLock();
       timerStartedAt = null;
       timerAccumulatedMs = 0;
       timerFinished = false;
@@ -3998,6 +4048,7 @@
         timerAccumulatedMs = timerElapsedMs();
         timerStartedAt = null;
         stopTimerTicking();
+        releaseTimerWakeLock();
         timerBeep(500, 660);
       }
 
