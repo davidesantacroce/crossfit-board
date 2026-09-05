@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v49 — 2026-09-05
+- Il calendario di REGISTRA è ora una **finestra scorrevole centrata su oggi** (da 3 giorni fa a
+  3 giorni avanti) invece della settimana fissa domenica-sabato. Prima, di **domenica** non si
+  vedeva **ieri** e di **sabato** non si vedeva **domani** senza prima spostare la settimana con
+  ‹ / ›: proprio i due giorni che servono più spesso per registrare un allenamento o recuperare
+  quello del giorno prima.
+- Toccando un giorno già visibile la riga **resta ferma** invece di riscorrere sotto il dito: si
+  ricentra solo quando la data scelta (es. dal picker 📅) è fuori dai giorni mostrati.
+- La lettera sotto ogni giorno ora segue la data vera e non la posizione nella riga, e
+  l'etichetta in alto nomina entrambi i mesi quando la finestra è a cavallo di due (es. "ago - set").
+
 ## v48 — 2026-09-05
 - **Un allenamento alla volta in REGISTRA**: sia OGGI sia un giorno passato mostrano ora di
   default la vista di sola lettura di quanto già registrato, invece del form sempre aperto.

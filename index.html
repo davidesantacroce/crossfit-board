@@ -673,7 +673,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v48";
+    const APP_VERSION = "v49";
     const APP_VERSION_DATE = "05/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -808,8 +808,12 @@
 
     // Data attualmente selezionata nel calendario (default: oggi)
     let selectedRegistraDate = getTodayDateString();
-    // Qualsiasi giorno della settimana correntemente mostrata nella riga del calendario
-    let calendarAnchorDate = new Date();
+    // Primo (YYYY-MM-DD) dei 7 giorni mostrati nella riga del calendario: una finestra
+    // scorrevole centrata su oggi, non la settimana fissa domenica-sabato. Con la settimana
+    // fissa, di domenica non si vedeva ieri e di sabato non si vedeva domani senza prima
+    // spostarsi con ‹ / ›, proprio i due giorni che servono più spesso.
+    const CALENDAR_WINDOW_DAYS = 7;
+    let calendarWindowStart = addDaysToDateString(getTodayDateString(), -3);
 
     // Restituisce il Domenica (inizio settimana) della settimana contenente la data data
     function getWeekStart(date) {
@@ -823,8 +827,13 @@
       const daysRow = document.getElementById('calendarDaysRow');
       if (!monthLabelEl || !daysRow) return;
 
-      const monthLabel = calendarAnchorDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
-      monthLabelEl.innerText = monthLabel;
+      // La finestra può stare a cavallo di due mesi (es. 29 ago - 4 set): in quel caso
+      // l'etichetta li nomina entrambi, invece di mostrarne uno solo che sarebbe metà falso.
+      const firstDate = new Date(calendarWindowStart + 'T00:00:00');
+      const lastDate = new Date(addDaysToDateString(calendarWindowStart, CALENDAR_WINDOW_DAYS - 1) + 'T00:00:00');
+      monthLabelEl.innerText = firstDate.getMonth() === lastDate.getMonth()
+        ? firstDate.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
+        : `${firstDate.toLocaleDateString('it-IT', { month: 'short' })} - ${lastDate.toLocaleDateString('it-IT', { month: 'short', year: 'numeric' })}`;
 
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const loggedDates = new Set(
@@ -842,13 +851,10 @@
           .map(w => w.date)
       );
 
-      const weekStart = getWeekStart(calendarAnchorDate);
-
       let html = '';
-      for (let i = 0; i < 7; i++) {
-        const dayDate = new Date(weekStart);
-        dayDate.setDate(weekStart.getDate() + i);
-        const dayStr = toDateString(dayDate);
+      for (let i = 0; i < CALENDAR_WINDOW_DAYS; i++) {
+        const dayStr = addDaysToDateString(calendarWindowStart, i);
+        const dayDate = new Date(dayStr + 'T00:00:00');
 
         const classes = ['calendar-day'];
         if (dayStr === selectedRegistraDate) classes.push('selected');
@@ -858,7 +864,7 @@
 
         html += `
           <div class="${classes.join(' ')}" onclick="selectCalendarDate('${dayStr}')">
-            <div class="calendar-day-name">${ITALIAN_DAY_LETTERS[i]}</div>
+            <div class="calendar-day-name">${ITALIAN_DAY_LETTERS[dayDate.getDay()]}</div>
             <div class="calendar-day-num">${dayDate.getDate()}</div>
           </div>
         `;
@@ -868,10 +874,19 @@
 
     function selectCalendarDate(dateStr) {
       selectedRegistraDate = dateStr;
-      calendarAnchorDate = new Date(dateStr + 'T00:00:00');
+      centerCalendarWindowOn(dateStr);
       loggingPastDay = false; // cambiando giorno si torna alla vista di sola lettura di default
       renderRegistraCalendar();
       updateRegistraDateView();
+    }
+
+    // Ricentra la finestra del calendario sul giorno passato, ma SOLO se non è già visibile:
+    // toccando un giorno già mostrato la riga resta ferma, invece di scorrere sotto il dito
+    // ricentrandosi a ogni tap. Serve quindi per le date scelte dal picker 📅.
+    function centerCalendarWindowOn(dateStr) {
+      const windowEnd = addDaysToDateString(calendarWindowStart, CALENDAR_WINDOW_DAYS - 1);
+      if (dateStr >= calendarWindowStart && dateStr <= windowEnd) return;
+      calendarWindowStart = addDaysToDateString(dateStr, -3);
     }
 
     // Bottone "+ Registra un allenamento" nella vista di sola lettura di un giorno passato o di
@@ -894,9 +909,10 @@
       updateRegistraDateView();
     }
 
+    // ‹ / ›: sposta la finestra di 7 giorni interi, così i giorni mostrati non si sovrappongono
+    // a quelli di prima.
     function shiftCalendarWeek(delta) {
-      calendarAnchorDate = new Date(calendarAnchorDate);
-      calendarAnchorDate.setDate(calendarAnchorDate.getDate() + delta * 7);
+      calendarWindowStart = addDaysToDateString(calendarWindowStart, delta * CALENDAR_WINDOW_DAYS);
       renderRegistraCalendar();
     }
 
