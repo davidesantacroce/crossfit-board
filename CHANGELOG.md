@@ -4,6 +4,20 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v51 — 2026-09-05
+- Il tab **ATLETA** era lungo circa **7 schermate** (6328 px): teneva sempre aperte tutte le
+  righe dei due elenchi, 33 massimali + 28 benchmark, quasi tutte vuote. Ora di default mostra
+  **solo le voci già compilate**, con una **ricerca** che trova anche quelle mai inserite e un
+  **"Mostra tutti"** per aprire l'elenco intero. Stessi dati, tab da 6328 a **1984 px**.
+- Un valore digitato e poi uscito dalla vista (ricerca cambiata, elenco richiuso) **non si perde
+  e viene salvato lo stesso**: il salvataggio non guarda più solo le righe a schermo. Resta
+  invariato il fatto che si mandino al Foglio solo i valori davvero cambiati.
+- Lo **storico** ora è ordinato per **data dell'allenamento** (più recente in cima) invece che
+  per ordine di salvataggio. Prima un recupero registrato oggi per lunedì scorso finiva in cima,
+  e modificare una sessione vecchia la faceva risalire (il salvataggio la cancella e la riaccoda).
+- Sul giorno di oggi la vista vuota dice "Nessun allenamento registrato per **oggi**", coerente
+  con il titolo e il bottone (diceva ancora "per questo giorno").
+
 ## v50 — 2026-09-05
 - **🏆 Log Result** e **👥 Results** ora stanno **affiancati**, metà riga a testa, con misure
   identiche: erano uno sopra l'altro e di dimensioni diverse, pur essendo le due azioni gemelle

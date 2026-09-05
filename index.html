@@ -491,14 +491,20 @@
     <div class="card">
       <div class="card-title">MASSIMALI E PARAMETRI CROSSFIT</div>
       <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 14px;">Inserisci i tuoi massimali di sollevamento (Kg), ginnastica (max reps o secondi), e benchmark cardiovascolari (passo/tempo).</p>
+      <input type="text" id="rmSearch" placeholder="🔍 Cerca esercizio..." style="margin-bottom: 12px;" oninput="filterMovementList('rmContainer', this.value)">
       <div id="rmContainer"></div>
+      <p id="rmEmptyHint" style="font-size: 12px; color: var(--text-muted); margin: 0;"></p>
+      <button type="button" id="rmToggleAll" class="btn-secondary" style="width: 100%; margin-top: 10px; padding: 10px; font-size: 12px;" onclick="toggleMovementList('rmContainer')"></button>
       <button class="btn-main" style="margin-top: 12px;" onclick="withButtonGuard(this, saveMassimaliCloud)">SALVA MASSIMALI</button>
     </div>
 
     <div class="card">
       <div class="card-title">🏆 BENCHMARK WOD</div>
       <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 14px;">I WOD benchmark più famosi del CrossFit (Girls, Hero e altri classici). Inserisci il tuo miglior risultato (tempo, rounds+reps o reps totali) — se non lo compili a mano, viene aggiornato in automatico ogni volta che logghi un risultato migliore per uno di questi WOD.</p>
+      <input type="text" id="benchmarkSearch" placeholder="🔍 Cerca benchmark..." style="margin-bottom: 12px;" oninput="filterMovementList('benchmarkContainer', this.value)">
       <div id="benchmarkContainer"></div>
+      <p id="benchmarkEmptyHint" style="font-size: 12px; color: var(--text-muted); margin: 0;"></p>
+      <button type="button" id="benchmarkToggleAll" class="btn-secondary" style="width: 100%; margin-top: 10px; padding: 10px; font-size: 12px;" onclick="toggleMovementList('benchmarkContainer')"></button>
       <button class="btn-main" style="margin-top: 12px;" onclick="withButtonGuard(this, saveMassimaliCloud)">SALVA BENCHMARK</button>
     </div>
   </div>
@@ -682,7 +688,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v50";
+    const APP_VERSION = "v51";
     const APP_VERSION_DATE = "05/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1021,7 +1027,7 @@
       `;
 
       if (sessions.length === 0) {
-        contentEl.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 4px;">Nessun allenamento registrato per questo giorno.</p>' + logPastBtnHtml;
+        contentEl.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 4px;">Nessun allenamento registrato per ${dayLabel}.</p>` + logPastBtnHtml;
         return;
       }
 
@@ -1970,27 +1976,120 @@
       renderRmContainer(maxsMap);
     }
 
+    // I due elenchi del tab ATLETA (massimali e benchmark) sono 61 righe in tutto: tenerle
+    // sempre tutte aperte rendeva il tab lungo ~7 schermate solo per aggiornare un valore.
+    // Di default si vedono solo le voci già compilate; la ricerca trova anche le altre e
+    // "mostra tutti" apre l'elenco intero.
+    const movementListState = {
+      rmContainer: { query: '', showAll: false, toggleId: 'rmToggleAll', hintId: 'rmEmptyHint', names: [] },
+      benchmarkContainer: { query: '', showAll: false, toggleId: 'benchmarkToggleAll', hintId: 'benchmarkEmptyHint', names: [] },
+    };
+    // Valori digitati e non ancora salvati. L'elenco si ridisegna a ogni ricerca, e una voce
+    // modificata può anche sparire dalla vista: senza questa memoria si perderebbe quello che
+    // si è appena scritto (e "Salva" non lo manderebbe, vedi saveMassimaliCloud).
+    let movementPendingEdits = {};
+    let movementSavedMaxs = {};
+
+    // Memorizza cosa c'è scritto ora nelle righe di un elenco, prima di svuotarlo e ridisegnarlo.
+    function captureMovementEdits(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.querySelectorAll('.rm-weight').forEach(input => {
+        const key = (input.getAttribute('data-movement') || '').toLowerCase();
+        if (!key) return;
+        const original = (input.getAttribute('data-original') || '').trim();
+        if (input.value.trim() === original) delete movementPendingEdits[key];
+        else movementPendingEdits[key] = input.value;
+      });
+    }
+
+    // Valore da mostrare per un movimento: quello appena digitato se c'è, altrimenti il salvato.
+    function movementValueFor(movement) {
+      const key = movement.toLowerCase();
+      return (key in movementPendingEdits) ? movementPendingEdits[key] : (movementSavedMaxs[key] || '');
+    }
+
     // Riempie un container di righe "esercizio + campo valore" (stesso markup per massimali
     // classici e benchmark WOD, entrambi salvati con la stessa logica su 'saveMassimale').
     function renderMovementInputRows(containerId, movementNames, savedMaxs) {
       const container = document.getElementById(containerId);
-      if (!container) return;
+      const state = movementListState[containerId];
+      if (!container || !state) return;
+      state.names = movementNames;
+      captureMovementEdits(containerId);
       container.innerHTML = '';
 
-      movementNames.forEach(movement => {
-        const val = savedMaxs[movement.toLowerCase()] || '';
+      const query = state.query.trim().toLowerCase();
+      // Cercando si guarda dentro l'elenco intero, comprese le voci mai compilate: è il modo
+      // per arrivare a una voce nuova senza aprire tutte e 33 (o 28) le righe.
+      const visible = movementNames.filter(movement =>
+        query ? movement.toLowerCase().includes(query) : (state.showAll || !!movementValueFor(movement))
+      );
+
+      visible.forEach(movement => {
+        // data-original resta il valore SALVATO, non quello digitato: è il confronto che dice
+        // a saveMassimaliCloud se c'è davvero qualcosa di nuovo da mandare.
+        const saved = savedMaxs[movement.toLowerCase()] || '';
+        const val = movementValueFor(movement);
         const row = document.createElement('div');
         row.className = 'rm-row';
         row.innerHTML = `
           <span>${escapeHtml(movement)}</span>
-          <input type="text" class="rm-weight" data-movement="${escapeHtml(movement)}" data-original="${escapeHtml(val)}" placeholder="Kg / Reps / Tempo" value="${escapeHtml(val)}">
-          ${val ? `<button type="button" class="rm-history-btn" title="Storico" onclick="openMassimaleHistoryModal('${movement.replace(/'/g, "\\'")}')">📈</button>` : '<span></span>'}
+          <input type="text" class="rm-weight" data-movement="${escapeHtml(movement)}" data-original="${escapeHtml(saved)}" placeholder="Kg / Reps / Tempo" value="${escapeHtml(val)}">
+          ${saved ? `<button type="button" class="rm-history-btn" title="Storico" onclick="openMassimaleHistoryModal('${movement.replace(/'/g, "\\'")}')">📈</button>` : '<span></span>'}
         `;
         container.appendChild(row);
       });
+
+      updateMovementListChrome(containerId, visible.length);
+    }
+
+    // Etichetta del bottone mostra tutti/solo compilati e messaggio quando non c'è nulla in vista.
+    function updateMovementListChrome(containerId, visibleCount) {
+      const state = movementListState[containerId];
+      if (!state) return;
+      const searching = state.query.trim() !== '';
+      const compiledCount = state.names.filter(m => !!movementValueFor(m)).length;
+
+      const toggle = document.getElementById(state.toggleId);
+      if (toggle) {
+        // Mentre si cerca il bottone non serve: la ricerca guarda già in tutto l'elenco.
+        toggle.style.display = searching ? 'none' : '';
+        toggle.innerText = state.showAll
+          ? `Mostra solo i compilati (${compiledCount})`
+          : `Mostra tutti (${state.names.length})`;
+      }
+
+      const hint = document.getElementById(state.hintId);
+      if (hint) {
+        let text = '';
+        if (visibleCount === 0 && searching) text = `Nessuna voce trovata per "${state.query.trim()}".`;
+        else if (visibleCount === 0) text = 'Niente inserito qui per ora: cerca una voce qui sopra, oppure mostrale tutte.';
+        hint.innerText = text;
+        hint.style.display = text ? '' : 'none';
+      }
+    }
+
+    function filterMovementList(containerId, query) {
+      const state = movementListState[containerId];
+      if (!state) return;
+      state.query = query || '';
+      renderMovementInputRows(containerId, state.names, movementSavedMaxs);
+    }
+
+    function toggleMovementList(containerId) {
+      const state = movementListState[containerId];
+      if (!state) return;
+      state.showAll = !state.showAll;
+      renderMovementInputRows(containerId, state.names, movementSavedMaxs);
     }
 
     function renderRmContainer(savedMaxs = {}) {
+      movementSavedMaxs = savedMaxs;
+      // Una modifica nel frattempo salvata non è più "in sospeso".
+      Object.keys(movementPendingEdits).forEach(key => {
+        if ((savedMaxs[key] || '').trim() === String(movementPendingEdits[key]).trim()) delete movementPendingEdits[key];
+      });
       renderMovementInputRows('rmContainer', CROSSFIT_STANDARD_RMS, savedMaxs);
       renderMovementInputRows('benchmarkContainer', CROSSFIT_BENCHMARK_WODS.map(b => b.name), savedMaxs);
     }
@@ -2062,16 +2161,24 @@
       const athleteName = localStorage.getItem('activeAthlete');
       if (!athleteName) { alert('Seleziona o salva prima il tuo profilo atleta!'); return; }
 
-      const rows = document.querySelectorAll('.rm-weight');
+      // Si parte dalle modifiche in sospeso, non dalle sole righe a schermo: una voce
+      // modificata e poi uscita dalla vista (ricerca cambiata, elenco richiuso) va salvata lo
+      // stesso, altrimenti quello che si è scritto sparirebbe senza dirlo.
+      captureMovementEdits('rmContainer');
+      captureMovementEdits('benchmarkContainer');
+
+      const nomePerChiave = {};
+      CROSSFIT_STANDARD_RMS.concat(CROSSFIT_BENCHMARK_WODS.map(b => b.name))
+        .forEach(m => { nomePerChiave[m.toLowerCase()] = m; });
+
       let changedCount = 0;
-      for (let input of rows) {
-        const movement = input.getAttribute('data-movement');
-        const weight = input.value.trim();
-        const original = input.getAttribute('data-original') || '';
+      for (const key of Object.keys(movementPendingEdits)) {
+        const movement = nomePerChiave[key];
+        const weight = String(movementPendingEdits[key]).trim();
         // Ogni salvataggio aggiunge una nuova riga di storico datata (vedi Apps Script):
         // inviamo quindi solo i valori realmente cambiati, per non duplicare righe identiche
         // ogni volta che si preme "Salva Massimali" senza aver modificato nulla.
-        if (movement && weight && weight !== original && url) {
+        if (movement && weight && weight !== (movementSavedMaxs[key] || '').trim() && url) {
           await fetch(url, {
             method: 'POST',
             body: JSON.stringify({ action: 'saveMassimale', athlete: athleteName, movement, weight, date: getTodayDateString() })
@@ -2772,8 +2879,13 @@
         return;
       }
 
+      // L'ordine del Foglio è quello di SALVATAGGIO, non della data dell'allenamento: senza
+      // riordinare, un recupero registrato oggi per lunedì scorso finirebbe in cima, e
+      // modificare una sessione vecchia la farebbe risalire (il salvataggio la cancella e la
+      // riaccoda). A parità di data resta la più recente salvata per prima, come prima.
+      const giornoDi = (item) => String(item.date || '').slice(0, 10);
       let html = '';
-      history.slice().reverse().forEach(item => {
+      history.slice().reverse().sort((a, b) => giornoDi(b).localeCompare(giornoDi(a))).forEach(item => {
         let contentHtml = '';
         
         if (item.blocks && Array.isArray(item.blocks)) {
