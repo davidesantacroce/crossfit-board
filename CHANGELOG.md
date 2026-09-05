@@ -4,6 +4,24 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v53 — 2026-09-05
+**Timer integrato nel blocco.** Nuovo tasto **⏱ Timer** su ogni Parte, sopra la coppia Log
+Result / Results, con tre modalità:
+- **Cronometro** per i For Time (parte da zero e sale).
+- **Countdown** per gli AMRAP: i minuti si leggono dal testo del WOD ("20 min AMRAP" →
+  countdown da 20:00), e si possono cambiare a mano.
+- **EMOM**: countdown che riparte a ogni round, con "Round 3 / 10" sotto le cifre e un bip a
+  ogni cambio round.
+- A fine tempo suona (e vibra, dove il telefono lo permette): il bip è generato al volo, nessun
+  file audio da scaricare o da tenere in cache per l'offline.
+- **"Usa questo tempo nel Log Result"** apre il Log Result della stessa Parte già impostato su
+  Time, coi minuti e i secondi compilati: niente da ricopiare a mano.
+- Il tempo si calcola sempre sull'orologio di sistema, mai sommando i tick: con lo schermo
+  spento o l'app in secondo piano il browser rallenta i timer, e un cronometro che accumula
+  tick perderebbe secondi proprio a metà WOD.
+- Cifre grandi e tabulari, leggibili col telefono per terra, e la coppia Log Result / Results
+  resta com'era (due metà uguali): il timer sta sopra, a tutta larghezza.
+
 ## v52 — 2026-09-05
 **Modalità palestra: l'app funziona anche senza linea.**
 - **I dati restano.** Ogni sincronizzazione riuscita viene tenuta sul telefono: aprendo l'app
