@@ -4,6 +4,26 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v52 — 2026-09-05
+**Modalità palestra: l'app funziona anche senza linea.**
+- **I dati restano.** Ogni sincronizzazione riuscita viene tenuta sul telefono: aprendo l'app
+  senza rete si vedono storico, massimali, bacheca e grafici dell'ultima volta, invece di
+  un'app vuota. È anche più veloce all'avvio, perché disegna subito la copia locale e poi la
+  sostituisce quando il Foglio risponde.
+- **I salvataggi non si perdono più.** Senza rete un salvataggio finiva in "Errore di
+  connessione", e il lavoro restava solo dentro al form finché non chiudevi l'app. Ora va in
+  una coda sul telefono, si vede subito nello storico e nel calendario come se fosse già
+  salvato, e **parte da solo appena torna la linea** (o alla sincronizzazione successiva).
+  Vale per: salvare un allenamento, pubblicare un WOD, eliminarlo, loggare un risultato e
+  salvare un massimale.
+- Le scritture partono **nell'ordine in cui le hai fatte**: modificare una sessione manda prima
+  la cancellazione e poi il nuovo salvataggio, e invertirle cancellerebbe quanto appena scritto.
+- Login, PIN e profilo restano **online**: rimandarli non avrebbe senso e il loro esito va visto
+  subito.
+- L'indicatore in fondo diceva sempre "Connesso al database di Google Sheet", **anche senza
+  linea**. Ora dice la verità: "Offline · stai vedendo gli ultimi dati scaricati" oppure quanti
+  salvataggi sono ancora in attesa.
+
 ## v51 — 2026-09-05
 - Il tab **ATLETA** era lungo circa **7 schermate** (6328 px): teneva sempre aperte tutte le
   righe dei due elenchi, 33 massimali + 28 benchmark, quasi tutte vuote. Ora di default mostra
