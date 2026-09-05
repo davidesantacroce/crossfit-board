@@ -222,6 +222,15 @@
     .fun-phrase-author { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
     .btn-log-result { width: 100%; background: var(--input-bg); border: 2px dashed var(--accent); color: var(--accent); padding: 12px; border-radius: 8px; font-weight: 800; text-transform: uppercase; font-size: 13px; cursor: pointer; }
+    /* "Log Result" e "Risultati Altri Atleti" sono le due azioni gemelle del blocco: stanno
+       affiancate e occupano esattamente metà riga a testa. box-sizing: border-box è necessario
+       perché i due bottoni hanno bordi/padding diversi: senza, a parità di flex-basis
+       finirebbero larghi diversamente. align-items: stretch li tiene alti uguali anche quando
+       l'etichetta più lunga va a capo. */
+    .result-actions-row { display: flex; align-items: stretch; gap: 8px; }
+    .result-actions-row > * { flex: 1 1 0; min-width: 0; box-sizing: border-box; }
+    .community-btn-wrap-paired { display: flex; }
+    .btn-community-paired { width: 100%; padding: 12px 8px; font-size: 13px; line-height: 1.25; }
     .result-summary-box { background: rgba(46, 125, 50, 0.12); border: 1px solid #2e7d32; border-radius: 10px; padding: 12px; }
     .result-summary-score { font-size: 15px; font-weight: 900; color: #4caf50; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .result-summary-cat { font-size: 10px; font-weight: 800; background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
@@ -673,7 +682,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v49";
+    const APP_VERSION = "v50";
     const APP_VERSION_DATE = "05/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -2170,8 +2179,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <label style="color: var(--accent);">🔥 PARTE #${currentId}</label>
           <div style="display: flex; gap: 6px;">
-            <button type="button" class="btn-secondary" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="triggerBlockImageUpload(${currentId})">📷 Carica Foto</button>
-            <button type="button" class="btn-remove" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="removeWorkoutBlock(${currentId})">✕</button>
+            <button type="button" class="btn-secondary" style="height: 36px; padding: 0 14px; font-size: 12px;" onclick="triggerBlockImageUpload(${currentId})">📷 Carica Foto</button>
+            <button type="button" class="btn-remove" style="height: 36px; padding: 0 12px; font-size: 12px;" onclick="removeWorkoutBlock(${currentId})">✕</button>
           </div>
         </div>
 
@@ -3836,11 +3845,19 @@
       const block = document.getElementById(`workout-block-${blockId}`);
       const liveTitle = block ? block.querySelector('.block-title').value : '';
       const liveType = block ? block.querySelector('.block-type').value : '';
-      const communityBtn = renderCommunityButton(`openCommunityResultsModal(${blockId})`, liveTitle, liveType, communityReferenceDateForForm());
       if (!r) {
-        box.innerHTML = `<button type="button" class="btn-log-result" onclick="openLogResultModal(${blockId})">🏆 Log Result</button>${communityBtn}`;
+        const pairedCommunityBtn = renderCommunityButton(`openCommunityResultsModal(${blockId})`, liveTitle, liveType, communityReferenceDateForForm(), { paired: true });
+        box.innerHTML = `
+          <div class="result-actions-row">
+            <button type="button" class="btn-log-result" onclick="openLogResultModal(${blockId})">🏆 Log Result</button>
+            ${pairedCommunityBtn}
+          </div>
+        `;
         return;
       }
+      // Con un risultato già loggato il posto di "Log Result" lo prende la card verde del
+      // punteggio, a tutta larghezza: qui il bottone community resta sotto, come prima.
+      const communityBtn = renderCommunityButton(`openCommunityResultsModal(${blockId})`, liveTitle, liveType, communityReferenceDateForForm());
       box.innerHTML = `
         <div class="result-summary-box">
           <div class="result-summary-score">🏆 ${escapeHtml(r.scoreDisplay)} <span class="result-summary-cat">${escapeHtml(r.category)}</span></div>
@@ -4037,11 +4054,19 @@
 
     // Pulsante "Risultati Altri Atleti" con il numero di persone che hanno già loggato quel WOD
     // in un badge in stile notifica iOS, in alto a destra sul pulsante (assente se nessuno).
-    function renderCommunityButton(onclickAttr, title, type, referenceDate) {
+    // paired: il bottone è affiancato a "Log Result" dentro una .result-actions-row, quindi
+    // prende le stesse misure di quello. Senza l'opzione resta come prima: da solo, a tutta
+    // larghezza e più compatto, sotto una card di sola lettura (Storico, vista giorno).
+    function renderCommunityButton(onclickAttr, title, type, referenceDate, options = {}) {
       const count = title ? getCommunityMatches(title, type, referenceDate).length : 0;
+      const paired = !!options.paired;
+      const wrapClass = paired ? 'community-btn-wrap community-btn-wrap-paired' : 'community-btn-wrap';
+      const wrapStyle = paired ? '' : ' style="margin-top: 6px;"';
+      const btnClass = paired ? 'btn-secondary btn-community-paired' : 'btn-secondary';
+      const btnStyle = paired ? '' : ' style="width: 100%; padding: 6px 10px; font-size: 11px;"';
       return `
-        <div class="community-btn-wrap" style="margin-top: 6px;">
-          <button type="button" class="btn-secondary" style="width: 100%; padding: 6px 10px; font-size: 11px;" onclick="${onclickAttr}">👥 Risultati Altri Atleti</button>
+        <div class="${wrapClass}"${wrapStyle}>
+          <button type="button" class="${btnClass}"${btnStyle} onclick="${onclickAttr}">👥 Risultati Altri Atleti</button>
           ${count > 0 ? `<span class="notification-badge">${count > 99 ? '99+' : count}</span>` : ''}
         </div>
       `;
