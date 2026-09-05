@@ -5,13 +5,17 @@ qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel 
 Impostazioni. Versioni più recenti in cima.
 
 ## v50 — 2026-09-05
-- **🏆 Log Result** e **👥 Risultati Altri Atleti** ora stanno **affiancati**, metà riga a testa,
-  stessa larghezza e stessa altezza: erano uno sopra l'altro e di misure diverse (il secondo
-  molto più piccolo), pur essendo le due azioni gemelle del blocco.
+- **🏆 Log Result** e **👥 Results** ora stanno **affiancati**, metà riga a testa, con misure
+  identiche: erano uno sopra l'altro e di dimensioni diverse, pur essendo le due azioni gemelle
+  del blocco. Il secondo si chiamava "Risultati Altri Atleti" e andava a capo su due righe:
+  ora è solo "Results" e sta su una riga sola come il gemello.
+- Tolto il **tratteggio** dal bordo di Log Result: bordo pieno da 1 px e stesso raggio degli
+  angoli dell'altro, così i due bottoni sono davvero identici (resta il colore accent a
+  distinguere l'azione principale).
 - Il bottone **📷 Carica Foto** (e la ✕ accanto) sono un po' più grandi: da 28 a 36 px di
   altezza, testo da 10 a 12 px, più facili da centrare col dito.
-- Nelle viste di sola lettura (Storico, giorno del calendario) il bottone dei risultati altri
-  atleti resta com'era: lì sta da solo sotto la card, non affiancato a nulla.
+- Nelle viste di sola lettura (Storico, giorno del calendario) il bottone resta com'era: lì sta
+  da solo sotto la card, non affiancato a nulla.
 
 ## v49 — 2026-09-05
 - Il calendario di REGISTRA è ora una **finestra scorrevole centrata su oggi** (da 3 giorni fa a
