@@ -24,7 +24,7 @@ test('la card Salute resta nascosta per un atleta senza dati', async ({ page }) 
   await expect(page.locator('#healthCard')).toBeHidden();
 });
 
-test('mostra peso, grasso corporeo, FC a riposo, passi ed energia più recenti', async ({ page }) => {
+test('mostra peso e grasso corporeo più recenti (FC a riposo/passi/energia attiva non si mostrano più qui: li segue Whoop)', async ({ page }) => {
   await mockBackend(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     health: [{
@@ -38,15 +38,15 @@ test('mostra peso, grasso corporeo, FC a riposo, passi ed energia più recenti',
 
   await expect(page.locator('#healthCard')).toBeVisible();
   const values = await page.locator('#healthContainer .health-stat-value').allInnerTexts();
-  expect(values).toEqual(['78.4 kg', '15.2%', '52 bpm', '8.400', '540 kcal']);
+  expect(values).toEqual(['78.4 kg', '15.2%']);
 });
 
 test('ogni metrica prende il suo giorno più recente, anche se non coincidono', async ({ page }) => {
   await mockBackend(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     health: [
-      { athlete: 'Test Athlete', date: daysAgo(5), weight: 80.0, steps: 3000 }, // solo peso vecchio
-      { athlete: 'Test Athlete', date: daysAgo(1), steps: 9000 },               // solo passi, oggi
+      { athlete: 'Test Athlete', date: daysAgo(5), weight: 80.0 },                 // solo peso, vecchio
+      { athlete: 'Test Athlete', date: daysAgo(1), bodyFatPercentage: 14.8 },      // solo grasso, oggi
     ],
   });
   await gotoApp(page);
@@ -55,7 +55,7 @@ test('ogni metrica prende il suo giorno più recente, anche se non coincidono', 
 
   const values = await page.locator('#healthContainer .health-stat-value').allInnerTexts();
   expect(values[0]).toBe('80.0 kg');  // dal giorno vecchio, unico con un peso
-  expect(values[3]).toBe('9.000');    // dal giorno recente, unico con i passi
+  expect(values[1]).toBe('14.8%');    // dal giorno recente, unico con il grasso corporeo
   await expect(page.locator('#healthContainer')).toContainText('Ultimo dato:'); // segue il giorno più recente in assoluto
 });
 
@@ -86,7 +86,7 @@ test('una metrica mancante mostra il trattino invece di sparire', async ({ page 
   await apriAtleta(page);
 
   const values = await page.locator('#healthContainer .health-stat-value').allInnerTexts();
-  expect(values).toEqual(['78.4 kg', '—', '—', '—', '—']);
+  expect(values).toEqual(['78.4 kg', '—']);
 });
 
 test('il bottone precompila il peso nel profilo senza salvare da solo', async ({ page }) => {
