@@ -688,7 +688,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v51";
+    const APP_VERSION = "v52";
     const APP_VERSION_DATE = "05/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1133,6 +1133,10 @@
     window.onload = function() {
       applyDefaultLogos();
       applyAppVersion();
+      // Prima i dati dell'ultima volta (istantanei, e sono tutto quello che c'è se non c'è
+      // linea), poi la sincronizzazione vera che li sostituisce appena risponde.
+      if (loadCloudDataCache()) renderAllFromCloudData();
+      updateConnectionIndicator();
       renderRegistraCalendar();
       updateRegistraDateView();
       showFunLoadingOverlay();
@@ -1144,6 +1148,15 @@
       // Lavoro" come primo passo (la bacheca WOD del giorno resta comunque visibile sopra
       // se qualcuno ha già pubblicato/salvato qualcosa oggi).
     };
+
+    // Quando il telefono ritrova la linea, la coda parte da sola senza che l'utente faccia
+    // nulla; quando la perde, l'indicatore lo dice invece di restare verde.
+    window.addEventListener('online', async () => {
+      updateConnectionIndicator(true);
+      const inviati = await flushPendingWrites();
+      if (inviati > 0) await fetchCloudData();
+    });
+    window.addEventListener('offline', () => updateConnectionIndicator(false));
 
     // Service worker: serve solo a rendere l'app installabile (icona in home screen) e a farla
     // aprire offline con l'ultima versione vista, non tocca le chiamate API (vedi sw.js). Il
@@ -1297,32 +1310,195 @@
       if (info) info.innerText = `${APP_VERSION} · aggiornata il ${APP_VERSION_DATE}`;
     }
 
+    // ===================== MODALITÀ PALESTRA (dati in locale + coda di scrittura) =========
+    // In palestra la linea spesso non c'è. Senza questa parte l'app si apriva vuota (nessuno
+    // storico, nessun massimale per i pesi proposti) e un salvataggio senza rete finiva con un
+    // "Errore di connessione" che lasciava il lavoro solo dentro al form.
+    const OFFLINE_CACHE_KEY = 'cachedCloudData';
+    const OFFLINE_QUEUE_KEY = 'pendingWrites';
+    // Solo le scritture che servono davvero in palestra passano dalla coda. Login/PIN e profilo
+    // restano online: rimandarli non avrebbe senso e il loro esito va visto subito.
+    const QUEUEABLE_ACTIONS = ['saveWodSession', 'deleteWod', 'logResult', 'saveMassimale'];
+
+    function saveCloudDataCache() {
+      try {
+        localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify(globalData));
+      } catch (err) {
+        // Quota piena: la cache è un di più, l'app funziona lo stesso finché c'è linea.
+        console.warn('Cache dati non salvata:', err);
+      }
+    }
+
+    // Ridà i dati dell'ultima sincronizzazione riuscita. Torna true se c'era qualcosa.
+    function loadCloudDataCache() {
+      try {
+        const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+        if (!raw) return false;
+        const cached = JSON.parse(raw);
+        if (!cached || typeof cached !== 'object') return false;
+        globalData = normalizeCloudData(cached);
+        return true;
+      } catch (err) {
+        console.warn('Cache dati illeggibile:', err);
+        return false;
+      }
+    }
+
+    function normalizeCloudData(data) {
+      data.wods = data.wods || [];
+      data.athletes = data.athletes || [];
+      data.massimali = data.massimali || [];
+      data.results = data.results || [];
+      data.whoop = data.whoop || [];
+      data.health = data.health || [];
+      data.funPhrases = data.funPhrases || [];
+      return data;
+    }
+
+    function loadPendingWrites() {
+      try {
+        const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function savePendingWrites(list) {
+      try {
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(list));
+      } catch (err) {
+        console.warn('Coda salvataggi non scritta:', err);
+      }
+    }
+
+    function enqueuePendingWrite(payload) {
+      const list = loadPendingWrites();
+      list.push({ payload, at: new Date().toISOString() });
+      savePendingWrites(list);
+      updateConnectionIndicator();
+    }
+
+    // Applica in locale una scrittura messa in coda, con le stesse regole del backend: così
+    // quello che salvi senza linea lo vedi subito in storico/calendario, non "al prossimo giro".
+    function applyWriteLocally(payload) {
+      normalizeCloudData(globalData);
+      if (payload.action === 'saveWodSession') {
+        globalData.wods = globalData.wods.filter(w => String(w.id) !== String(payload.id));
+        globalData.wods.push({ id: payload.id, date: payload.date, athlete: payload.athlete, mode: payload.mode, blocks: payload.blocks });
+      } else if (payload.action === 'deleteWod') {
+        globalData.wods = globalData.wods.filter(w => String(w.id) !== String(payload.id));
+      } else if (payload.action === 'logResult') {
+        const entry = {
+          id: payload.id, athlete: payload.athlete, date: payload.date, workout: payload.workout,
+          workoutType: payload.workoutType, scoreType: payload.scoreType, scoreDetail: payload.scoreDetail,
+          scoreDisplay: payload.score, category: payload.category, movements: payload.movements, notes: payload.notes,
+        };
+        const idx = globalData.results.findIndex(r => String(r.id) === String(payload.id));
+        if (idx >= 0) globalData.results[idx] = entry;
+        else globalData.results.unshift(entry);
+      } else if (payload.action === 'saveMassimale') {
+        globalData.massimali.push({ athlete: payload.athlete, movement: payload.movement, weight: payload.weight, date: payload.date });
+      }
+      saveCloudDataCache();
+    }
+
+    // Unico punto di uscita per le scritture. Torna { ok, queued }: "queued" vuol dire che è
+    // salvata sul telefono e partirà da sola, non che è andata persa.
+    async function postToBackend(payload) {
+      const url = getScriptUrl();
+      const queueable = QUEUEABLE_ACTIONS.includes(payload.action);
+      if (!url) return { ok: false, queued: false };
+
+      if (queueable && navigator.onLine === false) {
+        enqueuePendingWrite(payload);
+        applyWriteLocally(payload);
+        return { ok: true, queued: true };
+      }
+
+      try {
+        const res = await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
+        if (!res.ok) return { ok: false, queued: false, res };
+        updateConnectionIndicator(true);
+        return { ok: true, queued: false, res };
+      } catch (err) {
+        if (!queueable) return { ok: false, queued: false, error: err };
+        console.warn('Salvataggio messo in coda (niente linea):', err);
+        enqueuePendingWrite(payload);
+        applyWriteLocally(payload);
+        return { ok: true, queued: true, error: err };
+      }
+    }
+
+    // Svuota la coda in ordine. Al primo errore si ferma: la rete è ancora giù, si riproverà.
+    let flushingPendingWrites = false;
+    async function flushPendingWrites() {
+      if (flushingPendingWrites) return 0;
+      const url = getScriptUrl();
+      let list = loadPendingWrites();
+      if (!url || list.length === 0) return 0;
+
+      flushingPendingWrites = true;
+      let inviati = 0;
+      try {
+        while (list.length > 0) {
+          try {
+            const res = await fetch(url, { method: 'POST', body: JSON.stringify(list[0].payload) });
+            if (!res.ok) break;
+          } catch (err) {
+            break;
+          }
+          list.shift();
+          savePendingWrites(list);
+          inviati++;
+        }
+      } finally {
+        flushingPendingWrites = false;
+      }
+
+      updateConnectionIndicator();
+      return inviati;
+    }
+
+    // ===================== FINE MODALITÀ PALESTRA =====================
+
+    // Ridisegna tutto a partire da globalData. Serve sia dopo una sincronizzazione riuscita sia
+    // quando i dati arrivano dalla cache locale (offline).
+    function renderAllFromCloudData() {
+      renderHistory();
+      renderActiveDaysChart();
+      renderTrainingFocusChart();
+      renderWhoopCard();
+      renderHealthCard();
+      renderFunPhrases();
+      loadLocalMassimaliAndProfile();
+      renderRegistraCalendar();
+      updateRegistraDateView();
+      renderBachecaTab();
+      refreshAllBlockHints();
+    }
+
     async function fetchCloudData() {
       const url = getScriptUrl();
       if (!url) return;
       try {
         const res = await fetch(url + "?action=getData");
         if (res.ok) {
-          globalData = await res.json();
-          globalData.results = globalData.results || [];
-          globalData.whoop = globalData.whoop || [];
-          globalData.health = globalData.health || [];
-          globalData.funPhrases = globalData.funPhrases || [];
+          globalData = normalizeCloudData(await res.json());
+          saveCloudDataCache();
           updateConnectionIndicator(true);
-          renderHistory();
-          renderActiveDaysChart();
-          renderTrainingFocusChart();
-          renderWhoopCard();
-          renderHealthCard();
-          renderFunPhrases();
-          loadLocalMassimaliAndProfile();
-          renderRegistraCalendar();
-          updateRegistraDateView();
-          renderBachecaTab();
-          refreshAllBlockHints();
+          renderAllFromCloudData();
+          // Tornata la linea, quello che si era salvato senza parte da solo.
+          if (loadPendingWrites().length > 0) {
+            const inviati = await flushPendingWrites();
+            if (inviati > 0) await fetchCloudData();
+          }
         }
       } catch (err) {
         console.error("Errore sincronizzazione cloud:", err);
+        // Niente linea: si resta con l'ultima fotografia scaricata invece che con l'app vuota.
+        updateConnectionIndicator(false);
       }
     }
 
@@ -1344,10 +1520,26 @@
       }
     }
 
+    // Diceva sempre "Connesso", anche senza linea. Ora racconta lo stato vero, compreso quanto
+    // c'è ancora da mandare al Foglio (vedi modalità palestra).
     function updateConnectionIndicator(isConnected) {
       const dot = document.getElementById('connectionDot');
       const text = document.getElementById('connectionStatusText');
-      if (dot && text) {
+      if (!dot || !text) return;
+
+      const inAttesa = loadPendingWrites().length;
+      const online = isConnected !== false && navigator.onLine !== false;
+      const attesaTxt = inAttesa === 1 ? '1 salvataggio in attesa' : `${inAttesa} salvataggi in attesa`;
+
+      if (!online) {
+        dot.style.backgroundColor = '#e64a19';
+        text.innerText = inAttesa > 0
+          ? `Offline · ${attesaTxt}, partono da soli quando torna la linea`
+          : 'Offline · stai vedendo gli ultimi dati scaricati';
+      } else if (inAttesa > 0) {
+        dot.style.backgroundColor = '#f9a825';
+        text.innerText = `${attesaTxt} di sincronizzazione`;
+      } else {
         dot.style.backgroundColor = '#2e7d32';
         text.innerText = 'Connesso al database di Google Sheet';
       }
@@ -2179,10 +2371,7 @@
         // inviamo quindi solo i valori realmente cambiati, per non duplicare righe identiche
         // ogni volta che si preme "Salva Massimali" senza aver modificato nulla.
         if (movement && weight && weight !== (movementSavedMaxs[key] || '').trim() && url) {
-          await fetch(url, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'saveMassimale', athlete: athleteName, movement, weight, date: getTodayDateString() })
-          });
+          await postToBackend({ action: 'saveMassimale', athlete: athleteName, movement, weight, date: getTodayDateString() });
           changedCount++;
         }
       }
@@ -2503,14 +2692,19 @@
           // accoda sempre nuove righe, quindi senza questo passaggio un blocco rimosso o
           // un numero di blocchi diverso lascerebbe righe duplicate/orfane sul Foglio.
           if (isEditing) {
-            await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'deleteWod', id: String(editingWodId) }) });
+            await postToBackend({ action: 'deleteWod', id: String(editingWodId) });
           }
 
-          const response = await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
-          if (response.ok) {
-            await fetchCloudData();
+          const esito = await postToBackend(entry);
+          if (esito.ok) {
+            // Senza linea la sessione è già stata applicata in locale e messa in coda: non
+            // c'è niente da riscaricare, e soprattutto non c'è niente da perdere.
+            if (!esito.queued) await fetchCloudData();
+            else renderAllFromCloudData();
             hideFunLoadingOverlay();
-            alert(isEditing ? 'Modifiche salvate!' : 'Sessione multi-blocco salvata sul Foglio Google!');
+            alert(esito.queued
+              ? 'Nessuna linea: salvato sul telefono. Parte da solo appena torni online.'
+              : (isEditing ? 'Modifiche salvate!' : 'Allenamento salvato sul Foglio Google!'));
             editingWodId = null;
             editingWodDate = null;
             loggingPastDay = false;
@@ -2573,10 +2767,13 @@
 
       showFunLoadingOverlay();
       try {
-        const response = await fetch(url, { method: 'POST', body: JSON.stringify(entry) });
-        await fetchCloudData();
+        const esito = await postToBackend(entry);
+        if (!esito.queued) await fetchCloudData();
+        else renderAllFromCloudData();
         hideFunLoadingOverlay();
-        if (response.ok) {
+        if (esito.queued) {
+          alert('Nessuna linea: il WOD è salvato sul telefono e finirà in bacheca appena torni online.');
+        } else if (esito.ok) {
           alert(isFuture
             ? `WOD programmato per il ${formatDateForDisplay(selectedRegistraDate)}! Comparirà in bacheca quel giorno, e allora potrai loggare il tuo risultato.`
             : 'WOD pubblicato in bacheca! Quando lo fai, torna qui e logga il tuo risultato con "Salva Sessione Completa".');
@@ -2831,19 +3028,11 @@
     async function deleteWod(id) {
       if (!confirm('Vuoi davvero eliminare questo allenamento?')) return;
       
-      const url = getScriptUrl();
-      if (url) {
-        try {
-          await fetch(url, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'deleteWod', id: String(id) })
-          });
-        } catch (err) {
-          console.error("Errore eliminazione dal cloud:", err);
-        }
-      }
+      // Senza linea l'eliminazione finisce in coda (vedi postToBackend) e vale comunque qui.
+      await postToBackend({ action: 'deleteWod', id: String(id) });
 
       globalData.wods = globalData.wods.filter(item => String(item.id) !== String(id));
+      saveCloudDataCache();
       renderHistory();
       renderRegistraCalendar();
       updateRegistraDateView();
@@ -3314,13 +3503,12 @@
 
       const url = getScriptUrl();
       if (url) {
-        try {
-          await fetch(url, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'saveMassimale', athlete: athleteName, movement: movementName, weight: scoreDisplay, date })
-          });
-        } catch (err) {
-          console.error('Errore aggiornamento automatico massimale/benchmark:', err);
+        const esito = await postToBackend({ action: 'saveMassimale', athlete: athleteName, movement: movementName, weight: scoreDisplay, date });
+        // In coda la riga è già stata aggiunta in locale da applyWriteLocally: aggiungerla di
+        // nuovo qui sotto la duplicherebbe.
+        if (esito.queued) return;
+        if (!esito.ok) {
+          console.error('Errore aggiornamento automatico massimale/benchmark');
           return;
         }
       }
@@ -3908,9 +4096,7 @@
       const url = getScriptUrl();
       if (url) {
         try {
-          await fetch(url, {
-            method: 'POST',
-            body: JSON.stringify({
+          await postToBackend({
               action: 'logResult',
               id: result.id,
               athlete: result.athlete,
@@ -3923,7 +4109,6 @@
               category: result.category,
               movements: result.movements.join(', '),
               notes: result.notes
-            })
           });
         } catch (err) {
           console.error('Errore salvataggio Log Result sul cloud:', err);
