@@ -41,14 +41,22 @@ test('un giorno passato resta in sola lettura, come prima', async ({ page }) => 
   await expect(page.locator('#registraDayView')).toBeVisible();
 });
 
-test('tornando su oggi il form riprende il suo aspetto normale', async ({ page }) => {
+test('tornando su oggi si vede di nuovo la vista di sola lettura, non più la programmazione', async ({ page }) => {
   await mockBackend(page, { athletes: [{ name: 'Test Athlete', hasPin: false }] });
   await gotoApp(page);
   await loginAs(page, 'Test Athlete');
   await apriGiorno(page, DOMANI);
   await page.evaluate(() => selectCalendarDate(getTodayDateString()));
 
+  // Oggi mostra di default la vista di sola lettura (v48), non più il form di programmazione
+  // del giorno futuro appena lasciato.
   await expect(page.locator('#futureDayBanner')).toBeHidden();
+  await expect(page.locator('#registraFormCard')).toBeHidden();
+  await expect(page.locator('#registraDayView')).toBeVisible();
+
+  // Aprendo il form per oggi, il tasto pubblica torna quello standard (non più quello del
+  // giorno futuro appena lasciato).
+  await page.getByRole('button', { name: '+ Registra un allenamento per oggi' }).click();
   await expect(page.locator('#saveWodBtn')).toBeVisible();
   await expect(page.locator('#publishWodBtn')).toContainText('PUBBLICA SOLO IL WOD');
 });

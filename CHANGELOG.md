@@ -4,6 +4,20 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v48 — 2026-09-05
+- **Un allenamento alla volta in REGISTRA**: sia OGGI sia un giorno passato mostrano ora di
+  default la vista di sola lettura di quanto già registrato, invece del form sempre aperto.
+  Prima si poteva impilare più "Parti" (+ Aggiungi Lavoro) in un'unica sessione salvata in un
+  colpo solo: comodo ma creava discrepanze nello storico, perché spesso si fa solo UNA delle
+  parti di una giornata proposta, non l'intera seduta. Ora "+ Aggiungi Lavoro" aggiunge solo la
+  prima Parte e poi sparisce: per un secondo allenamento fatto lo stesso giorno si usa "+
+  Registra un altro allenamento", che apre un form vuoto e lo salva come riga separata.
+- Il tasto PUBBLICA resta disponibile registrando un nuovo allenamento per oggi (a differenza
+  del recupero di un giorno passato, dove non ha senso proporlo in bacheca).
+- Sessioni multi-Parte già esistenti nello storico restano visibili e modificabili come prima:
+  la modifica riapre tutte le Parti già salvate; il limite riguarda solo la creazione di nuove
+  sessioni.
+
 ## v47 — 2026-09-04
 - La card SALUTE ora mostra solo **peso** e **grasso corporeo**: FC a riposo, passi ed energia
   attiva sono stati tolti dalla card (chi li segue lo fa già dalla card Whoop). Il backend

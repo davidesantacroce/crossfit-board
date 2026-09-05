@@ -369,7 +369,9 @@
         <button type="button" class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="cancelLoggingPastDay()">Annulla</button>
       </div>
 
-      <button type="button" class="btn-secondary" style="width: 100%; padding: 14px; font-size: 14px; margin-bottom: 16px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
+      <!-- Una sola Parte per sessione: il bottone compare solo per aggiungere la prima, non
+           per impilarne altre (vedi updateAddWorkoutBlockButtonVisibility). -->
+      <button type="button" id="addWorkoutBlockBtn" class="btn-secondary" style="width: 100%; padding: 14px; font-size: 14px; margin-bottom: 16px;" onclick="addWorkoutBlock()">+ Aggiungi Lavoro</button>
 
       <!-- Contenitore Dinamico Blocchi Multipli -->
       <div id="workoutBlocksContainer"></div>
@@ -659,17 +661,20 @@
     let editingWodId = null;
     let editingWodDate = null;
 
-    // Registrazione di un allenamento su un giorno PASSATO senza sessioni ancora salvate (es.
-    // recupero: fatto oggi il WOD di ieri). Diverso da editingWodId: qui si crea una sessione
-    // nuova con la data passata, non se ne modifica una esistente. Va esplicitamente attivata
-    // dal bottone nella vista di sola lettura (vedi renderRegistraDayView), altrimenti un
-    // giorno passato mostra di default solo quanto già registrato.
+    // Registrazione ESPLICITA di UN allenamento (una sola Parte) su un giorno che mostra di
+    // default la vista di sola lettura: sia un giorno PASSATO (es. recupero: fatto oggi il WOD
+    // di ieri), sia OGGI stesso. Diverso da editingWodId: qui si crea una sessione nuova, non se
+    // ne modifica una esistente. Va esplicitamente attivata dal bottone nella vista di sola
+    // lettura (vedi renderRegistraDayView), altrimenti oggi/un giorno passato mostrano di
+    // default solo quanto già registrato: niente più form aperto di default con "+ Aggiungi
+    // Lavoro" per impilare più Parti in una sessione sola (una discrepanza con lo storico reale,
+    // perché spesso si fa solo UNA delle Parti proposte, non l'intera giornata).
     let loggingPastDay = false;
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v47";
-    const APP_VERSION_DATE = "04/09/2026";
+    const APP_VERSION = "v48";
+    const APP_VERSION_DATE = "05/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -869,15 +874,23 @@
       updateRegistraDateView();
     }
 
-    // Bottone "+ Registra un allenamento per questo giorno" nella vista di sola lettura di un
-    // giorno passato (vedi renderRegistraDayView).
+    // Bottone "+ Registra un allenamento" nella vista di sola lettura di un giorno passato o di
+    // oggi (vedi renderRegistraDayView). Si riparte sempre da un form vuoto (una sola Parte alla
+    // volta): eventuali blocchi rimasti da un tentativo precedente annullato non devono
+    // ripresentarsi.
     function startLoggingPastDay() {
       loggingPastDay = true;
+      document.getElementById('workoutBlocksContainer').innerHTML = '';
+      blockCounter = 0;
+      blockResults = {};
       updateRegistraDateView();
     }
 
     function cancelLoggingPastDay() {
       loggingPastDay = false;
+      document.getElementById('workoutBlocksContainer').innerHTML = '';
+      blockCounter = 0;
+      blockResults = {};
       updateRegistraDateView();
     }
 
@@ -910,20 +923,26 @@
       // Confronto fra stringhe YYYY-MM-DD: ordinamento lessicografico e cronologico coincidono.
       const isFuture = selectedRegistraDate > getTodayDateString();
       const isPast = !isToday && !isFuture;
-      // Mentre si modifica una sessione passata, il form resta visibile anche se la data
-      // selezionata nel calendario non è quella odierna. Su un giorno passato SENZA modifica in
-      // corso, il form compare solo se richiesto esplicitamente (recupero: vedi loggingPastDay).
-      const showForm = isToday || isFuture || editingWodId !== null || (isPast && loggingPastDay);
+      // Mentre si modifica una sessione esistente, il form resta visibile a prescindere dalla
+      // data selezionata nel calendario. Su un giorno futuro si programma sempre (vedi sotto).
+      // Su OGGI e su un giorno PASSATO, di default si vede la vista di sola lettura di quanto
+      // già registrato: il form compare solo se richiesto esplicitamente col bottone "+
+      // Registra un allenamento" (vedi loggingPastDay/startLoggingPastDay), una sola Parte alla
+      // volta, invece di restare sempre aperto pronto a impilarne più di una in un'unica sessione.
+      const showForm = isFuture || editingWodId !== null || ((isToday || isPast) && loggingPastDay);
       formCard.style.display = showForm ? '' : 'none';
       dayView.style.display = showForm ? 'none' : '';
 
       // Su un giorno futuro si può solo PROGRAMMARE il WOD: l'allenamento non è ancora stato
       // fatto, quindi non ha senso salvare una sessione con un risultato.
       const isProgramming = isFuture && editingWodId === null;
-      // Recupero: si sta registrando ORA un allenamento di un giorno passato (es. fatto oggi il
-      // WOD di ieri). Qui invece il risultato ha senso eccome; è "pubblica il WOD" a non averne,
-      // perché un giorno già passato non ha più senso proporlo in bacheca ad altri.
+      // Recupero: si sta registrando ORA un allenamento di un giorno PASSATO (es. fatto oggi il
+      // WOD di ieri). Qui il risultato ha senso eccome; è "pubblica il WOD" a non averne, perché
+      // un giorno già passato non ha più senso proporlo in bacheca ad altri.
       const isPastLogging = isPast && loggingPastDay && editingWodId === null;
+      // Stessa modalità "un allenamento alla volta" ma per OGGI: qui, a differenza del recupero
+      // di un giorno passato, pubblicare il WOD in bacheca resta perfettamente sensato.
+      const isTodayLogging = isToday && loggingPastDay && editingWodId === null;
 
       const banner = document.getElementById('futureDayBanner');
       const bannerText = document.getElementById('futureDayBannerText');
@@ -935,8 +954,9 @@
 
       if (banner) banner.style.display = isProgramming ? '' : 'none';
       if (bannerText && isProgramming) bannerText.innerText = `📅 STAI PROGRAMMANDO IL WOD DI ${formatDateForDisplay(selectedRegistraDate)}`;
-      if (pastBanner) pastBanner.style.display = isPastLogging ? 'flex' : 'none';
+      if (pastBanner) pastBanner.style.display = (isPastLogging || isTodayLogging) ? 'flex' : 'none';
       if (pastBannerText && isPastLogging) pastBannerText.innerText = `📝 STAI REGISTRANDO L'ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
+      if (pastBannerText && isTodayLogging) pastBannerText.innerText = `📝 STAI REGISTRANDO UN ALLENAMENTO PER OGGI`;
       if (saveBtn) saveBtn.style.display = isProgramming ? 'none' : '';
       if (publishBtn) publishBtn.style.display = isPastLogging ? 'none' : '';
       if (publishHint) publishHint.style.display = (isProgramming || isPastLogging) ? 'none' : '';
@@ -946,6 +966,7 @@
           : '📋 PUBBLICA SOLO IL WOD (senza risultato)';
       }
 
+      updateAddWorkoutBlockButtonVisibility();
       if (!showForm) renderRegistraDayView();
     }
 
@@ -954,20 +975,23 @@
       const contentEl = document.getElementById('registraDayViewContent');
       if (!titleEl || !contentEl) return;
 
-      titleEl.innerText = `ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
+      const isToday = selectedRegistraDate === getTodayDateString();
+      titleEl.innerText = isToday ? 'ALLENAMENTO DI OGGI' : `ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
 
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const sessions = (globalData.wods || []).filter(w =>
         w.date === selectedRegistraDate && w.athlete && w.athlete.toLowerCase() === activeAthlete
       );
 
-      // Bottone per il recupero: registrare ORA (con un risultato) l'allenamento di questo
-      // giorno passato, es. fatto oggi il WOD di ieri. Questa vista è di sola lettura per
-      // default (vedi updateRegistraDateView), quindi senza questo bottone non c'era alcun modo
-      // di loggare un giorno passato che non avesse già una sessione salvata.
+      // Bottone per registrare ORA (con un risultato) UN allenamento, sia esso il recupero di
+      // un giorno passato (es. fatto oggi il WOD di ieri) sia un nuovo WOD di oggi stesso.
+      // Questa vista è di sola lettura per default (vedi updateRegistraDateView), quindi senza
+      // questo bottone non ci sarebbe alcun modo di registrare un giorno che non abbia già
+      // almeno una sessione salvata.
+      const dayLabel = isToday ? 'oggi' : 'questo giorno';
       const logPastBtnHtml = `
         <button type="button" class="btn-secondary" style="width: 100%; margin-top: ${sessions.length ? '12px' : '0'};" onclick="startLoggingPastDay()">
-          + Registra ${sessions.length ? 'un altro' : 'un'} allenamento per questo giorno
+          + Registra ${sessions.length ? 'un altro' : 'un'} allenamento per ${dayLabel}
         </button>
       `;
 
@@ -2131,7 +2155,7 @@
           <label style="color: var(--accent);">🔥 PARTE #${currentId}</label>
           <div style="display: flex; gap: 6px;">
             <button type="button" class="btn-secondary" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="triggerBlockImageUpload(${currentId})">📷 Carica Foto</button>
-            <button type="button" class="btn-remove" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="document.getElementById('workout-block-${currentId}').remove()">✕</button>
+            <button type="button" class="btn-remove" style="height: 28px; padding: 0 8px; font-size: 10px;" onclick="removeWorkoutBlock(${currentId})">✕</button>
           </div>
         </div>
 
@@ -2174,6 +2198,26 @@
       container.appendChild(blockDiv);
       renderBlockResultSummary(currentId);
       renderDetectedSetsHint(currentId);
+      updateAddWorkoutBlockButtonVisibility();
+    }
+
+    // Rimuove una Parte dal form e ripristina il bottone "+ Aggiungi Lavoro" se il form è
+    // tornato vuoto (vedi updateAddWorkoutBlockButtonVisibility).
+    function removeWorkoutBlock(blockId) {
+      const block = document.getElementById(`workout-block-${blockId}`);
+      if (block) block.remove();
+      updateAddWorkoutBlockButtonVisibility();
+    }
+
+    // "+ Aggiungi Lavoro" compare solo per aggiungere la PRIMA Parte, non per impilarne altre
+    // nella stessa sessione: si registra un lavoro alla volta (vedi anche loggingPastDay), così
+    // lo storico riflette esattamente cosa si è fatto quel giorno invece di un'intera giornata
+    // proposta che magari non si è svolta per intero.
+    function updateAddWorkoutBlockButtonVisibility() {
+      const btn = document.getElementById('addWorkoutBlockBtn');
+      const container = document.getElementById('workoutBlocksContainer');
+      if (!btn || !container) return;
+      btn.style.display = container.children.length === 0 ? '' : 'none';
     }
 
     function setBlockCategory(blockId, cat) {
@@ -2539,11 +2583,11 @@
     function applyWodBlocksToRegistraForm(blocks) {
       if (!blocks || blocks.length === 0) return;
 
-      // Scegliere un WOD per un giorno passato significa anche voler iniziare a registrarlo per
-      // quel giorno (vedi loggingPastDay / updateRegistraDateView).
+      // Scegliere un WOD per oggi o per un giorno passato (entrambi mostrano di default la
+      // vista di sola lettura) significa anche voler iniziare a registrarlo (vedi
+      // loggingPastDay / updateRegistraDateView).
       const isFuture = selectedRegistraDate > getTodayDateString();
-      const isToday = selectedRegistraDate === getTodayDateString();
-      if (!isToday && !isFuture && editingWodId === null) loggingPastDay = true;
+      if (!isFuture && editingWodId === null) loggingPastDay = true;
 
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;

@@ -18,6 +18,10 @@ test('Registra parte senza nessuna Parte precompilata', async ({ page }) => {
   await loginAs(page, 'Test Athlete');
   await page.evaluate(() => switchTab('registra'));
 
+  // Oggi mostra di default la vista di sola lettura (vedi one-workout-at-a-time in registra.spec.js):
+  // bisogna prima aprire esplicitamente il form per un nuovo allenamento.
+  await page.getByRole('button', { name: '+ Registra un allenamento per oggi' }).click();
+
   await expect(page.locator('[id^="workout-block-"]')).toHaveCount(0);
 
   await page.getByText('+ Aggiungi Lavoro').click();
