@@ -4,6 +4,19 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v55 — 2026-09-06
+- **La fascia incontra il WOD.** Sotto ogni sessione registrata (nello Storico e nella vista
+  giorno del calendario) compaiono ora i dati Whoop di quell'allenamento: sport, **strain**,
+  **bpm medi e massimi**, **calorie**. I due pezzi erano già entrambi nell'app — la card Whoop
+  nel tab ATLETA e lo storico dei WOD — ma non si erano mai incontrati: si vedeva *cosa* avevi
+  fatto oppure *quanto era costato*, mai le due cose insieme.
+- L'abbinamento è **per giornata**, e lo dice: Whoop salva solo la data dell'allenamento (non
+  l'ora) e una sessione registrata non ha un'ora sua. Se in un giorno la fascia ha rilevato più
+  allenamenti li mostra **tutti**, segnalando che sono più di uno, invece di sceglierne uno a
+  caso e far leggere numeri sbagliati.
+- Niente striscia sui WOD solo **pubblicati** in bacheca: non sono allenamenti che hai fatto.
+- Nessuna modifica al backend: usa i dati che la sincronizzazione Whoop porta già nel Foglio.
+
 ## v54 — 2026-09-05
 - **Fix del timer (v53): chiudere la modale a metà WOD faceva perdere il tempo.** Bastava
   chiuderla per rileggere il WOD, o toccarla per sbaglio: riaprendola si trovava 00:00, fermo.

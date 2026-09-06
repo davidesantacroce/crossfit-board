@@ -81,7 +81,13 @@ test('selezionare dalla bacheca un WOD di un giorno passato apre il form in moda
   await loginAs(page, 'Test Athlete');
   page.on('dialog', (d) => d.accept());
   await page.evaluate(() => fetchCloudData());
-  await apriBacheca(page);
+  // Posiziona la bacheca sulla settimana di IERI: girando di domenica, ieri cade nella settimana
+  // precedente a quella mostrata di default (stessa accortezza degli altri test qui sotto).
+  await page.evaluate((d) => {
+    switchTab('bacheca');
+    bachecaWeekStart = toDateString(getWeekStart(new Date(d + 'T00:00:00')));
+    renderBachecaTab();
+  }, IERI);
 
   await page.evaluate(() => useWodFromBacheca(0));
 
