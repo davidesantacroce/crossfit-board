@@ -590,6 +590,14 @@
       </p>
     </div>
 
+    <!-- Compare solo se ci sono ancora sessioni "vecchio stile" da spacchettare (vedi
+         renderSplitSessionsCard): una volta finito, sparisce da sola. -->
+    <div class="card" id="splitSessionsCard" style="display: none;">
+      <div class="card-title">⑂ ALLENAMENTI RAGGRUPPATI</div>
+      <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;" id="splitSessionsInfo"></p>
+      <button class="btn-main" id="splitSessionsBtn" onclick="withButtonGuard(this, splitAllMultiBlockSessions)"></button>
+    </div>
+
     <div class="card">
       <div class="card-title">😄 FRASI DI CARICAMENTO</div>
       <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 14px;">
@@ -840,7 +848,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v63";
+    const APP_VERSION = "v64";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1158,6 +1166,115 @@
       if (!showForm) renderRegistraDayView();
     }
 
+    // Sessioni ancora "vecchio stile": un'unica riga con dentro più lavori. Dalla v48 non se ne
+    // creano più, ma quelle già salvate restano raggruppate, e con la giornata a lavori singoli
+    // (frecce, riordino, un tasto Risultati per lavoro) stanno strette.
+    function multiBlockSessionsOf(athlete) {
+      const nome = (athlete || '').toLowerCase();
+      return (globalData.wods || []).filter(w =>
+        w.athlete && w.athlete.toLowerCase() === nome && Array.isArray(w.blocks) && w.blocks.length > 1
+      );
+    }
+
+    // Spacchetta UNA sessione: ogni Parte diventa un allenamento a sé, stessa data, stesso
+    // atleta, stesso stato (pubblicato o no). Prima si creano i nuovi e solo dopo si elimina il
+    // vecchio: se qualcosa si inceppa a metà restano dei doppioni, che si vedono e si
+    // cancellano, invece di un buco nello storico.
+    async function splitOneSession(session) {
+      const blocks = Array.isArray(session.blocks) ? session.blocks : [];
+      if (blocks.length < 2) return 0;
+
+      const ordineBase = sessionOrderValue(session);
+      const base = ordineBase !== null ? ordineBase : nextOrderForDay(session.athlete, session.date);
+      let inCoda = false;
+
+      for (let i = 0; i < blocks.length; i++) {
+        const esito = await postToBackend({
+          action: 'saveWodSession',
+          // +i perché Date.now() dentro il ciclo può ripetersi, e due sessioni non possono
+          // condividere l'id.
+          id: String(Date.now() + i),
+          date: session.date,
+          athlete: session.athlete,
+          mode: session.mode || undefined,
+          order: base + i,
+          blocks: [blocks[i]],
+        });
+        if (!esito.ok) throw new Error('Salvataggio non riuscito durante lo spacchettamento.');
+        if (esito.queued) inCoda = true;
+      }
+
+      const esitoDelete = await postToBackend({ action: 'deleteWod', id: String(session.id) });
+      if (!esitoDelete.ok) throw new Error('Il vecchio allenamento non è stato eliminato.');
+      if (esitoDelete.queued) inCoda = true;
+
+      return inCoda ? -1 : blocks.length;
+    }
+
+    async function splitWodSession(id) {
+      const session = (globalData.wods || []).find(w => String(w.id) === String(id));
+      if (!session) return;
+      const quanti = Array.isArray(session.blocks) ? session.blocks.length : 0;
+      if (quanti < 2) return;
+      if (!confirm(`Questo allenamento contiene ${quanti} lavori insieme. Diventeranno ${quanti} allenamenti separati, con la stessa data e lo stesso risultato di adesso. Procedo?`)) return;
+
+      showFunLoadingOverlay();
+      try {
+        const esito = await splitOneSession(session);
+        if (esito === -1) renderAllFromCloudData(); else await fetchCloudData();
+        hideFunLoadingOverlay();
+        alert(`Fatto: ora sono ${quanti} allenamenti separati.`);
+      } catch (err) {
+        hideFunLoadingOverlay();
+        console.error('Spacchettamento non riuscito:', err);
+        alert('Spacchettamento non riuscito: ' + err.message + ' Controlla lo storico prima di riprovare.');
+      }
+    }
+
+    // Spacchetta in un colpo solo tutte le sessioni multi-Parte dell'atleta (tab IMPOSTAZIONI).
+    async function splitAllMultiBlockSessions() {
+      const athleteName = localStorage.getItem('activeAthlete');
+      const daFare = multiBlockSessionsOf(athleteName);
+      if (daFare.length === 0) { alert('Non hai allenamenti da spacchettare.'); return; }
+
+      const totaleLavori = daFare.reduce((acc, w) => acc + w.blocks.length, 0);
+      if (!confirm(`${daFare.length} allenamenti contengono più lavori insieme, ${totaleLavori} in tutto. Diventeranno ${totaleLavori} allenamenti separati, ognuno con la sua data e il suo risultato. Procedo?`)) return;
+
+      showFunLoadingOverlay();
+      let fatti = 0;
+      try {
+        for (const sessione of daFare) {
+          await splitOneSession(sessione);
+          fatti++;
+        }
+        await fetchCloudData();
+        hideFunLoadingOverlay();
+        alert(`Fatto: ${totaleLavori} allenamenti separati.`);
+      } catch (err) {
+        await fetchCloudData();
+        hideFunLoadingOverlay();
+        console.error('Spacchettamento non riuscito:', err);
+        alert(`Spacchettamento interrotto dopo ${fatti} allenamenti su ${daFare.length}: ${err.message} Controlla lo storico prima di riprovare.`);
+      }
+      renderSplitSessionsCard();
+    }
+
+    // La card in IMPOSTAZIONI compare solo se c'è davvero qualcosa da spacchettare.
+    function renderSplitSessionsCard() {
+      const card = document.getElementById('splitSessionsCard');
+      const info = document.getElementById('splitSessionsInfo');
+      const btn = document.getElementById('splitSessionsBtn');
+      if (!card || !info || !btn) return;
+
+      const daFare = multiBlockSessionsOf(localStorage.getItem('activeAthlete'));
+      if (daFare.length === 0) { card.style.display = 'none'; return; }
+
+      const totaleLavori = daFare.reduce((acc, w) => acc + w.blocks.length, 0);
+      card.style.display = '';
+      info.innerText = `${daFare.length} allenamenti nel tuo storico contengono più lavori insieme (${totaleLavori} lavori in tutto), come si faceva prima. Spacchettandoli, ognuno diventa un allenamento a sé: si riordinano con le frecce, hanno il loro tasto Risultati e contano uno per uno nelle statistiche.`;
+      btn.innerText = `SPACCHETTA ${daFare.length} ALLENAMENTI`;
+    }
+
     // Sposta un lavoro su o giù dentro la sua giornata. Rinumera TUTTA la giornata: così anche
     // le sessioni vecchie senza "order" ne prendono uno, e da lì in poi l'ordine è esplicito.
     async function moveWodInDay(id, delta) {
@@ -1266,9 +1383,11 @@
         // Con un lavoro solo il tasto Risultati entra nella riga con Modifica ed Elimina; le
         // vecchie sessioni multi-Parte lo tengono sotto ogni Parte, perché lì è per Parte.
         const itemDateAzioni = String(item.date || '').slice(0, 10);
+        // Con una Parte sola la riga è Modifica · Risultati · Elimina; con più Parti il posto
+        // centrale lo prende "Spacchetta", perché lì Risultati è per singola Parte.
         const azioniRisultatiHtml = blocchi.length === 1
           ? renderCommunityButton(`openCommunityResultsModalFor('${String(primo.title || '').replace(/'/g, "\\'")}', '${String(primo.type || '').replace(/'/g, "\\'")}', '${itemDateAzioni}')`, primo.title, primo.type, itemDateAzioni, { row: true })
-          : '';
+          : `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession('${String(item.id).replace(/'/g, "\\'")}'))">⑂ Spacchetta in ${blocchi.length}</button></div>`;
 
         let blocksHtml = '';
         if (item.blocks && Array.isArray(item.blocks)) {
@@ -1735,6 +1854,7 @@
       renderRegistraCalendar();
       updateRegistraDateView();
       renderBachecaTab();
+      renderSplitSessionsCard();
       refreshAllBlockHints();
     }
 
@@ -3544,7 +3664,7 @@
         const itemDateAzioni = String(item.date || '').slice(0, 10);
         const azioniRisultatiHtml = blocchiStorico.length === 1
           ? renderCommunityButton(`openCommunityResultsModalFor('${String(primoStorico.title || '').replace(/'/g, "\\'")}', '${String(primoStorico.type || '').replace(/'/g, "\\'")}', '${itemDateAzioni}')`, primoStorico.title, primoStorico.type, itemDateAzioni, { row: true })
-          : '';
+          : `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession('${String(item.id).replace(/'/g, "\\'")}'))">⑂ Spacchetta in ${blocchiStorico.length}</button></div>`;
 
         cardsPerGiorno.push({ giorno: giornoDi(item), html: `
           <div class="history-item">
@@ -5261,7 +5381,7 @@
       if (tab === 'registra') { renderRegistraCalendar(); updateRegistraDateView(); }
       if (tab === 'bacheca') { renderBachecaTab(); }
       if (tab === 'atleta') { updateProfilePinVisibility(); renderActiveDaysChart(); renderTrainingFocusChart(); renderWhoopCard(); renderHealthCard(); }
-      if (tab === 'impostazioni') { renderFunPhrases(); }
+      if (tab === 'impostazioni') { renderFunPhrases(); renderSplitSessionsCard(); }
     }
   </script>
 </body>

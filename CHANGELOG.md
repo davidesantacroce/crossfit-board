@@ -4,6 +4,20 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v64 — 2026-09-06
+- **Le sessioni vecchie si spacchettano in allenamenti singoli.** Quelle salvate prima della v48
+  contengono più lavori in un'unica riga: ora un tasto **⑂ Spacchetta in N** (sulla card, sia
+  nella vista giorno sia nello Storico) le trasforma in **N allenamenti separati**, con la stessa
+  data, lo stesso atleta, lo stesso risultato, la stessa categoria RX/Scaled e, se erano
+  pubblicati, il **pubblicato** conservato.
+- In **IMPOSTAZIONI** compare la card **⑂ ALLENAMENTI RAGGRUPPATI** che li conta e li spacchetta
+  tutti in un colpo. Sparisce da sola quando non c'è più niente da fare.
+- Spacchettati, quei lavori entrano a pieno titolo nel resto: si riordinano con le frecce (v63),
+  hanno ciascuno il proprio tasto Risultati e contano uno per uno.
+- I nuovi allenamenti vengono **creati prima** e il vecchio eliminato **dopo**: se qualcosa si
+  inceppa a metà restano dei doppioni, che si vedono e si cancellano, invece di un buco nello
+  storico. Nessuna modifica al backend: usa i salvataggi che già esistono, coda offline compresa.
+
 ## v63 — 2026-09-06
 - **L'ordine dei lavori dentro una giornata si decide a mano**, con le frecce ↑/↓ su ogni lavoro
   nella vista giorno di REGISTRA (compaiono solo se la giornata ne ha più di uno, e non aprono la

@@ -83,10 +83,11 @@ test('una vecchia sessione multi-Parte tiene un Risultati per Parte', async ({ p
   });
   await page.evaluate(() => switchTab('storico'));
 
-  // Il confronto è per singolo lavoro: con due Parti restano due tasti, uno per Parte, e la
-  // riga in fondo ha solo Modifica ed Elimina.
+  // Il confronto è per singolo lavoro: con due Parti restano due tasti Risultati, uno per Parte.
   await expect(page.locator('#historyList .community-btn-wrap')).toHaveCount(2);
+  // Nella riga in fondo il posto centrale lo prende "Spacchetta" (v64), sempre a misure uguali.
   const b = await misure(page, '#historyList .item-actions-row');
-  expect(b.map((x) => x.testo)).toEqual(['✏️ MODIFICA', '✕ ELIMINA']);
+  expect(b.map((x) => x.testo)).toEqual(['✏️ MODIFICA', '⑂ SPACCHETTA IN 2', '✕ ELIMINA']);
   expect(new Set(b.map((x) => x.w)).size).toBe(1);
+  expect(new Set(b.map((x) => x.h)).size).toBe(1);
 });
