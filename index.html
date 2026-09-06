@@ -782,7 +782,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v58";
+    const APP_VERSION = "v59";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3146,31 +3146,40 @@
       label.innerText = isCurrentWeek ? `Questa settimana (${formatActiveDaysLabel(weekStart)})` : formatActiveDaysLabel(weekStart);
       if (todayBtn) todayBtn.style.display = isCurrentWeek ? 'none' : '';
 
-      // Raggruppamento per atleta+giorno prima, poi per WOD identico pubblicato da più persone
-      // lo stesso giorno (vedi wodBlocksSignature).
+      // La bacheca elenca i LAVORI SINGOLI, non le giornate: una giornata con tre lavori sono
+      // tre card, e sceglierne una porta nel form quel lavoro soltanto (un allenamento alla
+      // volta, come in REGISTRA dalla v48). Prima si accorpava per atleta+giorno, quindi i
+      // lavori di una stessa persona finivano tutti in una card e "USA QUESTO WOD" li caricava
+      // tutti insieme.
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const relevantSessions = (globalData.wods || []).filter(w =>
         w.date && w.date >= weekStart && w.date <= weekEnd && w.athlete
       );
 
-      const byAthleteDay = {};
-      relevantSessions.forEach(w => {
-        const key = w.athlete + '|' + w.date;
-        if (!byAthleteDay[key]) byAthleteDay[key] = { athlete: w.athlete, date: w.date, blocks: [], lastId: w.id };
-        byAthleteDay[key].blocks.push(...(w.blocks || []));
-        if (String(w.id).localeCompare(String(byAthleteDay[key].lastId)) > 0) byAthleteDay[key].lastId = w.id;
-      });
-
+      // Lo stesso lavoro pubblicato da più persone nello stesso giorno resta UNA card, con tutti
+      // i nomi: è il senso della bacheca, vedere il WOD del giorno e chi lo ha proposto.
       const bySignature = {};
-      Object.values(byAthleteDay).forEach(c => {
-        const sig = c.date + '|' + wodBlocksSignature(c.blocks);
-        if (!bySignature[sig]) bySignature[sig] = { athletes: [], date: c.date, blocks: c.blocks, lastId: c.lastId };
-        bySignature[sig].athletes.push(c.athlete);
-        if (String(c.lastId).localeCompare(String(bySignature[sig].lastId)) > 0) bySignature[sig].lastId = c.lastId;
+      relevantSessions.forEach(w => {
+        (w.blocks || []).forEach(b => {
+          const sig = w.date + '|' + wodBlocksSignature([b]);
+          if (!bySignature[sig]) bySignature[sig] = { athletes: [], date: w.date, blocks: [b], firstId: w.id, lastId: w.id };
+          const gruppo = bySignature[sig];
+          // Chi ripubblica lo stesso lavoro nello stesso giorno resta un nome solo.
+          if (!gruppo.athletes.some(a => a.toLowerCase() === String(w.athlete).toLowerCase())) {
+            gruppo.athletes.push(w.athlete);
+          }
+          // firstId ordina la giornata: conta quando il lavoro è comparso in bacheca, non
+          // l'ultimo che lo ha ripubblicato (altrimenti un WOD accorpato scavalcherebbe quelli
+          // programmati dopo di lui).
+          if (String(w.id).localeCompare(String(gruppo.firstId)) < 0) gruppo.firstId = w.id;
+          if (String(w.id).localeCompare(String(gruppo.lastId)) > 0) gruppo.lastId = w.id;
+        });
       });
 
+      // Giorno più recente in cima; dentro la giornata l'ordine di pubblicazione (gli id sono
+      // Date.now()), così A, B, C si leggono nell'ordine in cui sono stati programmati.
       bachecaCandidates = Object.values(bySignature).sort((a, b) =>
-        String(b.date).localeCompare(String(a.date)) || b.blocks.length - a.blocks.length || String(b.lastId).localeCompare(String(a.lastId))
+        String(b.date).localeCompare(String(a.date)) || String(a.firstId).localeCompare(String(b.firstId))
       );
 
       if (bachecaCandidates.length === 0) {
@@ -3188,11 +3197,9 @@
             <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
             <div style="font-size: 10px; font-weight: 800; white-space: nowrap; color: ${c.date === todayStr ? 'var(--accent)' : 'var(--text-muted)'};">${escapeHtml(formatDateWithWeekday(c.date))}</div>
           </div>
-          ${c.blocks.map(b => `
-            <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
-              • ${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 500;">(${escapeHtml(b.type || '')})</span>
-            </div>
-          `).join('')}
+          <div style="font-size: 14px; font-weight: 800; margin-top: 6px; color: var(--accent);">
+            ${escapeHtml(c.blocks[0].title || 'WOD')} <span style="color: var(--text-muted); font-weight: 600; font-size: 12px;">(${escapeHtml(c.blocks[0].type || '')})</span>
+          </div>
           <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useWodFromBacheca(${idx})">${isSelfOnly ? 'RIUSA QUESTO WOD' : 'USA QUESTO WOD'}</button>
         </div>
       `;
