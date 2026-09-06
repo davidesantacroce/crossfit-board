@@ -4,6 +4,19 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v58 — 2026-09-06
+- **Le giornate con più lavori ora si leggono in una schermata.** Nella vista giorno di REGISTRA
+  ogni lavoro è una card **richiudibile**: chiusa mostra badge RX/Scaled, titolo, tipo e
+  punteggio; si apre toccandola quando serve leggere il WOD o loggarlo. Con tre lavori la
+  giornata passa da ~700 a **288 px**.
+- Le card partono **chiuse quando ce n'è più di una** e **aperta quando è una sola** (lì non c'è
+  niente da riassumere). Si apre solo quella toccata, le altre restano chiuse.
+- Nel riassunto della card chiusa il punteggio a tempi per set mostra solo il **totale**
+  ("13:57"): i parziali si leggono aprendola.
+- **Modifica** ed **Elimina** stanno ora dentro la card aperta, non nell'intestazione: scorrendo
+  la giornata non si rischia di toccarli.
+- Con una sola Parte il titolo non viene più ripetuto dentro la card: è già nell'intestazione.
+
 ## v57 — 2026-09-06
 - **Fix: su un giorno futuro si riusciva a programmare un solo WOD.** Dopo aver pubblicato, il
   form restava pieno del lavoro appena pubblicato e "+ Aggiungi Lavoro" è nascosto quando una
