@@ -162,6 +162,15 @@
     .item-actions-row .notification-badge { top: -6px; right: -2px; }
     .day-item.is-open .day-item-title { color: var(--accent); }
 
+    /* Bacheca raggruppata per giornata: la settimana si vede tutta, si apre il giorno che serve. */
+    .bacheca-day { border-bottom: 1px solid var(--border); padding: 10px 0; }
+    .bacheca-day:last-child { border-bottom: none; }
+    .bacheca-day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+    .bacheca-day-label { font-size: 13px; font-weight: 800; color: var(--text); text-transform: uppercase; }
+    .bacheca-day.is-today .bacheca-day-label { color: var(--accent); }
+    .bacheca-day-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .bacheca-day-count { font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap; }
+
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
@@ -791,7 +800,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v60";
+    const APP_VERSION = "v61";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3142,6 +3151,19 @@
 
     // ===================== TAB BACHECA (sfoglia libera, non legata al giorno di REGISTRA) =====
 
+    // Giornate aperte nella bacheca. Con una settimana piena di lavori singoli (dalla v59 uno
+    // per card) la pagina diventava lunghissima: ora si vede l'elenco dei giorni e si apre
+    // quello che interessa. Di default è aperto solo oggi, che è ciò che si cerca aprendo la
+    // bacheca; cambiando settimana si riparte dal default di quella settimana.
+    let expandedBachecaDays = new Set();
+    let bachecaDaysInitializedFor = null;
+
+    function toggleBachecaDay(day) {
+      if (expandedBachecaDays.has(day)) expandedBachecaDays.delete(day);
+      else expandedBachecaDays.add(day);
+      renderBachecaTab();
+    }
+
     // Domenica (inizio settimana) attualmente mostrata nel tab BACHECA. Indipendente dal
     // calendario di REGISTRA: qui si sfoglia liberamente avanti e indietro nel tempo, senza che
     // farlo sposti anche il giorno che si sta eventualmente registrando.
@@ -3193,10 +3215,11 @@
         });
       });
 
-      // Giorno più recente in cima; dentro la giornata l'ordine di pubblicazione (gli id sono
-      // Date.now()), così A, B, C si leggono nell'ordine in cui sono stati programmati.
+      // I giorni in ordine di calendario (la settimana si legge dal primo all'ultimo, non a
+      // ritroso); dentro la giornata l'ordine di pubblicazione (gli id sono Date.now()), così
+      // A, B, C si leggono nell'ordine in cui sono stati programmati.
       bachecaCandidates = Object.values(bySignature).sort((a, b) =>
-        String(b.date).localeCompare(String(a.date)) || String(a.firstId).localeCompare(String(b.firstId))
+        String(a.date).localeCompare(String(b.date)) || String(a.firstId).localeCompare(String(b.firstId))
       );
 
       if (bachecaCandidates.length === 0) {
@@ -3205,21 +3228,54 @@
       }
 
       const todayStr = getTodayDateString();
-      content.innerHTML = bachecaCandidates.map((c, idx) => {
-        const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);
-        const isSelfOnly = names.length === 1 && names[0] === 'te';
+
+      // Un gruppo per giornata, nell'ordine in cui i candidati sono già ordinati.
+      const perGiorno = [];
+      bachecaCandidates.forEach((c, idx) => {
+        let gruppo = perGiorno.find(g => g.date === c.date);
+        if (!gruppo) { gruppo = { date: c.date, voci: [] }; perGiorno.push(gruppo); }
+        gruppo.voci.push({ c, idx });
+      });
+
+      // Cambiando settimana si riparte dal default: aperto il giorno di oggi se c'è, altrimenti
+      // (settimana con un solo giorno di lavori) quell'unico giorno, altrimenti tutto chiuso.
+      if (bachecaDaysInitializedFor !== weekStart) {
+        bachecaDaysInitializedFor = weekStart;
+        expandedBachecaDays = new Set();
+        if (perGiorno.some(g => g.date === todayStr)) expandedBachecaDays.add(todayStr);
+        else if (perGiorno.length === 1) expandedBachecaDays.add(perGiorno[0].date);
+      }
+
+      content.innerHTML = perGiorno.map(g => {
+        const aperto = expandedBachecaDays.has(g.date);
+        const quanti = g.voci.length === 1 ? '1 lavoro' : `${g.voci.length} lavori`;
+
+        const cards = g.voci.map(({ c, idx }) => {
+          const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);
+          const isSelfOnly = names.length === 1 && names[0] === 'te';
+          return `
+            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
+              <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
+              <div style="font-size: 14px; font-weight: 800; margin-top: 4px; color: var(--accent);">
+                ${escapeHtml(c.blocks[0].title || 'WOD')} <span style="color: var(--text-muted); font-weight: 600; font-size: 12px;">(${escapeHtml(c.blocks[0].type || '')})</span>
+              </div>
+              <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useWodFromBacheca(${idx})">${isSelfOnly ? 'RIUSA QUESTO WOD' : 'USA QUESTO WOD'}</button>
+            </div>
+          `;
+        }).join('');
+
         return `
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-            <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
-            <div style="font-size: 10px; font-weight: 800; white-space: nowrap; color: ${c.date === todayStr ? 'var(--accent)' : 'var(--text-muted)'};">${escapeHtml(formatDateWithWeekday(c.date))}</div>
+          <div class="bacheca-day ${g.date === todayStr ? 'is-today' : ''}">
+            <div class="bacheca-day-head" onclick="toggleBachecaDay('${g.date}')">
+              <div class="bacheca-day-label">${escapeHtml(formatDateWithWeekday(g.date))}${g.date === todayStr ? ' · oggi' : ''}</div>
+              <div class="bacheca-day-aside">
+                <span class="bacheca-day-count">${quanti}</span>
+                <span class="day-item-chevron">${aperto ? '⌃' : '⌄'}</span>
+              </div>
+            </div>
+            <div class="bacheca-day-body" ${aperto ? '' : 'hidden'}>${cards}</div>
           </div>
-          <div style="font-size: 14px; font-weight: 800; margin-top: 6px; color: var(--accent);">
-            ${escapeHtml(c.blocks[0].title || 'WOD')} <span style="color: var(--text-muted); font-weight: 600; font-size: 12px;">(${escapeHtml(c.blocks[0].type || '')})</span>
-          </div>
-          <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useWodFromBacheca(${idx})">${isSelfOnly ? 'RIUSA QUESTO WOD' : 'USA QUESTO WOD'}</button>
-        </div>
-      `;
+        `;
       }).join('');
     }
 

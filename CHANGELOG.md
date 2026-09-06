@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v61 — 2026-09-06
+- **La bacheca raggruppa i lavori per giornata**, e ogni giornata si apre e si chiude. Con la
+  settimana programmata (dalla v59 un lavoro per card) la pagina diventava lunghissima: 15 lavori
+  su 5 giorni erano **1924 px**, ora sono **532**. Ogni riga dice il giorno e quanti lavori ci
+  sono ("3 lavori").
+- **Di default è aperto il giorno di oggi**, che è quello che si cerca aprendo la bacheca, ed è
+  segnalato con "· oggi". Se nella settimana c'è una sola giornata con lavori, quella è già
+  aperta. Cambiando settimana si riparte dal default di quella settimana.
+- I giorni ora si leggono **in ordine di calendario** (dal primo all'ultimo della settimana)
+  invece che dal più recente: raggruppati per giornata, la settimana si legge come un programma.
+
 ## v60 — 2026-09-06
 - **Modifica · Risultati · Elimina sono ora tre tasti gemelli**, stessa larghezza e stessa
   altezza, sulla stessa riga — identici nella vista giorno di REGISTRA e nello **Storico**.
