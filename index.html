@@ -848,7 +848,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v64";
+    const APP_VERSION = "v65";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3602,86 +3602,82 @@
         g.items.push(item);
       });
 
+      // UNA CARD PER LAVORO, anche quando la riga sul Foglio ne contiene più d'uno (sessioni
+      // salvate prima della v48): nello storico non si accorpa più niente. Quei lavori però
+      // condividono ancora la stessa riga, quindi al posto di Elimina — che li cancellerebbe
+      // tutti insieme — mostrano "Spacchetta", che li rende davvero indipendenti (v64).
       const cardsPerGiorno = [];
       perGiornoOrdinati.flatMap(g => sortSessionsWithinDay(g.items)).forEach(item => {
-        let contentHtml = '';
         const blocchiStorico = Array.isArray(item.blocks) ? item.blocks : [];
+        const raggruppata = blocchiStorico.length > 1;
+        const itemDate = String(item.date || '').slice(0, 10);
+        const idEsc = String(item.id).replace(/'/g, "\\'");
 
-        if (item.blocks && Array.isArray(item.blocks)) {
-          contentHtml = item.blocks.map(b => {
-            let bodyHtml = '';
-            if (b.explanation) {
-              bodyHtml = `
-                <div class="history-explanation-label">WOD:</div>
-                <div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin-top: 2px;">${escapeHtml(b.explanation)}</div>
-              `;
-            } else if (b.exercises && b.exercises.length > 0) {
-              bodyHtml = (b.exercises || []).map(ex => `
-                <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
-                  • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
-                </div>
-              `).join('');
-            }
+        // Le sessioni vecchissime non hanno "blocks" ma i campi in cima alla riga: restano una
+        // card sola, non c'è niente da dividere.
+        const lavori = blocchiStorico.length > 0
+          ? blocchiStorico
+          : [{ title: item.title, type: item.type, explanation: '', exercises: item.exercises, result: item.result, category: item.mode }];
 
-            let scoreHtml = '';
-            if (b.type === 'Sets' && Array.isArray(b.result)) {
-              let setsRows = b.result.map(sr => `
-                <div style="font-size: 12px; color: #2e7d32; margin-left: 10px;">
-                  • ${escapeHtml(sr.reps || '')} <b>${escapeHtml(sr.name || '')}</b> ${sr.weight ? '(' + escapeHtml(sr.weight) + ')' : ''}
-                </div>
-              `).join('');
-              scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score (Serie/Carichi):</div>${setsRows}`;
-            } else if (b.result) {
-              scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${escapeHtml(b.result)}</div>`;
-            }
-
-            const itemDate = String(item.date || '').slice(0, 10);
-            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate);
-
-            return `
-              <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
-                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
-                ${bodyHtml}
-                ${scoreHtml}
-                ${blocchiStorico.length > 1 ? communityBtn : ''}
-              </div>
+        lavori.forEach((b, indice) => {
+          let bodyHtml = '';
+          if (b.explanation) {
+            bodyHtml = `
+              <div class="history-explanation-label">WOD:</div>
+              <div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin-top: 2px;">${escapeHtml(b.explanation)}</div>
             `;
-          }).join('');
-        } else {
-          let exercisesHtml = (item.exercises || []).map(ex => `
-            <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
-              • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
-            </div>
-          `).join('');
-          contentHtml = `
-            <div style="font-size: 14px; font-weight: 800; margin-top: 4px;">${blockCategoryBadge(item.mode)}${escapeHtml(item.title || '')} (${escapeHtml(item.type || '')})</div>
-            <div style="margin-top: 6px;">${exercisesHtml}</div>
-            ${item.result ? `<div style="margin-top: 6px; font-size: 13px; color: #2e7d32; font-weight: 800;">Score: ${escapeHtml(item.result)}</div>` : ''}
-          `;
-        }
+          } else if (b.exercises && b.exercises.length > 0) {
+            bodyHtml = (b.exercises || []).map(ex => `
+              <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
+                • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
+              </div>
+            `).join('');
+          }
 
-        const primoStorico = blocchiStorico[0] || {};
-        const itemDateAzioni = String(item.date || '').slice(0, 10);
-        const azioniRisultatiHtml = blocchiStorico.length === 1
-          ? renderCommunityButton(`openCommunityResultsModalFor('${String(primoStorico.title || '').replace(/'/g, "\\'")}', '${String(primoStorico.type || '').replace(/'/g, "\\'")}', '${itemDateAzioni}')`, primoStorico.title, primoStorico.type, itemDateAzioni, { row: true })
-          : `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession('${String(item.id).replace(/'/g, "\\'")}'))">⑂ Spacchetta in ${blocchiStorico.length}</button></div>`;
+          let scoreHtml = '';
+          if (b.type === 'Sets' && Array.isArray(b.result)) {
+            const setsRows = b.result.map(sr => `
+              <div style="font-size: 12px; color: #2e7d32; margin-left: 10px;">
+                • ${escapeHtml(sr.reps || '')} <b>${escapeHtml(sr.name || '')}</b> ${sr.weight ? '(' + escapeHtml(sr.weight) + ')' : ''}
+              </div>
+            `).join('');
+            scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score (Serie/Carichi):</div>${setsRows}`;
+          } else if (b.result) {
+            scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${escapeHtml(b.result)}</div>`;
+          }
 
-        cardsPerGiorno.push({ giorno: giornoDi(item), html: `
-          <div class="history-item">
-            <div class="history-item-header">
-              <div>
-                ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
+          const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate, { row: true });
+
+          // Terzo tasto: Elimina se il lavoro sta da solo sulla sua riga, Spacchetta se la
+          // condivide con altri (cancellarne uno cancellerebbe anche gli altri).
+          const terzoTasto = raggruppata
+            ? `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession('${idEsc}'))">⑂ Spacchetta in ${blocchiStorico.length}</button></div>`
+            : `<div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${idEsc}'))">✕ Elimina</button></div>`;
+
+          const notaRaggruppata = raggruppata
+            ? `<div style="font-size: 10px; color: var(--text-muted); font-style: italic; margin-top: 6px;">Salvato insieme ad altri ${blocchiStorico.length - 1} lavori nella stessa riga (lavoro ${indice + 1} di ${blocchiStorico.length}): spacchettalo per gestirlo da solo.</div>`
+            : '';
+
+          cardsPerGiorno.push({ giorno: giornoDi(item), html: `
+            <div class="history-item">
+              <div class="history-item-header">
+                <div>
+                  ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
+                </div>
+              </div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 600; font-size: 12px;">(${escapeHtml(b.type || '')})</span></div>
+              ${bodyHtml}
+              ${scoreHtml}
+              ${isPublishedWod(item) || indice > 0 ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
+              ${notaRaggruppata}
+              <div class="item-actions-row">
+                <div><button class="btn-secondary" onclick="editWodSession('${idEsc}')">✏️ Modifica</button></div>
+                ${communityBtn}
+                ${terzoTasto}
               </div>
             </div>
-            ${contentHtml}
-            ${isPublishedWod(item) ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
-            <div class="item-actions-row">
-              <div><button class="btn-secondary" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button></div>
-              ${azioniRisultatiHtml}
-              <div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button></div>
-            </div>
-          </div>
-        ` });
+          ` });
+        });
       });
 
       // Un gruppo per giornata, nell'ordine già ordinato (più recente in cima, vedi v51).

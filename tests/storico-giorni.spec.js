@@ -68,3 +68,50 @@ test('cercando si aprono i giorni che contengono i risultati', async ({ page }) 
   await page.locator('#searchWod').fill('');
   await expect(page.locator('#historyList .day-group')).toHaveCount(3);
 });
+
+// --- v65: nello storico ogni lavoro ha la sua card, anche dentro una riga vecchia multi-Parte ---
+
+test('una riga con più lavori diventa una card per lavoro', async ({ page }) => {
+  await apriStorico(page, [
+    { id: 'v1', date: giorniFa(1), athlete: 'Test Athlete', blocks: [
+      { title: 'A. Back Squat', type: 'Sets', explanation: '5x5', result: '110 kg', category: 'RX' },
+      { title: 'B. Fran', type: 'For Time', explanation: '21-15-9', result: '4:30', category: 'RX' },
+    ] },
+    wod('s1', 1, 'C. Cindy', '18 rounds'),
+  ]);
+
+  // Tre lavori, tre card: non si accorpa più niente.
+  await expect(page.locator('#historyList .history-item')).toHaveCount(3);
+  await expect(page.locator('#historyList .day-group-count')).toHaveText('3 allenamenti');
+  await expect(page.locator('#historyList')).toContainText('A. Back Squat');
+  await expect(page.locator('#historyList')).toContainText('B. Fran');
+  await expect(page.locator('#historyList')).toContainText('C. Cindy');
+
+  // Ogni card ha il suo punteggio, non un elenco di punteggi tutti insieme.
+  const cardFran = page.locator('#historyList .history-item').filter({ hasText: 'B. Fran' });
+  await expect(cardFran).toContainText('4:30');
+  await expect(cardFran).not.toContainText('110 kg');
+});
+
+test('sui lavori che condividono una riga, Elimina lascia il posto a Spacchetta', async ({ page }) => {
+  await apriStorico(page, [
+    { id: 'v1', date: giorniFa(1), athlete: 'Test Athlete', blocks: [
+      { title: 'A', type: 'Sets', explanation: '', result: '' },
+      { title: 'B', type: 'For Time', explanation: '', result: '' },
+    ] },
+    wod('s1', 1, 'Singolo', '1:00'),
+  ]);
+
+  // Cancellarne uno cancellerebbe anche l'altro: al suo posto c'è Spacchetta, e la card lo dice.
+  // Regex (case-sensitive): con una stringa, hasText ignora le maiuscole e "A (" pescherebbe
+  // anche "riga (lavoro 1 di 2)" della nota, finendo su due card.
+  const cardA = page.locator('#historyList .history-item').filter({ hasText: /A \(Sets\)/ });
+  await expect(cardA.getByRole('button', { name: /Spacchetta in 2/ })).toBeVisible();
+  await expect(cardA.getByRole('button', { name: /Elimina/ })).toHaveCount(0);
+  await expect(cardA).toContainText('Salvato insieme ad altri 1 lavori');
+
+  // Il lavoro che sta da solo sulla sua riga tiene Elimina.
+  const cardSingola = page.locator('#historyList .history-item').filter({ hasText: 'Singolo' });
+  await expect(cardSingola.getByRole('button', { name: /Elimina/ })).toBeVisible();
+  await expect(cardSingola.getByRole('button', { name: /Spacchetta/ })).toHaveCount(0);
+});

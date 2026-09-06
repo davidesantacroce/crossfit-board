@@ -37,7 +37,9 @@ test('spacchettare una sessione crea un allenamento per lavoro, conservando tutt
   await page.evaluate((d) => { switchTab('registra'); selectCalendarDate(d); }, IERI);
 
   await page.locator('#registraDayView').getByRole('button', { name: /Spacchetta in 3/ }).click();
-  await expect.poll(() => state.wods.length).toBe(3);
+  // Durante lo spacchettamento il conteggio sale a 4 (i nuovi ci sono già, il vecchio non è
+  // ancora stato eliminato): si aspetta lo stato finale, non un numero di passaggio.
+  await expect.poll(() => state.wods.length === 3 && state.wods.every((w) => w.blocks.length === 1)).toBe(true);
 
   // Ogni lavoro è ora una sessione a sé, nell'ordine in cui stava dentro la vecchia.
   expect(state.wods.map((w) => w.blocks.length)).toEqual([1, 1, 1]);
@@ -58,7 +60,7 @@ test('un WOD pubblicato spacchettato resta pubblicato', async ({ page }) => {
   await page.evaluate((d) => { switchTab('registra'); selectCalendarDate(d); }, IERI);
 
   await page.locator('#registraDayView').getByRole('button', { name: /Spacchetta in 2/ }).click();
-  await expect.poll(() => state.wods.length).toBe(2);
+  await expect.poll(() => state.wods.length === 2 && state.wods.every((w) => w.blocks.length === 1)).toBe(true);
 
   expect(state.wods.every((w) => w.mode === 'PUBLISHED')).toBe(true);
 });
@@ -83,8 +85,9 @@ test('si spacchetta anche dallo Storico', async ({ page }) => {
   const state = await apri(page, [vecchia('v1', 1, ['A', 'B'])]);
   await page.evaluate(() => switchTab('storico'));
 
-  await page.locator('#historyList').getByRole('button', { name: /Spacchetta in 2/ }).click();
-  await expect.poll(() => state.wods.length).toBe(2);
+  // Una card per lavoro (v65): il tasto compare su entrambe e spacchetta la stessa riga.
+  await page.locator('#historyList').getByRole('button', { name: /Spacchetta in 2/ }).first().click();
+  await expect.poll(() => state.wods.length === 2 && state.wods.every((w) => w.blocks.length === 1)).toBe(true);
   await expect(page.locator('#historyList').getByRole('button', { name: /Spacchetta/ })).toHaveCount(0);
 });
 
@@ -101,7 +104,8 @@ test('da IMPOSTAZIONI si spacchetta tutto in un colpo, e poi la card sparisce', 
   await expect(page.locator('#splitSessionsInfo')).toContainText('5 lavori');
 
   await page.locator('#splitSessionsBtn').click();
-  await expect.poll(() => state.wods.length).toBe(6); // 2 + 3 + quella già singola
+  // 2 + 3 + quella già singola, e solo quando tutte sono davvero a un lavoro ciascuna.
+  await expect.poll(() => state.wods.length === 6 && state.wods.every((w) => w.blocks.length === 1)).toBe(true);
 
   expect(state.wods.every((w) => w.blocks.length === 1)).toBe(true);
   await expect(page.locator('#splitSessionsCard')).toBeHidden(); // niente più da fare

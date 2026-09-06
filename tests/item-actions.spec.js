@@ -73,7 +73,7 @@ test('Risultati apre comunque il confronto con gli altri atleti', async ({ page 
   await expect(page.locator('#communityResultsContent')).toContainText('Mario Rossi');
 });
 
-test('una vecchia sessione multi-Parte tiene un Risultati per Parte', async ({ page }) => {
+test('una vecchia sessione multi-Parte diventa una card per lavoro, senza Elimina', async ({ page }) => {
   await apri(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     wods: [{ id: 'vecchia', date: IERI, athlete: 'Test Athlete', blocks: [
@@ -83,11 +83,15 @@ test('una vecchia sessione multi-Parte tiene un Risultati per Parte', async ({ p
   });
   await page.evaluate(() => switchTab('storico'));
 
-  // Il confronto è per singolo lavoro: con due Parti restano due tasti Risultati, uno per Parte.
+  // v65: nello storico non si accorpa più niente, quindi due card con un Risultati ciascuna.
+  await expect(page.locator('#historyList .history-item')).toHaveCount(2);
   await expect(page.locator('#historyList .community-btn-wrap')).toHaveCount(2);
-  // Nella riga in fondo il posto centrale lo prende "Spacchetta" (v64), sempre a misure uguali.
+
+  // I due lavori condividono ancora la riga sul Foglio: al posto di Elimina (che cancellerebbe
+  // anche l'altro) c'è Spacchetta. I tre tasti restano delle stesse misure.
   const b = await misure(page, '#historyList .item-actions-row');
-  expect(b.map((x) => x.testo)).toEqual(['✏️ MODIFICA', '⑂ SPACCHETTA IN 2', '✕ ELIMINA']);
+  expect(b.map((x) => x.testo)).toEqual(['✏️ MODIFICA', '👥 RISULTATI', '⑂ SPACCHETTA IN 2']);
   expect(new Set(b.map((x) => x.w)).size).toBe(1);
   expect(new Set(b.map((x) => x.h)).size).toBe(1);
+  await expect(page.locator('#historyList').getByRole('button', { name: /Elimina/ })).toHaveCount(0);
 });
