@@ -4,6 +4,20 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v56 — 2026-09-06
+- **TEMPO PER SET**: un WOD a set cronometrati ora chiede un tempo **per ogni set**, come fanno i
+  gestionali di programmazione, invece di un unico numero. Esempio reale: *Ironworkers — 5 Sets:
+  400m Run + 16 Thruster + 8 Bar Muscle Ups, rest 2 minutes between sets*. Il numero di set si
+  legge dal testo del WOD (stesso riconoscimento del CARICO PER SET) e resta modificabile con
+  **+ Aggiungi Set** e il tasto rimuovi.
+- Sotto le righe compare il **totale aggiornato mentre scrivi**: è la somma dei set, senza il
+  recupero fra l'uno e l'altro.
+- Il punteggio salvato porta **totale davanti e parziali dietro** — `13:57 (2:35/2:41/2:48/2:52/3:01)`
+  — così nello storico si vede subito com'è andata set per set. Confronti con la community e
+  aggiornamento automatico dei PR usano il **totale**, non un numero pescato a caso dal testo.
+- Vale solo per i blocchi **Sets** con più di un set: un For Time normale mantiene il campo unico
+  di sempre.
+
 ## v55 — 2026-09-06
 - **La fascia incontra il WOD.** Sotto ogni sessione registrata (nello Storico e nella vista
   giorno del calendario) compaiono ora i dati Whoop di quell'allenamento: sport, **strain**,
