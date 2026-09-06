@@ -163,13 +163,13 @@
     .day-item.is-open .day-item-title { color: var(--accent); }
 
     /* Bacheca raggruppata per giornata: la settimana si vede tutta, si apre il giorno che serve. */
-    .bacheca-day { border-bottom: 1px solid var(--border); padding: 10px 0; }
-    .bacheca-day:last-child { border-bottom: none; }
-    .bacheca-day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
-    .bacheca-day-label { font-size: 13px; font-weight: 800; color: var(--text); text-transform: uppercase; }
-    .bacheca-day.is-today .bacheca-day-label { color: var(--accent); }
-    .bacheca-day-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    .bacheca-day-count { font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap; }
+    .day-group { border-bottom: 1px solid var(--border); padding: 10px 0; }
+    .day-group:last-child { border-bottom: none; }
+    .day-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+    .day-group-label { font-size: 13px; font-weight: 800; color: var(--text); text-transform: uppercase; }
+    .day-group.is-today .day-group-label { color: var(--accent); }
+    .day-group-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .day-group-count { font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap; }
 
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -774,6 +774,11 @@
     // editingWodId/editingWodDate sono null quando si sta invece creando una sessione nuova.
     let editingWodId = null;
     let editingWodDate = null;
+    // Il "mode" della sessione che si sta modificando (es. PUBLISHED). Va ricordato e rimandato
+    // al salvataggio: senza, correggere anche solo il titolo di un WOD pubblicato lo faceva
+    // tornare una sessione normale, che spariva dai WOD pubblicati e compariva nello storico
+    // come allenamento svolto (senza punteggio, perché un WOD pubblicato non ne ha).
+    let editingWodMode = null;
 
     // Registrazione ESPLICITA di UN allenamento (una sola Parte) su un giorno che mostra di
     // default la vista di sola lettura: sia un giorno PASSATO (es. recupero: fatto oggi il WOD
@@ -800,7 +805,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v61";
+    const APP_VERSION = "v62";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -2892,6 +2897,9 @@
         id: isEditing ? editingWodId : String(Date.now()),
         date: isEditing ? editingWodDate : selectedRegistraDate,
         athlete: athleteName,
+        // Modificando si conserva il mode di partenza (un WOD pubblicato resta pubblicato); una
+        // sessione nuova non ne ha, e JSON.stringify omette del tutto la chiave undefined.
+        mode: isEditing ? (editingWodMode || undefined) : undefined,
         blocks: blocksData
       };
 
@@ -2917,6 +2925,7 @@
               : (isEditing ? 'Modifiche salvate!' : 'Allenamento salvato sul Foglio Google!'));
             editingWodId = null;
             editingWodDate = null;
+      editingWodMode = null;
             loggingPastDay = false;
 
             document.getElementById('workoutBlocksContainer').innerHTML = '';
@@ -3023,6 +3032,7 @@
 
       editingWodId = session.id;
       editingWodDate = session.date;
+      editingWodMode = session.mode || null;
 
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
@@ -3091,6 +3101,7 @@
     function cancelEditWod() {
       editingWodId = null;
       editingWodDate = null;
+      editingWodMode = null;
       loggingPastDay = false;
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
@@ -3265,15 +3276,15 @@
         }).join('');
 
         return `
-          <div class="bacheca-day ${g.date === todayStr ? 'is-today' : ''}">
-            <div class="bacheca-day-head" onclick="toggleBachecaDay('${g.date}')">
-              <div class="bacheca-day-label">${escapeHtml(formatDateWithWeekday(g.date))}${g.date === todayStr ? ' · oggi' : ''}</div>
-              <div class="bacheca-day-aside">
-                <span class="bacheca-day-count">${quanti}</span>
+          <div class="day-group ${g.date === todayStr ? 'is-today' : ''}">
+            <div class="day-group-head" onclick="toggleBachecaDay('${g.date}')">
+              <div class="day-group-label">${escapeHtml(formatDateWithWeekday(g.date))}${g.date === todayStr ? ' · oggi' : ''}</div>
+              <div class="day-group-aside">
+                <span class="day-group-count">${quanti}</span>
                 <span class="day-item-chevron">${aperto ? '⌃' : '⌄'}</span>
               </div>
             </div>
-            <div class="bacheca-day-body" ${aperto ? '' : 'hidden'}>${cards}</div>
+            <div class="day-group-body" ${aperto ? '' : 'hidden'}>${cards}</div>
           </div>
         `;
       }).join('');
@@ -3314,6 +3325,19 @@
       updateRegistraDateView();
     }
 
+    // Giornate aperte nello Storico. Come in bacheca: l'elenco è lungo (mesi di allenamenti),
+    // quindi si vedono i giorni e si apre quello che interessa. Di default è aperto il più
+    // recente; cercando si aprono tutti i giorni che contengono risultati, altrimenti la
+    // ricerca mostrerebbe solo righe chiuse.
+    let expandedStoricoDays = new Set();
+    let storicoDaysInitialized = false;
+
+    function toggleStoricoDay(day) {
+      if (expandedStoricoDays.has(day)) expandedStoricoDays.delete(day);
+      else expandedStoricoDays.add(day);
+      renderHistory();
+    }
+
     function renderHistory() {
       const historyList = document.getElementById('historyList');
       if (!historyList) return;
@@ -3349,7 +3373,7 @@
       // modificare una sessione vecchia la farebbe risalire (il salvataggio la cancella e la
       // riaccoda). A parità di data resta la più recente salvata per prima, come prima.
       const giornoDi = (item) => String(item.date || '').slice(0, 10);
-      let html = '';
+      const cardsPerGiorno = [];
       history.slice().reverse().sort((a, b) => giornoDi(b).localeCompare(giornoDi(a))).forEach(item => {
         let contentHtml = '';
         const blocchiStorico = Array.isArray(item.blocks) ? item.blocks : [];
@@ -3413,12 +3437,11 @@
           ? renderCommunityButton(`openCommunityResultsModalFor('${String(primoStorico.title || '').replace(/'/g, "\\'")}', '${String(primoStorico.type || '').replace(/'/g, "\\'")}', '${itemDateAzioni}')`, primoStorico.title, primoStorico.type, itemDateAzioni, { row: true })
           : '';
 
-        html += `
+        cardsPerGiorno.push({ giorno: giornoDi(item), html: `
           <div class="history-item">
             <div class="history-item-header">
               <div>
                 ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
-                <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(item.date))}</span>
               </div>
             </div>
             ${contentHtml}
@@ -3429,9 +3452,42 @@
               <div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button></div>
             </div>
           </div>
-        `;
+        ` });
       });
-      historyList.innerHTML = html;
+
+      // Un gruppo per giornata, nell'ordine già ordinato (più recente in cima, vedi v51).
+      const perGiorno = [];
+      cardsPerGiorno.forEach(({ giorno, html: cardHtml }) => {
+        let gruppo = perGiorno.find(g => g.giorno === giorno);
+        if (!gruppo) { gruppo = { giorno, cards: [] }; perGiorno.push(gruppo); }
+        gruppo.cards.push(cardHtml);
+      });
+
+      // Al primo disegno è aperto il giorno più recente. Durante una ricerca si apre tutto
+      // quello che la ricerca ha trovato, altrimenti si vedrebbero solo giorni chiusi.
+      if (!storicoDaysInitialized && perGiorno.length > 0) {
+        storicoDaysInitialized = true;
+        expandedStoricoDays.add(perGiorno[0].giorno);
+      }
+      const stoCercando = searchQuery !== '';
+
+      const todayStr = getTodayDateString();
+      historyList.innerHTML = perGiorno.map(g => {
+        const aperto = stoCercando || expandedStoricoDays.has(g.giorno);
+        const quanti = g.cards.length === 1 ? '1 allenamento' : `${g.cards.length} allenamenti`;
+        return `
+          <div class="day-group ${g.giorno === todayStr ? 'is-today' : ''}">
+            <div class="day-group-head" onclick="toggleStoricoDay('${g.giorno}')">
+              <div class="day-group-label">${escapeHtml(formatDateWithWeekday(g.giorno))}${g.giorno === todayStr ? ' · oggi' : ''}</div>
+              <div class="day-group-aside">
+                <span class="day-group-count">${quanti}</span>
+                <span class="day-item-chevron">${aperto ? '⌃' : '⌄'}</span>
+              </div>
+            </div>
+            <div class="day-group-body" ${aperto ? '' : 'hidden'}>${g.cards.join('')}</div>
+          </div>
+        `;
+      }).join('');
     }
 
     // ===================== LOG RESULT (risultato per singolo workout) =====================

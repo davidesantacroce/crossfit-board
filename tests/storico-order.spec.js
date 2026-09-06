@@ -10,8 +10,9 @@ function daysAgo(n) {
   return d.toISOString().slice(0, 10);
 }
 
+// Dalla v62 lo storico raggruppa per giornata: le date stanno nelle intestazioni dei giorni.
 const dateMostrate = (page) =>
-  page.evaluate(() => Array.from(document.querySelectorAll('#historyList .history-item-header div:first-child')).map((e) => e.innerText.trim()).filter(Boolean));
+  page.evaluate(() => Array.from(document.querySelectorAll('#historyList .day-group-label')).map((e) => e.innerText.replace(/^[A-Za-z]{3}\s+/, '').replace(/\s*·.*$/, '').trim()));
 
 test('il più recente sta in cima, anche se salvato per primo', async ({ page }) => {
   await mockBackend(page, {
