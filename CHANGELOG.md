@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v60 — 2026-09-06
+- **Modifica · Risultati · Elimina sono ora tre tasti gemelli**, stessa larghezza e stessa
+  altezza, sulla stessa riga — identici nella vista giorno di REGISTRA e nello **Storico**.
+  Prima Modifica ed Elimina stavano nell'intestazione della card con misure diverse fra loro, e
+  il tasto dei risultati era un blocco a parte a tutta larghezza sotto il WOD.
+- Il tasto si chiama di nuovo **Risultati** (era "Results"), ovunque compaia.
+- Le vecchie sessioni multi-Parte tengono un Risultati **per Parte** — il confronto con gli altri
+  è per singolo lavoro — e la riga in fondo resta con Modifica ed Elimina.
+- Anche il badge col numero di risultati resta sopra il proprio tasto: coi tre affiancati
+  sporgeva su quello accanto.
+
 ## v59 — 2026-09-06
 - **La bacheca elenca i lavori singoli**, non le giornate. Prima accorpava per *atleta + giorno*:
   i tre lavori programmati da una persona per lunedì diventavano una card sola, e "USA QUESTO

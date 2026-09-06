@@ -150,7 +150,16 @@
     .day-item-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .day-item-score { font-size: 12px; font-weight: 800; color: #4caf50; white-space: nowrap; }
     .day-item-chevron { font-size: 16px; font-weight: 900; color: var(--text-muted); line-height: 1; }
-    .day-item-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+    /* Modifica · Risultati · Elimina: tre tasti gemelli, stessa larghezza e stessa altezza,
+       identici nella vista giorno e nello Storico. Ogni tasto sta in una cella senza padding né
+       bordo propri, altrimenti padding e bordi diversi darebbero terzi diversi (flex-basis: 0
+       si risolve sul content box, vedi .result-actions-row). */
+    .item-actions-row { display: flex; align-items: stretch; gap: 6px; margin-top: 10px; }
+    .item-actions-row > * { flex: 1 1 0; min-width: 0; display: flex; }
+    .item-actions-row > * > button { width: 100%; box-sizing: border-box; padding: 10px 4px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+    /* Il badge resta sopra il proprio tasto: con i tre affiancati, sporgendo di 7px finiva
+       sopra quello accanto. */
+    .item-actions-row .notification-badge { top: -6px; right: -2px; }
     .day-item.is-open .day-item-title { color: var(--accent); }
 
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
@@ -782,7 +791,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v59";
+    const APP_VERSION = "v60";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1158,6 +1167,13 @@
 
         const aperta = expandedDayItems.has(String(item.id));
 
+        // Con un lavoro solo il tasto Risultati entra nella riga con Modifica ed Elimina; le
+        // vecchie sessioni multi-Parte lo tengono sotto ogni Parte, perché lì è per Parte.
+        const itemDateAzioni = String(item.date || '').slice(0, 10);
+        const azioniRisultatiHtml = blocchi.length === 1
+          ? renderCommunityButton(`openCommunityResultsModalFor('${String(primo.title || '').replace(/'/g, "\\'")}', '${String(primo.type || '').replace(/'/g, "\\'")}', '${itemDateAzioni}')`, primo.title, primo.type, itemDateAzioni, { row: true })
+          : '';
+
         let blocksHtml = '';
         if (item.blocks && Array.isArray(item.blocks)) {
           blocksHtml = item.blocks.map(b => {
@@ -1182,7 +1198,7 @@
                 ${titoloBloccoHtml}
                 ${bodyHtml}
                 ${scoreHtml}
-                ${communityBtn}
+                ${blocchi.length > 1 ? communityBtn : ''}
               </div>
             `;
           }).join('');
@@ -1203,9 +1219,10 @@
             <div class="day-item-body" ${aperta ? '' : 'hidden'}>
               ${blocksHtml}
               ${isPublishedWod(item) ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
-              <div class="day-item-actions">
-                <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
-                <button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button>
+              <div class="item-actions-row">
+                <div><button class="btn-secondary" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button></div>
+                ${azioniRisultatiHtml}
+                <div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button></div>
               </div>
             </div>
           </div>
@@ -3279,7 +3296,8 @@
       let html = '';
       history.slice().reverse().sort((a, b) => giornoDi(b).localeCompare(giornoDi(a))).forEach(item => {
         let contentHtml = '';
-        
+        const blocchiStorico = Array.isArray(item.blocks) ? item.blocks : [];
+
         if (item.blocks && Array.isArray(item.blocks)) {
           contentHtml = item.blocks.map(b => {
             let bodyHtml = '';
@@ -3316,7 +3334,7 @@
                 <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
                 ${bodyHtml}
                 ${scoreHtml}
-                ${communityBtn}
+                ${blocchiStorico.length > 1 ? communityBtn : ''}
               </div>
             `;
           }).join('');
@@ -3333,6 +3351,12 @@
           `;
         }
 
+        const primoStorico = blocchiStorico[0] || {};
+        const itemDateAzioni = String(item.date || '').slice(0, 10);
+        const azioniRisultatiHtml = blocchiStorico.length === 1
+          ? renderCommunityButton(`openCommunityResultsModalFor('${String(primoStorico.title || '').replace(/'/g, "\\'")}', '${String(primoStorico.type || '').replace(/'/g, "\\'")}', '${itemDateAzioni}')`, primoStorico.title, primoStorico.type, itemDateAzioni, { row: true })
+          : '';
+
         html += `
           <div class="history-item">
             <div class="history-item-header">
@@ -3340,13 +3364,14 @@
                 ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">${escapeHtml(formatDateForDisplay(item.date))}</span>
               </div>
-              <div style="display: flex; gap: 6px;">
-                <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
-                <button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button>
-              </div>
             </div>
             ${contentHtml}
             ${isPublishedWod(item) ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
+            <div class="item-actions-row">
+              <div><button class="btn-secondary" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button></div>
+              ${azioniRisultatiHtml}
+              <div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button></div>
+            </div>
           </div>
         `;
       });
@@ -4930,19 +4955,20 @@
 
     // Pulsante "Risultati Altri Atleti" con il numero di persone che hanno già loggato quel WOD
     // in un badge in stile notifica iOS, in alto a destra sul pulsante (assente se nessuno).
-    // paired: il bottone è affiancato a "Log Result" dentro una .result-actions-row, quindi
-    // prende le stesse misure di quello. Senza l'opzione resta come prima: da solo, a tutta
-    // larghezza e più compatto, sotto una card di sola lettura (Storico, vista giorno).
+    // Tre modalità: "paired" affiancato a Log Result nel form (stesse misure di quello),
+    // "row" dentro la riga di azioni Modifica/Risultati/Elimina (misure dettate dalla riga), e
+    // quella di default, da solo a tutta larghezza sotto una card.
     function renderCommunityButton(onclickAttr, title, type, referenceDate, options = {}) {
       const count = title ? getCommunityMatches(title, type, referenceDate).length : 0;
       const paired = !!options.paired;
+      const inRow = !!options.row;
       const wrapClass = paired ? 'community-btn-wrap community-btn-wrap-paired' : 'community-btn-wrap';
-      const wrapStyle = paired ? '' : ' style="margin-top: 6px;"';
+      const wrapStyle = (paired || inRow) ? '' : ' style="margin-top: 6px;"';
       const btnClass = paired ? 'btn-secondary btn-community-paired' : 'btn-secondary';
-      const btnStyle = paired ? '' : ' style="width: 100%; padding: 6px 10px; font-size: 11px;"';
+      const btnStyle = (paired || inRow) ? '' : ' style="width: 100%; padding: 6px 10px; font-size: 11px;"';
       return `
         <div class="${wrapClass}"${wrapStyle}>
-          <button type="button" class="${btnClass}"${btnStyle} onclick="${onclickAttr}">👥 Results</button>
+          <button type="button" class="${btnClass}"${btnStyle} onclick="${onclickAttr}">👥 Risultati</button>
           ${count > 0 ? `<span class="notification-badge">${count > 99 ? '99+' : count}</span>` : ''}
         </div>
       `;

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { mockBackend, gotoApp, loginAs } = require('./helpers');
 
-// Le due azioni del blocco ("🏆 Log Result" e "👥 Results") sono gemelle: stessa riga, stessa
+// Le due azioni del blocco ("🏆 Log Result" e "👥 Risultati") sono gemelle: stessa riga, stessa
 // larghezza, stessa altezza. Il vincolo è facile da rompere senza accorgersene, perché basta
 // che uno dei due bottoni torni a essere figlio diretto della riga flex: il suo padding+bordo
 // si sommerebbe alla sua metà (flex-basis: 0 si risolve sul content box).
@@ -12,7 +12,7 @@ async function apriBloccoNuovo(page) {
   await page.evaluate(() => addWorkoutBlock('For Time', 'Fran', '21-15-9 Thruster + Pull-up'));
 }
 
-test('Log Result e Results hanno esattamente la stessa larghezza e la stessa altezza', async ({ page }) => {
+test('Log Result e Risultati hanno esattamente la stessa larghezza e la stessa altezza', async ({ page }) => {
   await mockBackend(page, { athletes: [{ name: 'Test Athlete', hasPin: false }] });
   await gotoApp(page);
   await loginAs(page, 'Test Athlete');
@@ -40,13 +40,13 @@ test('il bottone Log Result non è più tratteggiato', async ({ page }) => {
   expect(stile.borderWidth).toBe('1px'); // stesso spessore del gemello
 });
 
-test('l\'etichetta è "Results", corta abbastanza da stare su una riga sola', async ({ page }) => {
+test('l\'etichetta è "Risultati", corta abbastanza da stare su una riga sola', async ({ page }) => {
   await mockBackend(page, { athletes: [{ name: 'Test Athlete', hasPin: false }] });
   await gotoApp(page);
   await loginAs(page, 'Test Athlete');
   await apriBloccoNuovo(page);
 
-  await expect(page.locator('.btn-community-paired')).toHaveText('👥 Results');
+  await expect(page.locator('.btn-community-paired')).toHaveText('👥 Risultati');
 });
 
 test('nelle viste di sola lettura il bottone resta da solo a tutta larghezza', async ({ page }) => {
