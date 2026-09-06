@@ -138,6 +138,21 @@
     .lr-perset-time-sep { font-weight: 900; color: var(--text-muted); }
     .lr-perset-total { margin-top: 10px; font-size: 13px; font-weight: 800; color: var(--accent); text-align: right; }
 
+    /* Card della giornata richiudibile: chiusa mostra solo titolo e punteggio, così più lavori
+       nello stesso giorno stanno tutti in una schermata; si apre quello che serve leggere o
+       loggare. */
+    .day-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+    .day-item-heading { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; flex: 1 1 auto; }
+    .day-item-title { font-size: 14px; font-weight: 800; color: var(--accent); }
+    .day-item-type { font-weight: 700; color: var(--text-muted); font-size: 12px; }
+    .day-item-more { font-size: 10px; font-weight: 800; color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
+    .day-item-published { background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; }
+    .day-item-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .day-item-score { font-size: 12px; font-weight: 800; color: #4caf50; white-space: nowrap; }
+    .day-item-chevron { font-size: 16px; font-weight: 900; color: var(--text-muted); line-height: 1; }
+    .day-item-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+    .day-item.is-open .day-item-title { color: var(--accent); }
+
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
@@ -752,9 +767,22 @@
     // perché spesso si fa solo UNA delle Parti proposte, non l'intera giornata).
     let loggingPastDay = false;
 
+    // Card aperte nella vista giorno (per id sessione). Con più lavori nello stesso giorno le
+    // card partono chiuse: si vede l'elenco completo della giornata in una schermata, e si apre
+    // solo quello che serve leggere o loggare. Con un lavoro solo non c'è niente da riassumere,
+    // quindi resta aperto.
+    let expandedDayItems = new Set();
+
+    function toggleDayItem(id) {
+      const key = String(id);
+      if (expandedDayItems.has(key)) expandedDayItems.delete(key);
+      else expandedDayItems.add(key);
+      renderRegistraDayView();
+    }
+
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v57";
+    const APP_VERSION = "v58";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1111,7 +1139,25 @@
         return;
       }
 
+      // Un lavoro solo non ha niente da riassumere: si apre da sé.
+      if (sessions.length === 1) expandedDayItems.add(String(sessions[0].id));
+
       contentEl.innerHTML = sessions.map(item => {
+        // Riassunto della card chiusa: titolo del lavoro e, se c'è, il punteggio — cioè quello
+        // che si cerca scorrendo la giornata. Le sessioni vecchie possono avere più Parti
+        // (prima di v48), quindi si dice quante sono invece di mostrarne una sola.
+        const blocchi = Array.isArray(item.blocks) ? item.blocks : [];
+        const primo = blocchi[0] || {};
+        const titoloRiassunto = `${blockCategoryBadge(primo.category)}${escapeHtml(primo.title || 'Allenamento')} <span class="day-item-type">(${escapeHtml(primo.type || '')})</span>${blocchi.length > 1 ? ` <span class="day-item-more">+${blocchi.length - 1}</span>` : ''}`;
+        // A card chiusa il punteggio serve a colpo d'occhio: dei tempi per set basta il totale
+        // ("13:57", non "13:57 (2:35/2:41/...)"), i parziali si leggono aprendo la card.
+        const punteggi = blocchi.map(b => String(b.result || '').replace(/\s*\(.*\)\s*$/, '').trim()).filter(Boolean);
+        const chipPunteggio = punteggi.length
+          ? `<span class="day-item-score">🏆 ${escapeHtml(punteggi.join(' · '))}</span>`
+          : '';
+
+        const aperta = expandedDayItems.has(String(item.id));
+
         let blocksHtml = '';
         if (item.blocks && Array.isArray(item.blocks)) {
           blocksHtml = item.blocks.map(b => {
@@ -1125,9 +1171,15 @@
             `;
             const itemDate = String(item.date || '').slice(0, 10);
             const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate);
+            // Con una Parte sola il titolo è già nell'intestazione della card: ripeterlo qui
+            // sarebbe solo rumore. Le sessioni vecchie multi-Parte lo tengono, perché lì serve
+            // a distinguere una Parte dall'altra.
+            const titoloBloccoHtml = blocchi.length > 1
+              ? `<div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>`
+              : '';
             return `
               <div style="margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border);">
-                <div style="font-size: 13px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || '')} (${escapeHtml(b.type || '')})</div>
+                ${titoloBloccoHtml}
                 ${bodyHtml}
                 ${scoreHtml}
                 ${communityBtn}
@@ -1137,18 +1189,25 @@
         }
 
         return `
-          <div class="history-item">
-            <div class="history-item-header">
-              <div>
-                ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
+          <div class="history-item day-item ${aperta ? 'is-open' : ''}">
+            <div class="day-item-head" onclick="toggleDayItem('${String(item.id).replace(/'/g, "\\'")}')">
+              <div class="day-item-heading">
+                ${isPublishedWod(item) ? `<span class="day-item-published">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
+                <div class="day-item-title">${titoloRiassunto}</div>
               </div>
-              <div style="display: flex; gap: 6px;">
+              <div class="day-item-aside">
+                ${aperta ? '' : chipPunteggio}
+                <span class="day-item-chevron">${aperta ? '⌃' : '⌄'}</span>
+              </div>
+            </div>
+            <div class="day-item-body" ${aperta ? '' : 'hidden'}>
+              ${blocksHtml}
+              ${isPublishedWod(item) ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
+              <div class="day-item-actions">
                 <button class="btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button>
                 <button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button>
               </div>
             </div>
-            ${blocksHtml}
-            ${isPublishedWod(item) ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
           </div>
         `;
       }).join('') + logPastBtnHtml;
