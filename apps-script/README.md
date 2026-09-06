@@ -50,6 +50,16 @@ Distinzione che è già costata parecchi giri a vuoto:
 In caso di guasto, dalla stessa schermata si può riselezionare una versione precedente per
 tornare immediatamente a un codice funzionante.
 
+### Modifiche di `Code.gs` in attesa di essere distribuite
+
+Queste stanno nel repo ma hanno effetto **solo dopo** aver ridistribuito il web app. Finché non
+lo si fa, l'app funziona lo stesso ma quelle funzioni restano a vuoto.
+
+| Da | Cosa cambia | Cosa si vede senza redeploy |
+|---|---|---|
+| v42 | `syncWhoopSince_` sincronizza anche `spo2_percentage` e `skin_temp_celsius`. | I due tile SpO2 e Temp. cutanea nella card Whoop restano sempre a "—". |
+| v63 | Colonna `order` nel foglio *Wods* e nuova azione `setWodOrder`. | Le frecce su/giù nella vista giorno riordinano solo sul dispositivo: l'app lo dice con un avviso, e alla sincronizzazione successiva l'ordine torna com'era. |
+
 ## Script Properties richieste
 
 Si impostano in **⚙️ Impostazioni progetto → Proprietà script**. I valori non stanno (e non

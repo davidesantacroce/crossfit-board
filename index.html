@@ -150,6 +150,9 @@
     .day-item-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .day-item-score { font-size: 12px; font-weight: 800; color: #4caf50; white-space: nowrap; }
     .day-item-chevron { font-size: 16px; font-weight: 900; color: var(--text-muted); line-height: 1; }
+    .day-item-move { display: flex; gap: 2px; }
+    .day-item-move-btn { width: 26px; height: 26px; padding: 0; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-weight: 900; line-height: 1; cursor: pointer; }
+    .day-item-move-btn:disabled { opacity: 0.3; cursor: default; }
     /* Modifica · Risultati · Elimina: tre tasti gemelli, stessa larghezza e stessa altezza,
        identici nella vista giorno e nello Storico. Ogni tasto sta in una cella senza padding né
        bordo propri, altrimenti padding e bordi diversi darebbero terzi diversi (flex-basis: 0
@@ -751,6 +754,38 @@
     // RX/Scaled né punteggio, serve solo a condividere il testo del lavoro con tutti prima che
     // qualcuno lo faccia davvero. Va escluso da tutto ciò che conta "giorni allenati" (calendario,
     // grafico Giorni Attivi), ma resta visibile/eliminabile/modificabile come le altre sessioni.
+    // Prossimo posto libero nella giornata: una sessione nuova si accoda a quelle già presenti.
+    function nextOrderForDay(athlete, dateStr) {
+      const ordini = (globalData.wods || [])
+        .filter(w => w.date === dateStr && w.athlete && athlete && w.athlete.toLowerCase() === athlete.toLowerCase())
+        .map(w => sessionOrderValue(w))
+        .filter(n => n !== null);
+      return ordini.length ? Math.max(...ordini) + 1 : 0;
+    }
+
+    // Ordine dei lavori dentro una giornata, deciso con le frecce su/giù (vedi moveWodInDay) e
+    // salvato nella colonna "order" del Foglio. Le sessioni vecchie non ce l'hanno: restano in
+    // fondo nell'ordine di pubblicazione, e il primo riordino della giornata le numera tutte.
+    function sessionOrderValue(session) {
+      const n = Number(session && session.order);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    // Ordina i lavori di UNA giornata: prima quelli con un ordine esplicito, poi gli altri come
+    // stavano. Usato dalla vista giorno, dalla bacheca e dallo storico, così le tre viste non si
+    // contraddicono più fra loro.
+    function sortSessionsWithinDay(sessions) {
+      return sessions
+        .map((s, i) => ({ s, i, ord: sessionOrderValue(s) }))
+        .sort((a, b) => {
+          if (a.ord !== null && b.ord !== null) return a.ord - b.ord || a.i - b.i;
+          if (a.ord !== null) return -1;
+          if (b.ord !== null) return 1;
+          return a.i - b.i;
+        })
+        .map(x => x.s);
+    }
+
     const PUBLISHED_WOD_MODE = 'PUBLISHED';
     function isPublishedWod(w) { return w && w.mode === PUBLISHED_WOD_MODE; }
     function formatModeBadge(mode) { return mode === PUBLISHED_WOD_MODE ? '📋 PUBBLICATO' : (mode || ''); }
@@ -805,7 +840,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v62";
+    const APP_VERSION = "v63";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1123,6 +1158,42 @@
       if (!showForm) renderRegistraDayView();
     }
 
+    // Sposta un lavoro su o giù dentro la sua giornata. Rinumera TUTTA la giornata: così anche
+    // le sessioni vecchie senza "order" ne prendono uno, e da lì in poi l'ordine è esplicito.
+    async function moveWodInDay(id, delta) {
+      const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
+      const giorno = sortSessionsWithinDay((globalData.wods || []).filter(w =>
+        w.date === selectedRegistraDate && w.athlete && w.athlete.toLowerCase() === activeAthlete
+      ));
+
+      const da = giorno.findIndex(w => String(w.id) === String(id));
+      const a = da + delta;
+      if (da < 0 || a < 0 || a >= giorno.length) return;
+
+      const riordinate = giorno.slice();
+      const [spostata] = riordinate.splice(da, 1);
+      riordinate.splice(a, 0, spostata);
+
+      const items = riordinate.map((w, i) => ({ id: String(w.id), order: i }));
+      const esito = await postToBackend({ action: 'setWodOrder', items });
+
+      // Il backend vecchio ignora un'azione che non conosce e risponde comunque ok: se non
+      // conferma, l'ordine è cambiato solo qui e va detto, invece di far credere sia salvato.
+      if (esito.ok && !esito.queued && esito.res) {
+        let confermato = false;
+        try {
+          const body = await esito.res.json();
+          confermato = body && body.action === 'setWodOrder';
+        } catch (err) { confermato = false; }
+        if (!confermato) {
+          alert("Ordine cambiato solo su questo dispositivo: il Foglio non ha ancora l'aggiornamento che lo salva (va ridistribuito l'Apps Script, vedi apps-script/README.md).");
+        }
+      }
+
+      applyWriteLocally({ action: 'setWodOrder', items });
+      renderAllFromCloudData();
+    }
+
     function renderRegistraDayView() {
       const titleEl = document.getElementById('registraDayViewTitle');
       const contentEl = document.getElementById('registraDayViewContent');
@@ -1135,9 +1206,9 @@
         : (isToday ? 'ALLENAMENTO DI OGGI' : `ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`);
 
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
-      const sessions = (globalData.wods || []).filter(w =>
+      const sessions = sortSessionsWithinDay((globalData.wods || []).filter(w =>
         w.date === selectedRegistraDate && w.athlete && w.athlete.toLowerCase() === activeAthlete
-      );
+      ));
 
       // Bottone per registrare ORA (con un risultato) UN allenamento, sia esso il recupero di
       // un giorno passato (es. fatto oggi il WOD di ieri) sia un nuovo WOD di oggi stesso.
@@ -1180,6 +1251,17 @@
           : '';
 
         const aperta = expandedDayItems.has(String(item.id));
+
+        // Frecce per decidere l'ordine dei lavori della giornata: compaiono solo se ce n'è più
+        // di uno, e non aprono la card (stopPropagation), che è il gesto dell'intestazione.
+        const posizione = sessions.findIndex(w => String(w.id) === String(item.id));
+        const idEsc = String(item.id).replace(/'/g, "\\'");
+        const frecceHtml = sessions.length > 1 ? `
+          <span class="day-item-move">
+            <button type="button" class="day-item-move-btn" title="Sposta su" ${posizione === 0 ? 'disabled' : ''} onclick="event.stopPropagation(); moveWodInDay('${idEsc}', -1)">↑</button>
+            <button type="button" class="day-item-move-btn" title="Sposta giù" ${posizione === sessions.length - 1 ? 'disabled' : ''} onclick="event.stopPropagation(); moveWodInDay('${idEsc}', 1)">↓</button>
+          </span>
+        ` : '';
 
         // Con un lavoro solo il tasto Risultati entra nella riga con Modifica ed Elimina; le
         // vecchie sessioni multi-Parte lo tengono sotto ogni Parte, perché lì è per Parte.
@@ -1227,6 +1309,7 @@
               </div>
               <div class="day-item-aside">
                 ${aperta ? '' : chipPunteggio}
+                ${frecceHtml}
                 <span class="day-item-chevron">${aperta ? '⌃' : '⌄'}</span>
               </div>
             </div>
@@ -1489,7 +1572,7 @@
     const OFFLINE_QUEUE_KEY = 'pendingWrites';
     // Solo le scritture che servono davvero in palestra passano dalla coda. Login/PIN e profilo
     // restano online: rimandarli non avrebbe senso e il loro esito va visto subito.
-    const QUEUEABLE_ACTIONS = ['saveWodSession', 'deleteWod', 'logResult', 'saveMassimale'];
+    const QUEUEABLE_ACTIONS = ['saveWodSession', 'deleteWod', 'logResult', 'saveMassimale', 'setWodOrder'];
 
     function saveCloudDataCache() {
       try {
@@ -1571,6 +1654,11 @@
         else globalData.results.unshift(entry);
       } else if (payload.action === 'saveMassimale') {
         globalData.massimali.push({ athlete: payload.athlete, movement: payload.movement, weight: payload.weight, date: payload.date });
+      } else if (payload.action === 'setWodOrder') {
+        (payload.items || []).forEach(it => {
+          const sessione = globalData.wods.find(w => String(w.id) === String(it.id));
+          if (sessione) sessione.order = it.order;
+        });
       }
       saveCloudDataCache();
     }
@@ -2900,6 +2988,9 @@
         // Modificando si conserva il mode di partenza (un WOD pubblicato resta pubblicato); una
         // sessione nuova non ne ha, e JSON.stringify omette del tutto la chiave undefined.
         mode: isEditing ? (editingWodMode || undefined) : undefined,
+        // Una sessione nuova si accoda in fondo alla giornata; in modifica si tiene il posto
+        // che aveva, altrimenti correggere un titolo la sposterebbe.
+        order: isEditing ? (sessionOrderValue((globalData.wods || []).find(w => String(w.id) === String(editingWodId))) ?? undefined) : nextOrderForDay(athleteName, selectedRegistraDate),
         blocks: blocksData
       };
 
@@ -2981,6 +3072,7 @@
         date: selectedRegistraDate,
         athlete: athleteName,
         mode: PUBLISHED_WOD_MODE,
+        order: nextOrderForDay(athleteName, selectedRegistraDate),
         blocks: blocksData
       };
 
@@ -3212,8 +3304,12 @@
       relevantSessions.forEach(w => {
         (w.blocks || []).forEach(b => {
           const sig = w.date + '|' + wodBlocksSignature([b]);
-          if (!bySignature[sig]) bySignature[sig] = { athletes: [], date: w.date, blocks: [b], firstId: w.id, lastId: w.id };
+          if (!bySignature[sig]) bySignature[sig] = { athletes: [], date: w.date, blocks: [b], firstId: w.id, lastId: w.id, order: sessionOrderValue(w) };
           const gruppo = bySignature[sig];
+          // Fra due pubblicazioni dello stesso lavoro vince l'ordine più basso: chi lo ha messo
+          // per primo in quel posto della giornata.
+          const suoOrdine = sessionOrderValue(w);
+          if (suoOrdine !== null && (gruppo.order === null || suoOrdine < gruppo.order)) gruppo.order = suoOrdine;
           // Chi ripubblica lo stesso lavoro nello stesso giorno resta un nome solo.
           if (!gruppo.athletes.some(a => a.toLowerCase() === String(w.athlete).toLowerCase())) {
             gruppo.athletes.push(w.athlete);
@@ -3227,11 +3323,16 @@
       });
 
       // I giorni in ordine di calendario (la settimana si legge dal primo all'ultimo, non a
-      // ritroso); dentro la giornata l'ordine di pubblicazione (gli id sono Date.now()), così
-      // A, B, C si leggono nell'ordine in cui sono stati programmati.
-      bachecaCandidates = Object.values(bySignature).sort((a, b) =>
-        String(a.date).localeCompare(String(b.date)) || String(a.firstId).localeCompare(String(b.firstId))
-      );
+      // ritroso); dentro la giornata vale l'ordine deciso con le frecce, e in mancanza quello di
+      // pubblicazione (gli id sono Date.now()).
+      bachecaCandidates = Object.values(bySignature).sort((a, b) => {
+        const perData = String(a.date).localeCompare(String(b.date));
+        if (perData !== 0) return perData;
+        if (a.order !== null && b.order !== null) return a.order - b.order;
+        if (a.order !== null) return -1;
+        if (b.order !== null) return 1;
+        return String(a.firstId).localeCompare(String(b.firstId));
+      });
 
       if (bachecaCandidates.length === 0) {
         content.innerHTML = `<p style="font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0 4px;">Nessun WOD caricato in questa settimana.</p>`;
@@ -3373,8 +3474,16 @@
       // modificare una sessione vecchia la farebbe risalire (il salvataggio la cancella e la
       // riaccoda). A parità di data resta la più recente salvata per prima, come prima.
       const giornoDi = (item) => String(item.date || '').slice(0, 10);
-      const cardsPerGiorno = [];
+      // Giorni dal più recente; dentro la giornata l'ordine scelto con le frecce.
+      const perGiornoOrdinati = [];
       history.slice().reverse().sort((a, b) => giornoDi(b).localeCompare(giornoDi(a))).forEach(item => {
+        let g = perGiornoOrdinati.find(x => x.giorno === giornoDi(item));
+        if (!g) { g = { giorno: giornoDi(item), items: [] }; perGiornoOrdinati.push(g); }
+        g.items.push(item);
+      });
+
+      const cardsPerGiorno = [];
+      perGiornoOrdinati.flatMap(g => sortSessionsWithinDay(g.items)).forEach(item => {
         let contentHtml = '';
         const blocchiStorico = Array.isArray(item.blocks) ? item.blocks : [];
 

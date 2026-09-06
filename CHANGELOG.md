@@ -4,6 +4,22 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v63 — 2026-09-06
+- **L'ordine dei lavori dentro una giornata si decide a mano**, con le frecce ↑/↓ su ogni lavoro
+  nella vista giorno di REGISTRA (compaiono solo se la giornata ne ha più di uno, e non aprono la
+  card). L'ordine scelto vale **ovunque**: vista giorno, bacheca e storico.
+- Prima le tre viste potevano contraddirsi: la bacheca ordinava per orario di pubblicazione,
+  vista giorno e storico per ordine delle righe sul Foglio — e quell'ordine cambiava da solo,
+  perché ri-salvare una sessione la cancella e la riaccoda in fondo.
+- Ogni spostamento **rinumera l'intera giornata** (0, 1, 2 …): così anche le sessioni vecchie,
+  che un ordine non ce l'hanno, ne prendono uno al primo riordino. Modificare una sessione non le
+  fa perdere il posto.
+- **Richiede di ridistribuire l'Apps Script** (nuova colonna `order` nel foglio *Wods* e nuova
+  azione `setWodOrder`, che aggiorna solo quella colonna senza riscrivere le righe). Finché non
+  lo si fa, le frecce riordinano solo sul dispositivo e **l'app lo dice con un avviso**, invece di
+  far credere che sia stato salvato. Vedi `apps-script/README.md`.
+- Senza linea il riordino finisce nella coda della modalità palestra, come gli altri salvataggi.
+
 ## v62 — 2026-09-06
 - **Fix: modificare un WOD pubblicato lo faceva smettere di essere pubblicato.** Bastava
   correggerne il titolo dalla bacheca: il salvataggio non rimandava il campo `mode`, quindi la

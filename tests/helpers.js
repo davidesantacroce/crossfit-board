@@ -9,7 +9,7 @@ const INDEX_PATH = 'file://' + path.resolve(__dirname, '..', 'index.html');
 function applyPost(state, body) {
   if (body.action === 'saveWodSession') {
     state.wods = state.wods.filter((w) => String(w.id) !== String(body.id));
-    state.wods.push({ id: body.id, date: body.date, athlete: body.athlete, mode: body.mode, blocks: body.blocks });
+    state.wods.push({ id: body.id, date: body.date, athlete: body.athlete, mode: body.mode, order: body.order, blocks: body.blocks });
   } else if (body.action === 'deleteWod') {
     state.wods = state.wods.filter((w) => String(w.id) !== String(body.id));
   } else if (body.action === 'saveMassimale') {
@@ -20,6 +20,13 @@ function applyPost(state, body) {
     state.funPhrases.push({ id: body.id, text: String(body.text).replace(/\s+/g, ' ').trim(), athlete: body.athlete });
   } else if (body.action === 'deleteFunPhrase') {
     state.funPhrases = state.funPhrases.filter((f) => String(f.id) !== String(body.id));
+  } else if (body.action === 'setWodOrder') {
+    // Come il backend vero: aggiorna solo la posizione delle sessioni indicate.
+    (body.items || []).forEach((it) => {
+      const w = state.wods.find((x) => String(x.id) === String(it.id));
+      if (w) w.order = it.order;
+    });
+    return { status: 'success', action: 'setWodOrder' };
   } else if (body.action === 'logResult') {
     const idx = state.results.findIndex((r) => String(r.id) === String(body.id));
     const entry = {
