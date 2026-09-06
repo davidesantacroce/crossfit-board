@@ -4,6 +4,19 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v62 — 2026-09-06
+- **Fix: modificare un WOD pubblicato lo faceva smettere di essere pubblicato.** Bastava
+  correggerne il titolo dalla bacheca: il salvataggio non rimandava il campo `mode`, quindi la
+  riga tornava una sessione normale — spariva dai WOD pubblicati e ricompariva nello storico
+  come allenamento svolto **senza punteggio** (un WOD pubblicato non ne ha), falsando anche
+  giorni attivi e radar del focus. Ora la modifica conserva il mode di partenza: un WOD
+  pubblicato resta pubblicato, una sessione normale resta normale.
+- **Lo Storico è raggruppato per giornata**, come la bacheca: ogni giorno è una riga con quanti
+  allenamenti contiene, e si apre toccandola. Di default è aperto il giorno più recente.
+- **Cercando** si aprono da soli tutti i giorni che contengono risultati: altrimenti la ricerca
+  avrebbe mostrato solo righe chiuse.
+- La data non è più ripetuta dentro ogni card: ora sta nell'intestazione della giornata.
+
 ## v61 — 2026-09-06
 - **La bacheca raggruppa i lavori per giornata**, e ogni giornata si apre e si chiude. Con la
   settimana programmata (dalla v59 un lavoro per card) la pagina diventava lunghissima: 15 lavori

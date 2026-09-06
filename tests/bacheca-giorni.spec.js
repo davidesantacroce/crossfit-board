@@ -44,11 +44,11 @@ function settimanaProgrammata() {
 test('i lavori sono raggruppati per giornata, con il conteggio', async ({ page }) => {
   await apriBacheca(page, settimanaProgrammata());
 
-  await expect(page.locator('.bacheca-day')).toHaveCount(3);
-  await expect(page.locator('.bacheca-day-count').first()).toHaveText('3 lavori');
+  await expect(page.locator('#bachecaContent .day-group')).toHaveCount(3);
+  await expect(page.locator('#bachecaContent .day-group-count').first()).toHaveText('3 lavori');
 
   // I giorni si leggono in ordine di calendario, dal primo all'ultimo della settimana.
-  const giorni = await page.evaluate(() => Array.from(document.querySelectorAll('.bacheca-day-label')).map((e) => e.innerText));
+  const giorni = await page.evaluate(() => Array.from(document.querySelectorAll('#bachecaContent .day-group-label')).map((e) => e.innerText));
   const attesi = [0, 1, 2].map((i) => giornoDellaSettimana(i));
   for (let i = 0; i < 3; i++) {
     const [y, m, d] = attesi[i].split('-');
@@ -62,8 +62,8 @@ test('di default è aperto il giorno di oggi, gli altri sono chiusi', async ({ p
   const aperte = await page.evaluate(() => Array.from(expandedBachecaDays));
   expect(aperte).toEqual([OGGI]);
 
-  const corpi = page.locator('.bacheca-day-body');
-  const indiceOggi = await page.evaluate(() => Array.from(document.querySelectorAll('.bacheca-day')).findIndex((el) => el.classList.contains('is-today')));
+  const corpi = page.locator('#bachecaContent .day-group-body');
+  const indiceOggi = await page.evaluate(() => Array.from(document.querySelectorAll('#bachecaContent .day-group')).findIndex((el) => el.classList.contains('is-today')));
   for (let i = 0; i < await corpi.count(); i++) {
     if (i === indiceOggi) await expect(corpi.nth(i)).toBeVisible();
     else await expect(corpi.nth(i)).toBeHidden();
@@ -72,20 +72,20 @@ test('di default è aperto il giorno di oggi, gli altri sono chiusi', async ({ p
 
 test('toccando una giornata si apre, e si richiude ritoccandola', async ({ page }) => {
   await apriBacheca(page, settimanaProgrammata());
-  const seconda = page.locator('.bacheca-day').nth(1);
+  const seconda = page.locator('#bachecaContent .day-group').nth(1);
 
-  await expect(seconda.locator('.bacheca-day-body')).toBeHidden();
-  await seconda.locator('.bacheca-day-head').click();
-  await expect(seconda.locator('.bacheca-day-body')).toBeVisible();
-  await expect(seconda.locator('.bacheca-day-body')).toContainText('A1');
+  await expect(seconda.locator('.day-group-body')).toBeHidden();
+  await seconda.locator('.day-group-head').click();
+  await expect(seconda.locator('.day-group-body')).toBeVisible();
+  await expect(seconda.locator('.day-group-body')).toContainText('A1');
 
-  await seconda.locator('.bacheca-day-head').click();
-  await expect(seconda.locator('.bacheca-day-body')).toBeHidden();
+  await seconda.locator('.day-group-head').click();
+  await expect(seconda.locator('.day-group-body')).toBeHidden();
 });
 
 test('il giorno di oggi è segnalato', async ({ page }) => {
   await apriBacheca(page, settimanaProgrammata());
-  await expect(page.locator('.bacheca-day.is-today .bacheca-day-label')).toContainText('oggi');
+  await expect(page.locator('#bachecaContent .day-group.is-today .day-group-label')).toContainText('oggi');
 });
 
 test('con una sola giornata nella settimana, quella è già aperta', async ({ page }) => {
@@ -93,16 +93,16 @@ test('con una sola giornata nella settimana, quella è già aperta', async ({ pa
     { id: '1', date: giornoDellaSettimana(3), athlete: 'Mario Rossi', mode: 'PUBLISHED', blocks: [{ title: 'Murph', type: 'For Time', explanation: '', result: '' }] },
   ]);
 
-  await expect(page.locator('.bacheca-day')).toHaveCount(1);
-  await expect(page.locator('.bacheca-day-body')).toBeVisible();
-  await expect(page.locator('.bacheca-day-count')).toHaveText('1 lavoro');
+  await expect(page.locator('#bachecaContent .day-group')).toHaveCount(1);
+  await expect(page.locator('#bachecaContent .day-group-body')).toBeVisible();
+  await expect(page.locator('#bachecaContent .day-group-count')).toHaveText('1 lavoro');
 });
 
 test('scegliere un WOD da una giornata aperta porta quel lavoro nel form', async ({ page }) => {
   await apriBacheca(page, settimanaProgrammata());
 
-  await page.locator('.bacheca-day').nth(1).locator('.bacheca-day-head').click();
-  await page.locator('.bacheca-day').nth(1).getByRole('button', { name: /QUESTO WOD/ }).nth(1).click();
+  await page.locator('#bachecaContent .day-group').nth(1).locator('.day-group-head').click();
+  await page.locator('#bachecaContent .day-group').nth(1).getByRole('button', { name: /QUESTO WOD/ }).nth(1).click();
 
   await expect(page.locator('[id^="workout-block-"]')).toHaveCount(1);
   await expect(page.locator('.block-title')).toHaveValue('B1');
