@@ -4,6 +4,19 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v57 — 2026-09-06
+- **Fix: su un giorno futuro si riusciva a programmare un solo WOD.** Dopo aver pubblicato, il
+  form restava pieno del lavoro appena pubblicato e "+ Aggiungi Lavoro" è nascosto quando una
+  Parte c'è già (v48): per programmarne un secondo per lo stesso giorno non c'era strada, se non
+  cancellare a mano la Parte con la ✕. Ora dopo la pubblicazione il form si svuota e si torna
+  all'elenco del giorno.
+- **Anche i giorni futuri partono dalla vista di sola lettura**, come oggi e i giorni passati:
+  si vede l'elenco dei **WOD già programmati** per quel giorno (con Modifica ed Elimina) e un
+  tasto **"+ Programma un altro WOD per questo giorno"**. Prima un giorno futuro mostrava solo
+  il form vuoto, senza modo di vedere cosa ci fosse già.
+- Titolo e testi seguono il giorno: "WOD PROGRAMMATI PER IL …" e "Nessun WOD ancora programmato
+  per questo giorno", invece delle parole pensate per un allenamento già svolto.
+
 ## v56 — 2026-09-06
 - **TEMPO PER SET**: un WOD a set cronometrati ora chiede un tempo **per ogni set**, come fanno i
   gestionali di programmazione, invece di un unico numero. Esempio reale: *Ironworkers — 5 Sets:

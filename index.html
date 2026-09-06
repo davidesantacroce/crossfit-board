@@ -754,7 +754,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v56";
+    const APP_VERSION = "v57";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1026,7 +1026,12 @@
       // già registrato: il form compare solo se richiesto esplicitamente col bottone "+
       // Registra un allenamento" (vedi loggingPastDay/startLoggingPastDay), una sola Parte alla
       // volta, invece di restare sempre aperto pronto a impilarne più di una in un'unica sessione.
-      const showForm = isFuture || editingWodId !== null || ((isToday || isPast) && loggingPastDay);
+      // Vale per tutti i giorni, futuri compresi: di default si vede quanto c'è già (registrato
+      // o programmato) e il form si apre su richiesta, un lavoro alla volta. Su un giorno futuro
+      // il form restava invece sempre aperto: dopo aver pubblicato il primo WOD non c'era modo
+      // di programmarne un secondo per lo stesso giorno, perché "+ Aggiungi Lavoro" sparisce
+      // quando una Parte c'è già.
+      const showForm = editingWodId !== null || loggingPastDay;
       formCard.style.display = showForm ? '' : 'none';
       dayView.style.display = showForm ? 'none' : '';
 
@@ -1073,7 +1078,10 @@
       if (!titleEl || !contentEl) return;
 
       const isToday = selectedRegistraDate === getTodayDateString();
-      titleEl.innerText = isToday ? 'ALLENAMENTO DI OGGI' : `ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
+      const isFuture = selectedRegistraDate > getTodayDateString();
+      titleEl.innerText = isFuture
+        ? `WOD PROGRAMMATI PER IL ${formatDateForDisplay(selectedRegistraDate)}`
+        : (isToday ? 'ALLENAMENTO DI OGGI' : `ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`);
 
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const sessions = (globalData.wods || []).filter(w =>
@@ -1086,14 +1094,20 @@
       // questo bottone non ci sarebbe alcun modo di registrare un giorno che non abbia già
       // almeno una sessione salvata.
       const dayLabel = isToday ? 'oggi' : 'questo giorno';
+      // Su un giorno futuro non si registra un risultato: si programma il WOD per gli altri.
       const logPastBtnHtml = `
         <button type="button" class="btn-secondary" style="width: 100%; margin-top: ${sessions.length ? '12px' : '0'};" onclick="startLoggingPastDay()">
-          + Registra ${sessions.length ? 'un altro' : 'un'} allenamento per ${dayLabel}
+          ${isFuture
+            ? `+ Programma ${sessions.length ? 'un altro' : 'un'} WOD per questo giorno`
+            : `+ Registra ${sessions.length ? 'un altro' : 'un'} allenamento per ${dayLabel}`}
         </button>
       `;
 
       if (sessions.length === 0) {
-        contentEl.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 4px;">Nessun allenamento registrato per ${dayLabel}.</p>` + logPastBtnHtml;
+        const vuotoTxt = isFuture
+          ? 'Nessun WOD ancora programmato per questo giorno.'
+          : `Nessun allenamento registrato per ${dayLabel}.`;
+        contentEl.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 4px;">${vuotoTxt}</p>` + logPastBtnHtml;
         return;
       }
 
@@ -2882,11 +2896,24 @@
         if (!esito.queued) await fetchCloudData();
         else renderAllFromCloudData();
         hideFunLoadingOverlay();
+        if (esito.ok) {
+          // Form svuotato: si torna all'elenco del giorno, dove il WOD appena pubblicato compare
+          // e il bottone invita a programmarne un altro. Senza questo, la Parte restava nel form
+          // e "+ Aggiungi Lavoro" (nascosto quando una Parte c'è già) non permetteva di
+          // comporne un secondo per lo stesso giorno.
+          document.getElementById('workoutBlocksContainer').innerHTML = '';
+          blockCounter = 0;
+          blockResults = {};
+          loggingPastDay = false;
+          updateSaveButtonLabel();
+          updateRegistraDateView();
+        }
+
         if (esito.queued) {
           alert('Nessuna linea: il WOD è salvato sul telefono e finirà in bacheca appena torni online.');
         } else if (esito.ok) {
           alert(isFuture
-            ? `WOD programmato per il ${formatDateForDisplay(selectedRegistraDate)}! Comparirà in bacheca quel giorno, e allora potrai loggare il tuo risultato.`
+            ? `WOD programmato per il ${formatDateForDisplay(selectedRegistraDate)}! Puoi programmarne subito un altro per lo stesso giorno.`
             : 'WOD pubblicato in bacheca! Quando lo fai, torna qui e logga il tuo risultato con "Salva Sessione Completa".');
         } else {
           alert('Errore durante la pubblicazione sul cloud.');
@@ -3023,11 +3050,10 @@
     function applyWodBlocksToRegistraForm(blocks) {
       if (!blocks || blocks.length === 0) return;
 
-      // Scegliere un WOD per oggi o per un giorno passato (entrambi mostrano di default la
-      // vista di sola lettura) significa anche voler iniziare a registrarlo (vedi
-      // loggingPastDay / updateRegistraDateView).
-      const isFuture = selectedRegistraDate > getTodayDateString();
-      if (!isFuture && editingWodId === null) loggingPastDay = true;
+      // Ogni giorno mostra di default la vista di sola lettura: scegliere un WOD dalla bacheca
+      // significa volerlo aprire nel form, per registrarlo (oggi o un giorno passato) o per
+      // riprogrammarlo (giorno futuro). Vedi loggingPastDay / updateRegistraDateView.
+      if (editingWodId === null) loggingPastDay = true;
 
       document.getElementById('workoutBlocksContainer').innerHTML = '';
       blockCounter = 0;
