@@ -88,3 +88,70 @@ test('aprendo la card il punteggio riassunto sparisce, come prima', async ({ pag
   await prima.locator('.day-item-head').click();
   await expect(prima.locator('.day-item-score')).toHaveCount(0);
 });
+
+// --- v68: tutte le card della giornata alte uguale (segnalato: "non mi piace che ci siano
+// altezze diverse", con una card più alta perché il badge PUBBLICATO le era finito sopra). ---
+
+const pubblicato = (id, order, title, type) => ({
+  id, date: OGGI, athlete: 'Test Athlete', mode: 'PUBLISHED', order,
+  blocks: [{ title, type, explanation: 'testo del wod', category: '', result: '' }],
+});
+
+async function altezzeTeste(page) {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll('#registraDayView .day-item-head'))
+      .map((t) => Math.round(t.getBoundingClientRect().height)));
+}
+
+test('le card della giornata sono tutte alte uguale, anche con un nome lungo', async ({ page }) => {
+  await apriGiorno(page, [
+    pubblicato('a', 0, 'Power Snatch + Hang Power Snatch + Snatch', 'Sets'), // va a capo
+    pubblicato('b', 1, 'Snatch', 'EMOM'),
+    pubblicato('c', 2, '3 Position Back Squat A', 'Sets'),
+    pubblicato('d', 3, 'Back Squat', 'EMOM'),
+  ]);
+
+  const altezze = await altezzeTeste(page);
+  expect(altezze).toHaveLength(4);
+  expect(new Set(altezze).size).toBe(1);
+});
+
+test('restano uguali anche se solo alcune hanno il punteggio', async ({ page }) => {
+  await apriGiorno(page, [
+    wod('a', 0, LUNGO, 'Sets', CARICHI),
+    wod('b', 1, 'Snatch', 'EMOM', ''),
+    wod('c', 2, 'Back Squat', 'EMOM', '1:00'),
+  ]);
+
+  const altezze = await altezzeTeste(page);
+  expect(altezze).toHaveLength(3);
+  expect(new Set(altezze).size).toBe(1);
+});
+
+test('il badge PUBBLICATO sta sempre sopra il nome, mai di fianco', async ({ page }) => {
+  await apriGiorno(page, [
+    pubblicato('a', 0, 'Power Snatch + Hang Power Snatch + Snatch', 'Sets'),
+    pubblicato('b', 1, 'Snatch', 'EMOM'),
+  ]);
+
+  const cards = page.locator('#registraDayView .day-item');
+  for (const i of [0, 1]) {
+    const badge = await cards.nth(i).locator('.day-item-published').boundingBox();
+    const titolo = await cards.nth(i).locator('.day-item-title').boundingBox();
+    expect(badge.y + badge.height).toBeLessThanOrEqual(titolo.y + 1); // righe distinte
+    expect(badge.x).toBeLessThanOrEqual(titolo.x + 1);                // e allineati a sinistra
+  }
+});
+
+test('un nome lungo ci sta tutto: non viene tagliato con i puntini', async ({ page }) => {
+  await apriGiorno(page, [
+    pubblicato('a', 0, 'Power Snatch + Hang Power Snatch + Snatch', 'Sets'),
+    pubblicato('b', 1, 'Snatch', 'EMOM'),
+  ]);
+
+  const tagliato = await page.evaluate(() => {
+    const el = document.querySelector('#registraDayView .day-item-title');
+    return el.scrollHeight > el.clientHeight + 1;
+  });
+  expect(tagliato).toBe(false);
+});
