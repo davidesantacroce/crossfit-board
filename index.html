@@ -147,8 +147,13 @@
        finivano per sovrapporsi. */
     .day-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; cursor: pointer; }
     .day-item-main { min-width: 0; flex: 1 1 auto; }
-    .day-item-heading { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
-    .day-item-title { font-size: 14px; font-weight: 800; color: var(--accent); overflow-wrap: anywhere; }
+    /* v68: il badge PUBBLICATO sta SEMPRE su una riga sua sopra il nome, come gia' nello
+       Storico. Prima divideva la riga con il nome e ci finiva sopra solo quando il nome era
+       lungo: quella card diventava piu' alta delle altre e l'elenco sembrava sbilenco. Cosi'
+       il nome ha tutta la larghezza e gli bastano due righe. */
+    .day-item-heading { min-width: 0; }
+    .day-item-title { font-size: 14px; font-weight: 800; color: var(--accent); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .day-item-badges { margin-bottom: 4px; }
     .day-item-type { font-weight: 700; color: var(--text-muted); font-size: 12px; }
     .day-item-more { font-size: 10px; font-weight: 800; color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
     .day-item-published { background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; }
@@ -864,7 +869,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v67";
+    const APP_VERSION = "v68";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1439,9 +1444,9 @@
           <div class="history-item day-item ${aperta ? 'is-open' : ''}">
             <div class="day-item-head" onclick="toggleDayItem('${String(item.id).replace(/'/g, "\\'")}')">
               <div class="day-item-main">
+                ${isPublishedWod(item) ? `<div class="day-item-badges"><span class="day-item-published">${escapeHtml(formatModeBadge(item.mode))}</span></div>` : ''}
                 <div class="day-item-heading">
-                  ${isPublishedWod(item) ? `<span class="day-item-published">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
-                  <div class="day-item-title">${titoloRiassunto}</div>
+                  <div class="day-item-title" title="${escapeHtml(primo.title || 'Allenamento')}">${titoloRiassunto}</div>
                 </div>
                 ${aperta ? '' : chipPunteggio}
               </div>
@@ -1462,7 +1467,28 @@
           </div>
         `;
       }).join('') + logPastBtnHtml;
+
+      pareggiaAltezzeGiorno(contentEl);
     }
+
+    // Tutte le card della giornata alte uguale: senza questo, una con il nome su due righe (o
+    // con un punteggio sotto) e' visibilmente piu' alta delle altre e l'elenco sembra sbilenco.
+    // Si misura invece di fissare un'altezza a caso, cosi' se i nomi sono tutti corti le card
+    // restano compatte. Va rifatto a ogni disegno e quando cambia la larghezza dello schermo.
+    function pareggiaAltezzeGiorno(contentEl) {
+      const teste = Array.from(contentEl.querySelectorAll('.day-item-head'));
+      teste.forEach(t => { t.style.minHeight = ''; });
+      if (teste.length < 2) return;
+      const massima = Math.max(...teste.map(t => t.getBoundingClientRect().height));
+      // A tab nascosto le misure sono tutte 0: si rifara' al prossimo disegno, quando si vede.
+      if (massima <= 0) return;
+      teste.forEach(t => { t.style.minHeight = massima + 'px'; });
+    }
+
+    window.addEventListener('resize', () => {
+      const contentEl = document.getElementById('registraDayViewContent');
+      if (contentEl) pareggiaAltezzeGiorno(contentEl);
+    });
 
     const CROSSFIT_STANDARD_RMS = [
       "Snatch (Strappo)", "Power Snatch", "Clean (Slancio)", "Power Clean",

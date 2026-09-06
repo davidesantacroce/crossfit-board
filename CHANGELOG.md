@@ -4,6 +4,16 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v68 — 2026-09-06
+- **Nella vista giorno le card sono tutte alte uguale.** Il badge PUBBLICATO divideva la riga
+  con il nome del lavoro e ci finiva sopra solo quando il nome era lungo: quella card diventava
+  più alta delle altre e l'elenco sembrava sbilenco.
+- Ora il badge sta **sempre su una riga sua sopra il nome** (come già nello Storico), così il
+  nome ha tutta la larghezza e gli bastano due righe.
+- Le altezze vengono **pareggiate misurando la card più alta** invece di fissare un valore: se i
+  nomi della giornata sono tutti corti, le card restano compatte. Si rifà anche quando ruoti il
+  telefono.
+
 ## v67 — 2026-09-06
 - **Nella vista giorno il nome del lavoro e il punteggio non si sovrappongono più.** Stavano
   affiancati sulla stessa riga e il punteggio non andava a capo: si prendeva tutta la larghezza
