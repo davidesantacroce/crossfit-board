@@ -15,6 +15,9 @@ function doPost(e) {
       } else {
         ensureColumnExists(sheet, "explanation");
       }
+      // Ordine del lavoro dentro la giornata, deciso dall'atleta con le frecce su/giù nell'app.
+      // Vuoto sulle righe vecchie: l'app in quel caso ripiega sull'ordine di pubblicazione.
+      ensureColumnExists(sheet, "order");
 
       var dateColIndex = getColumnIndex(sheet, "date");
       if (dateColIndex > 0) {
@@ -48,7 +51,8 @@ function doPost(e) {
             "explanation": block.explanation || "",
             "exercises": exercisesFormatted,
             "result": resultVal,
-            "notes": data.notes || ""
+            "notes": data.notes || "",
+            "order": (data.order === undefined || data.order === null) ? "" : data.order
           };
           var newRow = headers.map(function(h) {
             return rowMap.hasOwnProperty(h) ? rowMap[h] : "";
@@ -316,6 +320,36 @@ function doPost(e) {
     }
 
     // Riceve una misurazione di salute (peso/composizione dalla bilancia, frequenza cardiaca a
+    // Riordino dei lavori dentro una giornata: arrivano gli id delle sessioni con la loro nuova
+    // posizione. Tocca solo la colonna "order", senza cancellare e riscrivere le righe come fa
+    // saveWodSession, così riordinare non rischia di perdere nulla.
+    if (data.action === 'setWodOrder') {
+      var wodSheet = ss.getSheetByName("Wods");
+      if (!wodSheet || wodSheet.getLastRow() < 2) {
+        return ContentService.createTextOutput(JSON.stringify({"status": "success", "action": "setWodOrder", "updated": 0})).setMimeType(ContentService.MimeType.JSON);
+      }
+      ensureColumnExists(wodSheet, "order");
+
+      var idColIdx = getColumnIndex(wodSheet, "id");
+      var orderColIdx = getColumnIndex(wodSheet, "order");
+      var ordinePerId = {};
+      (data.items || []).forEach(function(it) { ordinePerId[String(it.id)] = it.order; });
+
+      var idValues = wodSheet.getRange(2, idColIdx, wodSheet.getLastRow() - 1, 1).getValues();
+      var aggiornate = 0;
+      idValues.forEach(function(riga, i) {
+        var fullId = String(riga[0] || "");
+        // Una sessione occupa una riga per Parte, con id "<idSessione>_<indice>".
+        var mainId = fullId.indexOf("_") >= 0 ? fullId.split("_")[0] : fullId;
+        if (ordinePerId.hasOwnProperty(mainId)) {
+          wodSheet.getRange(i + 2, orderColIdx).setValue(ordinePerId[mainId]);
+          aggiornate++;
+        }
+      });
+
+      return ContentService.createTextOutput(JSON.stringify({"status": "success", "action": "setWodOrder", "updated": aggiornate})).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // riposo/passi/calorie dall'Apple Watch) inviata da un Comando iOS che legge da Salute.
     if (data.action === 'saveHealthData') {
       return ContentService.createTextOutput(JSON.stringify(saveHealthPayload_(data, ss))).setMimeType(ContentService.MimeType.JSON);
@@ -574,6 +608,7 @@ function doGet(e) {
         athlete: row.athlete,
         mode: row.mode,
         notes: row.notes,
+        order: (row.order === "" || row.order === undefined || row.order === null) ? null : Number(row.order),
         blocks: []
       };
     }
