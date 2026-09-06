@@ -178,6 +178,15 @@
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
     .history-explanation-label { font-size: 10px; color: var(--accent); font-weight: 800; text-transform: uppercase; margin-top: 6px; }
+    /* v66: nella card dello storico il nome del WOD sta su una riga tutta sua. Prima divideva
+       la riga con il badge della categoria e il tipo fra parentesi, e su telefono un nome un
+       po' lungo veniva schiacciato o spezzato a meta'. Categoria e tipo passano a una riga di
+       dettaglio sotto, il punteggio resta sulla sua. */
+    .history-item-title { font-size: 15px; font-weight: 800; color: var(--accent); line-height: 1.25; overflow-wrap: anywhere; }
+    /* Niente gap: la spaziatura la da' gia' il margin-right del badge della categoria. */
+    .history-item-meta { display: flex; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+    .history-item-score { font-size: 13px; color: #2e7d32; font-weight: 800; margin-top: 8px; }
+    .history-item-score-row { font-size: 12px; color: #2e7d32; margin-left: 10px; }
     
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
     .tab-content { display: none; }
@@ -848,7 +857,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v65";
+    const APP_VERSION = "v66";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3637,13 +3646,13 @@
           let scoreHtml = '';
           if (b.type === 'Sets' && Array.isArray(b.result)) {
             const setsRows = b.result.map(sr => `
-              <div style="font-size: 12px; color: #2e7d32; margin-left: 10px;">
+              <div class="history-item-score-row">
                 • ${escapeHtml(sr.reps || '')} <b>${escapeHtml(sr.name || '')}</b> ${sr.weight ? '(' + escapeHtml(sr.weight) + ')' : ''}
               </div>
             `).join('');
-            scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score (Serie/Carichi):</div>${setsRows}`;
+            scoreHtml = `<div class="history-item-score">Score (Serie/Carichi):</div>${setsRows}`;
           } else if (b.result) {
-            scoreHtml = `<div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">Score: ${escapeHtml(b.result)}</div>`;
+            scoreHtml = `<div class="history-item-score">Score: ${escapeHtml(b.result)}</div>`;
           }
 
           const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate, { row: true });
@@ -3665,7 +3674,8 @@
                   ${isPublishedWod(item) ? `<span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
                 </div>
               </div>
-              <div style="font-size: 14px; font-weight: 800; color: var(--accent);">${blockCategoryBadge(b.category)}${escapeHtml(b.title || 'WOD')} <span style="color: var(--text-muted); font-weight: 600; font-size: 12px;">(${escapeHtml(b.type || '')})</span></div>
+              <div class="history-item-title">${escapeHtml(b.title || 'WOD')}</div>
+              ${b.category || b.type ? `<div class="history-item-meta">${blockCategoryBadge(b.category)}${b.type ? `<span>${escapeHtml(b.type)}</span>` : ''}</div>` : ''}
               ${bodyHtml}
               ${scoreHtml}
               ${isPublishedWod(item) || indice > 0 ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}

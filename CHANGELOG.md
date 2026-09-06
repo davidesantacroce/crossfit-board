@@ -4,6 +4,13 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v66 — 2026-09-06
+- **Nello Storico il nome del WOD sta su una riga tutta sua.** Prima la divideva con il badge
+  della categoria e con il tipo fra parentesi: su telefono un nome un po' lungo veniva
+  schiacciato o spezzato a metà e si leggeva male. Ora il nome è la prima riga della card, più
+  grande, e categoria e tipo scendono su una riga di dettaglio sotto.
+- Il **punteggio** ha anch'esso la sua riga, un filo più grande di prima.
+
 ## v65 — 2026-09-06
 - **Nello Storico ogni lavoro ha la sua card: niente più accorpamenti.** Anche le righe vecchie
   (più lavori salvati insieme, prima della v48) si vedono divise, un lavoro per card, con il suo

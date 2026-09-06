@@ -74,9 +74,10 @@ test('l\'ordine scelto vale anche in bacheca e nello storico', async ({ page }) 
   expect(await page.evaluate(() => bachecaCandidates.map((c) => c.blocks[0].title))).toEqual(['A', 'C', 'B']);
 
   await page.evaluate(() => switchTab('storico'));
+  // Dalla v66 il nome del WOD ha un elemento tutto suo, quindi si legge direttamente.
   const nelloStorico = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('#historyList .history-item')).map((el) => el.innerText.split('\n').find((r) => /^[ABC] \(/.test(r.trim()))?.trim().split(' (')[0]));
-  expect(nelloStorico.filter(Boolean)).toEqual(['A', 'C', 'B']);
+    Array.from(document.querySelectorAll('#historyList .history-item .history-item-title')).map((el) => el.textContent.trim()));
+  expect(nelloStorico).toEqual(['A', 'C', 'B']);
 });
 
 test('le sessioni vecchie senza ordine vengono numerate al primo riordino', async ({ page }) => {

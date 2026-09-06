@@ -103,9 +103,10 @@ test('sui lavori che condividono una riga, Elimina lascia il posto a Spacchetta'
   ]);
 
   // Cancellarne uno cancellerebbe anche l'altro: al suo posto c'è Spacchetta, e la card lo dice.
-  // Regex (case-sensitive): con una stringa, hasText ignora le maiuscole e "A (" pescherebbe
-  // anche "riga (lavoro 1 di 2)" della nota, finendo su due card.
-  const cardA = page.locator('#historyList .history-item').filter({ hasText: /A \(Sets\)/ });
+  // Si aggancia al titolo, che dalla v66 è un elemento a sé: cercare "A" nel testo dell'intera
+  // card pescherebbe anche la nota "riga (lavoro 1 di 2)", finendo su due card.
+  const cardA = page.locator('#historyList .history-item')
+    .filter({ has: page.locator('.history-item-title', { hasText: /^A$/ }) });
   await expect(cardA.getByRole('button', { name: /Spacchetta in 2/ })).toBeVisible();
   await expect(cardA.getByRole('button', { name: /Elimina/ })).toHaveCount(0);
   await expect(cardA).toContainText('Salvato insieme ad altri 1 lavori');
