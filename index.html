@@ -141,14 +141,21 @@
     /* Card della giornata richiudibile: chiusa mostra solo titolo e punteggio, così più lavori
        nello stesso giorno stanno tutti in una schermata; si apre quello che serve leggere o
        loggare. */
-    .day-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
-    .day-item-heading { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; flex: 1 1 auto; }
-    .day-item-title { font-size: 14px; font-weight: 800; color: var(--accent); }
+    /* v67: l'intestazione della card e' su due righe, nome sopra e punteggio sotto. Con tutto
+       su una riga sola il punteggio (che non va a capo) si prendeva la sua larghezza intera e
+       lasciava al nome una colonna strettissima: un nome lungo si spezzava in verticale e i due
+       finivano per sovrapporsi. */
+    .day-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; cursor: pointer; }
+    .day-item-main { min-width: 0; flex: 1 1 auto; }
+    .day-item-heading { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+    .day-item-title { font-size: 14px; font-weight: 800; color: var(--accent); overflow-wrap: anywhere; }
     .day-item-type { font-weight: 700; color: var(--text-muted); font-size: 12px; }
     .day-item-more { font-size: 10px; font-weight: 800; color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
     .day-item-published { background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; }
     .day-item-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    .day-item-score { font-size: 12px; font-weight: 800; color: #4caf50; white-space: nowrap; }
+    /* Sulla sua riga puo' andare a capo: una serie di carichi ("100/100/110/..." ) e' piu' lunga
+       della larghezza dello schermo. */
+    .day-item-score { display: block; margin-top: 4px; font-size: 12px; font-weight: 800; color: #4caf50; overflow-wrap: anywhere; }
     .day-item-chevron { font-size: 16px; font-weight: 900; color: var(--text-muted); line-height: 1; }
     .day-item-move { display: flex; gap: 2px; }
     .day-item-move-btn { width: 26px; height: 26px; padding: 0; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-weight: 900; line-height: 1; cursor: pointer; }
@@ -857,7 +864,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v66";
+    const APP_VERSION = "v67";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1431,12 +1438,14 @@
         return `
           <div class="history-item day-item ${aperta ? 'is-open' : ''}">
             <div class="day-item-head" onclick="toggleDayItem('${String(item.id).replace(/'/g, "\\'")}')">
-              <div class="day-item-heading">
-                ${isPublishedWod(item) ? `<span class="day-item-published">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
-                <div class="day-item-title">${titoloRiassunto}</div>
+              <div class="day-item-main">
+                <div class="day-item-heading">
+                  ${isPublishedWod(item) ? `<span class="day-item-published">${escapeHtml(formatModeBadge(item.mode))}</span>` : ''}
+                  <div class="day-item-title">${titoloRiassunto}</div>
+                </div>
+                ${aperta ? '' : chipPunteggio}
               </div>
               <div class="day-item-aside">
-                ${aperta ? '' : chipPunteggio}
                 ${frecceHtml}
                 <span class="day-item-chevron">${aperta ? '⌃' : '⌄'}</span>
               </div>

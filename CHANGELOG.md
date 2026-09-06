@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v67 — 2026-09-06
+- **Nella vista giorno il nome del lavoro e il punteggio non si sovrappongono più.** Stavano
+  affiancati sulla stessa riga e il punteggio non andava a capo: si prendeva tutta la larghezza
+  che gli serviva e al nome restava una colonna strettissima, dove si spezzava in verticale una
+  parola per riga finendo per finire sotto al punteggio ("Back Squat" scritto sopra
+  "100/100/110/110/… kg").
+- Ora il **nome sta sulla prima riga** e il **punteggio su quella sotto**, come già nello
+  Storico dalla v66. Le frecce ↑/↓ e la freccetta di apertura restano a destra.
+- Un punteggio più largo dello schermo (un EMOM con molti carichi) **va a capo** invece di
+  sbordare dalla card.
+
 ## v66 — 2026-09-06
 - **Nello Storico il nome del WOD sta su una riga tutta sua.** Prima la divideva con il badge
   della categoria e con il tipo fra parentesi: su telefono un nome un po' lungo veniva
