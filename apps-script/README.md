@@ -52,13 +52,19 @@ tornare immediatamente a un codice funzionante.
 
 ### Modifiche di `Code.gs` in attesa di essere distribuite
 
-Queste stanno nel repo ma hanno effetto **solo dopo** aver ridistribuito il web app. Finché non
-lo si fa, l'app funziona lo stesso ma quelle funzioni restano a vuoto.
+Nessuna: il web app distribuito è allineato al `Code.gs` di questo repo (verificato il 06/09/2026,
+`doGet` restituisce il campo `order` introdotto in v63).
 
-| Da | Cosa cambia | Cosa si vede senza redeploy |
+Quando una modifica di `Code.gs` viene committata ma non ancora distribuita, elencala qui con
+cosa si vede senza il redeploy, così è chiaro perché una funzione dell'app resta a vuoto.
+
+### Dopo il redeploy: cosa richiede anche un'azione sui dati
+
+Ridistribuire aggiorna il *codice*, non le righe già scritte sul foglio.
+
+| Da | Cosa serve in più | Perché |
 |---|---|---|
-| v42 | `syncWhoopSince_` sincronizza anche `spo2_percentage` e `skin_temp_celsius`. | I due tile SpO2 e Temp. cutanea nella card Whoop restano sempre a "—". |
-| v63 | Colonna `order` nel foglio *Wods* e nuova azione `setWodOrder`. | Le frecce su/giù nella vista giorno riordinano solo sul dispositivo: l'app lo dice con un avviso, e alla sincronizzazione successiva l'ordine torna com'era. |
+| v42 | Eseguire **una volta** `backfillWhoopHistory` dall'editor (menu a tendina in alto → Esegui ▶). | `spo2_percentage` e `skin_temp_celsius` vengono scritti solo quando una sincronizzazione riscrive la riga: quelle già presenti non li hanno, quindi i tile SpO2 e Temp. cutanea restano "—" finché non si ripassa sullo storico. In alternativa basta aspettare: il trigger giornaliero riscrive gli ultimi 14 giorni. |
 
 ## Script Properties richieste
 
