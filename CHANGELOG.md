@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v65 — 2026-09-06
+- **Nello Storico ogni lavoro ha la sua card: niente più accorpamenti.** Anche le righe vecchie
+  (più lavori salvati insieme, prima della v48) si vedono divise, un lavoro per card, con il suo
+  WOD, il suo punteggio e il suo tasto Risultati. Prima erano un'unica card con dentro l'elenco
+  delle Parti.
+- Su quei lavori il tasto **Elimina lascia il posto a ⑂ Spacchetta**: condividono ancora la
+  stessa riga sul Foglio, quindi cancellarne uno cancellerebbe anche gli altri. La card lo dice
+  ("Salvato insieme ad altri N lavori nella stessa riga"), e spacchettando diventano indipendenti
+  (v64) — da lì in poi hanno il loro Elimina.
+- Il conteggio della giornata conta i **lavori**, non le righe.
+
 ## v64 — 2026-09-06
 - **Le sessioni vecchie si spacchettano in allenamenti singoli.** Quelle salvate prima della v48
   contengono più lavori in un'unica riga: ora un tasto **⑂ Spacchetta in N** (sulla card, sia
