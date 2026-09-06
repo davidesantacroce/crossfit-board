@@ -132,6 +132,12 @@
     .wod-whoop-metrics { font-size: 12px; color: var(--text-muted); }
     .wod-whoop-note { font-size: 10px; color: var(--text-muted); font-style: italic; margin-top: 6px; }
 
+    .lr-perset-note { font-size: 11px; color: var(--text-muted); margin: 0 0 10px; }
+    .lr-perset-time-wrap { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+    .lr-perset-time-wrap input { width: 100%; min-width: 0; text-align: center; }
+    .lr-perset-time-sep { font-weight: 900; color: var(--text-muted); }
+    .lr-perset-total { margin-top: 10px; font-size: 13px; font-weight: 800; color: var(--accent); text-align: right; }
+
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
@@ -748,7 +754,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v55";
+    const APP_VERSION = "v56";
     const APP_VERSION_DATE = "06/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3572,7 +3578,9 @@
       if (!text) return null;
       const s = String(text).trim();
       if (scoreType === 'Time') {
-        const m = s.match(/^(\d{1,3}):(\d{2})$/);
+        // "4:30" oppure "13:57 (2:35/2:41/...)": nei WOD a set il punteggio porta con sé i
+        // parziali, ma il valore confrontabile resta il totale davanti.
+        const m = s.match(/^(\d{1,3}):(\d{2})(?:\s*\(.*\))?$/);
         return m ? (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) : null;
       }
       if (scoreType === 'AMRAP') {
@@ -4190,13 +4198,19 @@
 
       const activeBlock = lrActiveBlockId !== null ? document.getElementById(`workout-block-${lrActiveBlockId}`) : null;
       const activeBlockType = activeBlock ? activeBlock.querySelector('.block-type').value : '';
-      if (type === 'Weight' && (activeBlockType === 'Sets' || activeBlockType === 'EMOM')) {
+      // Un WOD a set chiede un valore PER OGNI SET, non uno solo per tutto il lavoro: vale per
+      // il carico (5x5 a peso crescente) e allo stesso modo per il tempo, quando i set sono
+      // cronometrati uno per uno con il recupero in mezzo (es. "5 Sets ... *Rest 2 minutes
+      // between sets": il punteggio è la serie dei cinque tempi, non un unico numero).
+      const PER_SET_BLOCK_TYPES = { Weight: ['Sets', 'EMOM'], Time: ['Sets'] };
+      if (activeBlock && (PER_SET_BLOCK_TYPES[type] || []).includes(activeBlockType)) {
         const titleEl = activeBlock.querySelector('.block-title');
         const explEl = activeBlock.querySelector('.block-explanation');
         const blockText = (titleEl ? titleEl.value : '') + '\n' + (explEl ? explEl.value : '');
         const setsInfo = getBlockSetsInfo(activeBlockType, blockText);
         if (setsInfo && setsInfo.numSets > 1) {
-          renderLrPerSetFields(setsInfo, prefill);
+          if (type === 'Time') renderLrPerSetTimeFields(setsInfo, prefill);
+          else renderLrPerSetFields(setsInfo, prefill);
           return;
         }
       }
@@ -4267,8 +4281,51 @@
     // e riusato da renderLrPerSetList quando si aggiunge/rimuove un set, perché aggiungere o
     // togliere una riga non cambia quante reps ha ciascun set.
     let lrPerSetRepsHint = '';
+    // La stessa lista di set serve sia per i carichi sia per i tempi: qui si ricorda quale dei
+    // due si sta compilando, così le righe (e "+ Aggiungi Set") restano una cosa sola.
+    let lrPerSetMode = 'weight';
+
+    // Tempo di un set in secondi, per il totale e per i confronti.
+    function perSetTimeSeconds(s) {
+      return (parseInt(s.minutes, 10) || 0) * 60 + (parseInt(s.seconds, 10) || 0);
+    }
+
+    // "13:57" (i minuti senza zero davanti, come gli altri punteggi a tempo dell'app).
+    function formatSecondsAsScore(totalSeconds) {
+      const min = Math.floor(totalSeconds / 60);
+      const sec = totalSeconds % 60;
+      return `${min}:${String(sec).padStart(2, '0')}`;
+    }
+
+    function renderLrPerSetTimeFields(setsInfo, prefill) {
+      prefill = prefill || {};
+      const container = document.getElementById('lrScoreFields');
+      const existingSets = (prefill.perSet && Array.isArray(prefill.sets)) ? prefill.sets : null;
+
+      lrPerSetMode = 'time';
+      lrPerSetRepsHint = '';
+      lrPerSetScores = [];
+      for (let i = 0; i < setsInfo.numSets; i++) {
+        const existing = existingSets ? existingSets[i] : null;
+        lrPerSetScores.push({
+          minutes: existing ? (existing.minutes || '') : '',
+          seconds: existing ? (existing.seconds || '') : '',
+          done: existing ? (existing.done !== false) : true,
+        });
+      }
+
+      container.innerHTML = `
+        <label>TEMPO PER SET</label>
+        <div class="lr-perset-note">Un tempo per ogni set. Il recupero fra un set e l'altro non si conta: il totale qui sotto è la somma dei set.</div>
+        <div class="lr-perset-list" id="lrPerSetList"></div>
+        <button type="button" class="btn-add" onclick="addLrPerSetRow()">+ Aggiungi Set</button>
+        <div class="lr-perset-total" id="lrPerSetTotal"></div>
+      `;
+      renderLrPerSetList();
+    }
 
     function renderLrPerSetFields(setsInfo, prefill) {
+      lrPerSetMode = 'weight';
       prefill = prefill || {};
       const container = document.getElementById('lrScoreFields');
       const unit = prefill.unit || 'kg';
@@ -4320,24 +4377,54 @@
     function renderLrPerSetList() {
       const list = document.getElementById('lrPerSetList');
       if (!list) return;
+      const campo = (s, i) => lrPerSetMode === 'time' ? `
+        <div class="lr-perset-time-wrap">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" class="lr-perset-min" placeholder="min" value="${escapeHtml(s.minutes || '')}" oninput="sanitizeIntInput(this); updateLrPerSetTime(${i}, 'minutes', this.value)">
+          <span class="lr-perset-time-sep">:</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" class="lr-perset-sec" placeholder="sec" value="${escapeHtml(s.seconds || '')}" oninput="sanitizeIntInput(this, 59); updateLrPerSetTime(${i}, 'seconds', this.value)">
+        </div>
+      ` : `
+        <div class="lr-perset-input-wrap">
+          <input type="text" inputmode="decimal" placeholder="Es. 80" value="${escapeHtml(s.weight || '')}" oninput="updateLrPerSetWeight(${i}, this.value)">
+          ${lrPerSetRepsHint ? `<span class="lr-perset-reps-hint">${lrPerSetRepsHint}</span>` : ''}
+        </div>
+      `;
+
       list.innerHTML = lrPerSetScores.map((s, i) => `
         <div class="lr-perset-row">
           <div class="lr-perset-label">Set ${i + 1}</div>
-          <div class="lr-perset-input-wrap">
-            <input type="text" inputmode="decimal" placeholder="Es. 80" value="${escapeHtml(s.weight)}" oninput="updateLrPerSetWeight(${i}, this.value)">
-            ${lrPerSetRepsHint ? `<span class="lr-perset-reps-hint">${lrPerSetRepsHint}</span>` : ''}
-          </div>
+          ${campo(s, i)}
           <button type="button" class="lr-perset-done-toggle ${s.done ? 'done' : ''}" onclick="toggleLrPerSetDone(${i})" title="Set completato">${s.done ? '✓' : '✕'}</button>
           <button type="button" class="lr-perset-remove-btn" onclick="removeLrPerSetRow(${i})" title="Rimuovi set" ${lrPerSetScores.length <= 1 ? 'disabled' : ''}>🗑</button>
         </div>
       `).join('');
+      renderLrPerSetTotal();
+    }
+
+    // Somma dei set compilati, mostrata sotto la lista mentre si scrive: è il numero che finisce
+    // nello storico e che confronta con gli altri.
+    function renderLrPerSetTotal() {
+      const el = document.getElementById('lrPerSetTotal');
+      if (!el) return;
+      if (lrPerSetMode !== 'time') { el.innerText = ''; return; }
+      const compilati = lrPerSetScores.filter(s => s.minutes || s.seconds);
+      const totale = compilati.reduce((acc, s) => acc + perSetTimeSeconds(s), 0);
+      el.innerText = compilati.length
+        ? `Totale ${formatSecondsAsScore(totale)} su ${compilati.length} set`
+        : '';
+    }
+
+    function updateLrPerSetTime(idx, campo, value) {
+      if (!lrPerSetScores[idx]) return;
+      lrPerSetScores[idx][campo] = value;
+      renderLrPerSetTotal();
     }
 
     // + Aggiungi/Rimuovi Set nel Log Result: il WOD scritto (spesso via OCR) a volte prescrive
     // set in modo ambiguo o l'atleta ne fa un numero diverso da quello rilevato, quindi la lista
     // resta sempre modificabile a mano invece di essere fissata da detectSetsInfo.
     function addLrPerSetRow() {
-      lrPerSetScores.push({ weight: '', done: true });
+      lrPerSetScores.push({ weight: '', minutes: '', seconds: '', done: true });
       renderLrPerSetList();
     }
 
@@ -4399,6 +4486,20 @@
       let scoreDisplay = '';
 
       const perSetList = document.getElementById('lrPerSetList');
+      if (type === 'Time' && perSetList && lrPerSetMode === 'time') {
+        const sets = lrPerSetScores.map((s, i) => ({ set: i + 1, minutes: s.minutes || '', seconds: s.seconds || '', done: s.done }));
+        scoreDetail = { perSet: true, sets };
+        const compilati = sets.filter(s => s.minutes || s.seconds);
+        // Totale davanti (è il numero confrontabile, vedi scoreSortValue) e parziali fra
+        // parentesi: nello storico si vede subito com'è andata set per set.
+        const parziali = compilati.map(s => formatSecondsAsScore(perSetTimeSeconds(s)));
+        const totale = compilati.reduce((acc, s) => acc + perSetTimeSeconds(s), 0);
+        scoreDisplay = compilati.length
+          ? `${formatSecondsAsScore(totale)} (${parziali.join('/')})`
+          : `${sets.length} set`;
+        return { scoreType: type, scoreDetail, scoreDisplay };
+      }
+
       if (type === 'Weight' && perSetList) {
         const unit = document.getElementById('lrPerSetUnit').value;
         const sets = lrPerSetScores.map((s, i) => ({ set: i + 1, weight: s.weight || '', done: s.done }));
@@ -4564,6 +4665,10 @@
       const maxNumInText = numsInText ? Math.max(...numsInText.map(n => parseFloat(n.replace(',', '.')))) : null;
 
       if (type === 'Time') {
+        if (detail.perSet && Array.isArray(detail.sets)) {
+          const totale = detail.sets.reduce((acc, s) => acc + perSetTimeSeconds(s), 0);
+          return { value: totale, higherIsBetter: false, confident: totale > 0 };
+        }
         if (detail.minutes !== undefined || detail.seconds !== undefined) {
           const min = parseInt(detail.minutes, 10) || 0;
           const sec = parseInt(detail.seconds, 10) || 0;
