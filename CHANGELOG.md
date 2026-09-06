@@ -4,6 +4,18 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v59 — 2026-09-06
+- **La bacheca elenca i lavori singoli**, non le giornate. Prima accorpava per *atleta + giorno*:
+  i tre lavori programmati da una persona per lunedì diventavano una card sola, e "USA QUESTO
+  WOD" li caricava tutti e tre insieme nel form — contro la regola di un allenamento alla volta
+  (v48). Ora ogni lavoro è una card e sceglierla porta nel form **quel lavoro soltanto**.
+- **Lo stesso lavoro pubblicato da più persone nello stesso giorno resta una card sola**, con
+  tutti i nomi: è il senso della bacheca, vedere il WOD del giorno e chi lo ha proposto. Chi
+  ripubblica lo stesso lavoro non compare due volte.
+- Le vecchie sessioni multi-Parte (precedenti alla v48) si aprono in una card per Parte.
+- Dentro la giornata l'ordine è quello di **pubblicazione**, e un lavoro accorpato resta al suo
+  posto invece di scavalcare quelli programmati dopo di lui.
+
 ## v58 — 2026-09-06
 - **Le giornate con più lavori ora si leggono in una schermata.** Nella vista giorno di REGISTRA
   ogni lavoro è una card **richiudibile**: chiusa mostra badge RX/Scaled, titolo, tipo e
