@@ -186,6 +186,11 @@
     .day-group-aside { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .day-group-count { font-size: 11px; font-weight: 800; color: var(--text-muted); white-space: nowrap; }
 
+    .bacheca-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px; }
+    .bacheca-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .bacheca-card-title { font-size: 14px; font-weight: 800; margin-top: 4px; color: var(--accent); overflow-wrap: anywhere; }
+    .bacheca-card-body { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+
     .history-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
     .history-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .btn-delete-history { background: #c62828; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: bold; cursor: pointer; }
@@ -869,8 +874,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v68";
-    const APP_VERSION_DATE = "06/09/2026";
+    const APP_VERSION = "v69";
+    const APP_VERSION_DATE = "07/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -3390,6 +3395,24 @@
     // Firma testuale di un set di blocchi (tipo+titolo+spiegazione normalizzati), usata solo
     // per capire se due WOD pubblicati da persone diverse sono "lo stesso lavoro" e vanno
     // mostrati come una card unica invece che ripetuti.
+    // Il testo di un lavoro, come si legge nello Storico: la spiegazione scritta a mano oppure,
+    // per i blocchi vecchi che non ce l'hanno, l'elenco degli esercizi. Stringa vuota se non
+    // c'e' niente da mostrare.
+    function descrizioneBlocco(b) {
+      if (!b) return '';
+      if (b.explanation) {
+        return `<div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap;">${escapeHtml(b.explanation)}</div>`;
+      }
+      if (Array.isArray(b.exercises) && b.exercises.length > 0) {
+        return b.exercises.map(ex => `
+          <div style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
+            • ${escapeHtml(ex.reps || '')} <b>${escapeHtml(ex.name || '')}</b> ${ex.weight ? '(' + escapeHtml(ex.weight) + ')' : ''}
+          </div>
+        `).join('');
+      }
+      return '';
+    }
+
     function wodBlocksSignature(blocks) {
       return (blocks || [])
         .map(b => `${String(b.type || '').trim().toLowerCase()}|${String(b.title || '').trim().toLowerCase()}|${String(b.explanation || '').trim().toLowerCase().replace(/\s+/g, ' ')}`)
@@ -3424,6 +3447,17 @@
     // bacheca; cambiando settimana si riparte dal default di quella settimana.
     let expandedBachecaDays = new Set();
     let bachecaDaysInitializedFor = null;
+
+    // v69: card della bacheca aperte, per leggere il testo del WOD senza doverlo prima caricare
+    // nel form. La chiave e' la posizione in bachecaCandidates, che vale per la settimana
+    // mostrata: cambiando settimana si riparte da tutte chiuse (vedi piu' sotto).
+    let expandedBachecaWods = new Set();
+
+    function toggleBachecaWod(idx) {
+      if (expandedBachecaWods.has(idx)) expandedBachecaWods.delete(idx);
+      else expandedBachecaWods.add(idx);
+      renderBachecaTab();
+    }
 
     function toggleBachecaDay(day) {
       if (expandedBachecaDays.has(day)) expandedBachecaDays.delete(day);
@@ -3486,11 +3520,12 @@
         });
       });
 
-      // I giorni in ordine di calendario (la settimana si legge dal primo all'ultimo, non a
-      // ritroso); dentro la giornata vale l'ordine deciso con le frecce, e in mancanza quello di
-      // pubblicazione (gli id sono Date.now()).
+      // v69: i giorni dal piu' recente in cima, cosi' l'ultimo programmato si legge subito
+      // senza scorrere la settimana. Dentro la giornata invece l'ordine resta quello deciso con
+      // le frecce (e' la sequenza dell'allenamento), e in mancanza quello di pubblicazione (gli
+      // id sono Date.now()).
       bachecaCandidates = Object.values(bySignature).sort((a, b) => {
-        const perData = String(a.date).localeCompare(String(b.date));
+        const perData = String(b.date).localeCompare(String(a.date));
         if (perData !== 0) return perData;
         if (a.order !== null && b.order !== null) return a.order - b.order;
         if (a.order !== null) return -1;
@@ -3518,6 +3553,7 @@
       if (bachecaDaysInitializedFor !== weekStart) {
         bachecaDaysInitializedFor = weekStart;
         expandedBachecaDays = new Set();
+        expandedBachecaWods = new Set();
         if (perGiorno.some(g => g.date === todayStr)) expandedBachecaDays.add(todayStr);
         else if (perGiorno.length === 1) expandedBachecaDays.add(perGiorno[0].date);
       }
@@ -3529,12 +3565,22 @@
         const cards = g.voci.map(({ c, idx }) => {
           const names = c.athletes.map(a => a.toLowerCase() === activeAthlete ? 'te' : a);
           const isSelfOnly = names.length === 1 && names[0] === 'te';
+          const descrizione = descrizioneBlocco(c.blocks[0]);
+          const aperta = expandedBachecaWods.has(idx);
+          // Senza testo da mostrare non c'e' niente da aprire: niente freccetta, niente click.
+          const apribile = descrizione !== '';
           return `
-            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;">
-              <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
-              <div style="font-size: 14px; font-weight: 800; margin-top: 4px; color: var(--accent);">
-                ${escapeHtml(c.blocks[0].title || 'WOD')} <span style="color: var(--text-muted); font-weight: 600; font-size: 12px;">(${escapeHtml(c.blocks[0].type || '')})</span>
+            <div class="bacheca-card">
+              <div class="bacheca-card-head" ${apribile ? `onclick="toggleBachecaWod(${idx})"` : ''} ${apribile ? 'style="cursor: pointer;"' : ''}>
+                <div style="min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(names.join(', '))}</div>
+                  <div class="bacheca-card-title">
+                    ${escapeHtml(c.blocks[0].title || 'WOD')} <span style="color: var(--text-muted); font-weight: 600; font-size: 12px;">(${escapeHtml(c.blocks[0].type || '')})</span>
+                  </div>
+                </div>
+                ${apribile ? `<span class="day-item-chevron">${aperta ? '⌃' : '⌄'}</span>` : ''}
               </div>
+              ${apribile ? `<div class="bacheca-card-body" ${aperta ? '' : 'hidden'}>${descrizione}</div>` : ''}
               <button type="button" class="btn-main" style="margin-top: 8px;" onclick="useWodFromBacheca(${idx})">${isSelfOnly ? 'RIUSA QUESTO WOD' : 'USA QUESTO WOD'}</button>
             </div>
           `;

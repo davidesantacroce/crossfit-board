@@ -4,6 +4,16 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v69 — 2026-09-07
+- **Nella Bacheca si legge il testo del WOD toccando la card.** Prima si vedevano solo nome e
+  tipo, e per sapere cosa c'era dentro bisognava caricarlo nel form con "USA QUESTO WOD". Ora la
+  card si apre e si richiude come le giornate; il tasto per usarlo resta raggiungibile senza
+  aprirla. I lavori vecchi senza testo scritto mostrano l'elenco degli esercizi; quelli che non
+  hanno proprio niente da mostrare non hanno la freccetta.
+- **I giorni sono dal più recente in cima**, così l'ultimo programmato si legge subito senza
+  scorrere la settimana. Dentro la giornata l'ordine resta quello deciso con le frecce, che è la
+  sequenza dell'allenamento.
+
 ## v68 — 2026-09-06
 - **Nella vista giorno le card sono tutte alte uguale.** Il badge PUBBLICATO divideva la riga
   con il nome del lavoro e ci finiva sopra solo quando il nome era lungo: quella card diventava
