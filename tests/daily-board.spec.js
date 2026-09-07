@@ -143,6 +143,15 @@ test('la sessione propria compare anche in un altro giorno della settimana', asy
 
 // Stesso algoritmo di getWeekStart() nell'app (settimana da domenica a sabato), calcolato qui
 // lato Node per scegliere date di test che ricadano garantite nella stessa settimana.
+// Somma giorni a una data YYYY-MM-DD, lato Node: l'omonima funzione dell'app vive nella pagina
+// e qui non è raggiungibile.
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  const pad = (v) => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function weekStartOf(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() - d.getDay());
@@ -154,7 +163,7 @@ test('un WOD caricato in un altro giorno della stessa settimana resta comunque d
   // Un giorno nella stessa settimana di IERI (domenica-sabato) ma non IERI stesso: il lunedì
   // della settimana di IERI, spostato di +1 se coincidesse già con IERI.
   let altroGiorno = weekStartOf(IERI);
-  if (altroGiorno === IERI) altroGiorno = addDaysToDateString(altroGiorno, 1);
+  if (altroGiorno === IERI) altroGiorno = addDays(altroGiorno, 1);
   expect(weekStartOf(altroGiorno)).toBe(weekStartOf(IERI)); // garanzia che il fixture sia corretto
 
   await mockBackend(page, {
