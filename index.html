@@ -707,6 +707,12 @@
       </div>
 
       <div class="form-group">
+        <label>GIORNO DELL'ALLENAMENTO</label>
+        <input type="date" id="lrDate" onchange="aggiornaAvvisoDataLog()">
+        <p id="lrDateHint" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;"></p>
+      </div>
+
+      <div class="form-group">
         <label>TIPO DI SCORE</label>
         <select id="lrScoreType" onchange="renderLrScoreFields()">
           <option value="Time">Time</option>
@@ -874,7 +880,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v69";
+    const APP_VERSION = "v70";
     const APP_VERSION_DATE = "07/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1180,6 +1186,8 @@
       if (pastBannerText && isPastLogging) pastBannerText.innerText = `📝 STAI REGISTRANDO L'ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
       if (pastBannerText && isTodayLogging) pastBannerText.innerText = `📝 STAI REGISTRANDO UN ALLENAMENTO PER OGGI`;
       if (saveBtn) saveBtn.style.display = isProgramming ? 'none' : '';
+      // Il testo del tasto (che dalla v70 nomina il giorno) ha un solo proprietario.
+      updateSaveButtonLabel();
       if (publishBtn) publishBtn.style.display = isPastLogging ? 'none' : '';
       if (publishHint) publishHint.style.display = (isProgramming || isPastLogging) ? 'none' : '';
       if (publishBtn && !isPastLogging) {
@@ -3383,7 +3391,12 @@
         bannerText.innerText = `✏️ Stai modificando la sessione del ${formatDateForDisplay(editingWodDate)}`;
         banner.style.display = 'flex';
       } else {
-        btn.innerText = 'SALVA SESSIONE COMPLETA';
+        // v70: il giorno si legge sul tasto, come gia' su PUBBLICA. Senza, l'unico posto dove
+        // compariva era il banner in cima al form: e' cosi' che un allenamento finiva salvato
+        // sul giorno su cui l'app era rimasta, senza che nessuno se ne accorgesse.
+        btn.innerText = selectedRegistraDate === getTodayDateString()
+          ? "💾 SALVA L'ALLENAMENTO DI OGGI"
+          : `💾 SALVA L'ALLENAMENTO DEL ${formatDateForDisplay(selectedRegistraDate)}`;
         banner.style.display = 'none';
       }
     }
@@ -4726,9 +4739,37 @@
 
       document.getElementById('lrNotes').value = existing ? (existing.notes || '') : '';
 
+      // v70: il giorno dell'allenamento si sceglie qui. Di default e' quello della sessione che
+      // si sta registrando (a sua volta oggi, salvo che si sia scelto un altro giorno nel
+      // calendario), ma chi logga il giorno dopo puo' correggerlo senza tornare al calendario.
+      const dataEl = document.getElementById('lrDate');
+      if (dataEl) {
+        dataEl.value = existing ? (existing.date || sessionDateForForm()) : sessionDateForForm();
+        // Un risultato non puo' riferirsi a un allenamento non ancora svolto.
+        dataEl.max = getTodayDateString();
+      }
+      aggiornaAvvisoDataLog();
+
       renderLrScoreFields(existing ? existing.scoreDetail : null);
 
       document.getElementById('logResultModal').classList.add('active');
+    }
+
+    // La data della sessione a cui il risultato appartiene: quella che si sta modificando,
+    // altrimenti il giorno selezionato nel calendario (di default oggi).
+    function sessionDateForForm() {
+      return editingWodId !== null ? editingWodDate : selectedRegistraDate;
+    }
+
+    // Avvisa quando il giorno scelto non e' oggi: e' il caso in cui prima si sbagliava senza
+    // accorgersene, salvando sul giorno su cui l'app era rimasta.
+    function aggiornaAvvisoDataLog() {
+      const hint = document.getElementById('lrDateHint');
+      const dataEl = document.getElementById('lrDate');
+      if (!hint || !dataEl) return;
+      const scelta = dataEl.value;
+      if (!scelta || scelta === getTodayDateString()) { hint.innerText = ''; return; }
+      hint.innerText = `L'allenamento verra' registrato sul ${formatDateForDisplay(scelta)}, non su oggi.`;
     }
 
     function closeLogResultModal() {
@@ -5096,6 +5137,19 @@
       const blockType = block ? block.querySelector('.block-type').value : '';
       const blockTitle = block ? (block.querySelector('.block-title').value || 'WOD') : 'WOD';
 
+      // v70: il giorno lo decide il campo qui dentro. Prima un risultato di una sessione NUOVA
+      // veniva sempre datato oggi (anche registrando il recupero di un giorno passato), e la
+      // sessione prendeva in silenzio il giorno su cui era rimasto il calendario.
+      const dataScelta = (document.getElementById('lrDate') || {}).value || sessionDateForForm();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataScelta)) {
+        alert('Scegli il giorno dell\'allenamento.');
+        return;
+      }
+      if (dataScelta > getTodayDateString()) {
+        alert('Non puoi registrare un risultato per un giorno futuro: pubblica il WOD e logga il risultato quando lo avrai fatto.');
+        return;
+      }
+
       const { scoreType, scoreDetail, scoreDisplay } = buildLrScoreResult();
       const existing = blockResults[lrActiveBlockId];
       const resultId = existing ? existing.id : `${Date.now()}-${lrActiveBlockId}`;
@@ -5103,9 +5157,7 @@
       const result = {
         id: resultId,
         athlete: athleteName,
-        // Se si sta modificando una sessione passata, il risultato va datato come la sessione
-        // stessa, non come oggi (altrimenti finirebbe associato al giorno sbagliato).
-        date: editingWodId !== null ? editingWodDate : getTodayDateString(),
+        date: dataScelta,
         workout: blockTitle,
         workoutType: blockType,
         scoreType,
@@ -5115,6 +5167,15 @@
         movements: lrMovements.slice(),
         notes: document.getElementById('lrNotes').value.trim()
       };
+
+      // Il risultato e la sessione che lo contiene devono stare sullo stesso giorno: dalla v48
+      // una sessione e' un lavoro solo con un risultato solo, quindi la data scelta qui vale
+      // per entrambi. Il calendario e i banner si aggiornano, cosi' lo spostamento si vede.
+      if (editingWodId !== null) editingWodDate = dataScelta;
+      else selectedRegistraDate = dataScelta;
+      renderRegistraCalendar();
+      updateRegistraDateView();
+      updateSaveButtonLabel();
 
       blockResults[lrActiveBlockId] = result;
       renderBlockResultSummary(lrActiveBlockId);
