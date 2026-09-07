@@ -4,6 +4,22 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v70 — 2026-09-07
+- **Nel Log Result il giorno dell'allenamento è un campo, con oggi come default.** Chi logga il
+  giorno dopo (o recupera un lavoro di qualche giorno prima) sceglie la data lì, senza dover
+  prima tornare sul calendario. Quando la data scelta non è oggi, la card lo dice a chiare
+  lettere. Un giorno futuro viene rifiutato: un risultato non può riferirsi a un allenamento non
+  ancora svolto.
+- **Il giorno scelto sposta anche la sessione**, non solo il risultato: dalla v48 una sessione è
+  un lavoro solo con un risultato solo, quindi i due non possono finire su giorni diversi. Il
+  calendario e il banner si aggiornano, così lo spostamento si vede.
+- **Corretto: il risultato di una sessione nuova veniva sempre datato oggi**, anche registrando
+  il recupero di un giorno passato. La sessione finiva sul giorno giusto e il suo risultato no,
+  e il foglio `results` (quello che alimenta il confronto fra atleti) restava disallineato.
+- **Il tasto SALVA nomina il giorno** ("SALVA L'ALLENAMENTO DEL 03/09/2026"), come già faceva
+  PUBBLICA. Prima l'unico posto dove il giorno compariva era il banner in cima al form: è così
+  che un allenamento poteva finire salvato sul giorno su cui l'app era rimasta.
+
 ## v69 — 2026-09-07
 - **Nella Bacheca si legge il testo del WOD toccando la card.** Prima si vedevano solo nome e
   tipo, e per sapere cosa c'era dentro bisognava caricarlo nel form con "USA QUESTO WOD". Ora la
