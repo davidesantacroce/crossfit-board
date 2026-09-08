@@ -4,6 +4,20 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v72 — 2026-09-08
+- **Un WOD pubblicato ma senza punteggio non compare più nello Storico:** è programmazione, non
+  un allenamento fatto. Chi pubblica i lavori della giornata per la palestra si ritrovava lo
+  Storico pieno di roba che non ha svolto. Ci rientra da solo appena gli si logga il risultato.
+  Vale per singolo lavoro: in una riga vecchia con più lavori si vede quello fatto e non quello
+  solo programmato.
+- **All'opposto, un WOD pubblicato e poi svolto ora conta come allenamento.** Il calendario, il
+  grafico dei giorni attivi e il radar del focus escludevano *tutti* i pubblicati: un allenamento
+  messo in bacheca e poi fatto davvero non risultava da nessuna parte. Ora i quattro punti usano
+  lo stesso criterio: pubblicato + punteggio = svolto, pubblicato + niente punteggio = solo
+  programmato, non pubblicato = svolto comunque (una mobility non ha uno score da mettere).
+- Per lo stesso motivo i **dati della fascia** ora compaiono anche sotto un WOD pubblicato e poi
+  svolto: prima li vedevano solo le sessioni non pubblicate.
+
 ## v71 — 2026-09-08
 - **Corretto: aprendo in modifica un lavoro senza risultato, ci finiva addosso il risultato di
   un altro lavoro della stessa giornata.** Per ritrovare il Log Result di un lavoro rinominato

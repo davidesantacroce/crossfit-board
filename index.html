@@ -828,6 +828,22 @@
 
     const PUBLISHED_WOD_MODE = 'PUBLISHED';
     function isPublishedWod(w) { return w && w.mode === PUBLISHED_WOD_MODE; }
+
+    // Un lavoro ha un punteggio? (i Sets lo tengono come elenco di serie, gli altri come testo)
+    function blockHasResult(b) {
+      const r = b && b.result;
+      if (Array.isArray(r)) return r.length > 0;
+      return String(r || '').trim() !== '';
+    }
+
+    // v72: distinzione fra "l'ho programmato" e "l'ho fatto". Pubblicare un WOD lo mette in
+    // bacheca per tutti: finche' non ha un punteggio e' programmazione, non allenamento svolto.
+    // Una sessione NON pubblicata invece e' per definizione roba tua che hai registrato, con o
+    // senza punteggio (una mobility non ha uno score da mettere).
+    function sessioneSvolta(w) {
+      if (!isPublishedWod(w)) return true;
+      return (w && w.blocks || []).some(blockHasResult);
+    }
     function formatModeBadge(mode) { return mode === PUBLISHED_WOD_MODE ? '📋 PUBBLICATO' : (mode || ''); }
 
     // Badge RX/SCALED per singolo blocco (non più per l'intera sessione): usato ovunque si
@@ -880,7 +896,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v71";
+    const APP_VERSION = "v72";
     const APP_VERSION_DATE = "08/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1045,7 +1061,7 @@
       const activeAthlete = (localStorage.getItem('activeAthlete') || '').toLowerCase();
       const loggedDates = new Set(
         (globalData.wods || [])
-          .filter(w => w.athlete && w.athlete.toLowerCase() === activeAthlete && !isPublishedWod(w))
+          .filter(w => w.athlete && w.athlete.toLowerCase() === activeAthlete && sessioneSvolta(w))
           .map(w => w.date)
       );
 
@@ -1470,7 +1486,7 @@
             </div>
             <div class="day-item-body" ${aperta ? '' : 'hidden'}>
               ${blocksHtml}
-              ${isPublishedWod(item) ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
+              ${sessioneSvolta(item) ? renderWhoopWorkoutStrip(item.athlete, item.date) : ''}
               <div class="item-actions-row">
                 <div><button class="btn-secondary" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button></div>
                 ${azioniRisultatiHtml}
@@ -2155,7 +2171,7 @@
       const activeAthlete = localStorage.getItem('activeAthlete');
       const activeDates = new Set(
         (globalData.wods || [])
-          .filter(w => w.athlete && activeAthlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && w.date && !isPublishedWod(w))
+          .filter(w => w.athlete && activeAthlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && w.date && sessioneSvolta(w))
           .map(w => String(w.date).slice(0, 10))
       );
 
@@ -2226,7 +2242,7 @@
 
       (globalData.wods || [])
         .filter(w => w.athlete && athleteName && w.athlete.toLowerCase() === athleteName.toLowerCase()
-          && w.date && w.date >= windowStart && !isPublishedWod(w))
+          && w.date && w.date >= windowStart && sessioneSvolta(w))
         .forEach(w => {
           (w.blocks || []).forEach(b => {
             detectMovementsInText((b.title || '') + ' ' + (b.explanation || '')).forEach(mv => {
@@ -2257,7 +2273,7 @@
 
       const activeAthlete = localStorage.getItem('activeAthlete');
       const hasAnyWod = activeAthlete && (globalData.wods || []).some(w =>
-        w.athlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && !isPublishedWod(w));
+        w.athlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && sessioneSvolta(w));
       if (!hasAnyWod) { card.style.display = 'none'; return; }
       card.style.display = '';
 
@@ -3729,6 +3745,7 @@
       perGiornoOrdinati.flatMap(g => sortSessionsWithinDay(g.items)).forEach(item => {
         const blocchiStorico = Array.isArray(item.blocks) ? item.blocks : [];
         const raggruppata = blocchiStorico.length > 1;
+        const raggruppataPubblicata = isPublishedWod(item);
         const itemDate = String(item.date || '').slice(0, 10);
         const idEsc = String(item.id).replace(/'/g, "\\'");
 
@@ -3739,6 +3756,11 @@
           : [{ title: item.title, type: item.type, explanation: '', exercises: item.exercises, result: item.result, category: item.mode }];
 
         lavori.forEach((b, indice) => {
+          // v72: un WOD pubblicato senza punteggio e' programmazione, non un allenamento fatto:
+          // nello Storico non ci va. Ci entra da solo appena gli logghi il risultato. Vale per
+          // singolo lavoro, perche' una riga vecchia puo' averne uno fatto e uno no.
+          if (raggruppataPubblicata && !blockHasResult(b)) return;
+
           let bodyHtml = '';
           if (b.explanation) {
             bodyHtml = `
@@ -3788,7 +3810,7 @@
               ${b.category || b.type ? `<div class="history-item-meta">${blockCategoryBadge(b.category)}${b.type ? `<span>${escapeHtml(b.type)}</span>` : ''}</div>` : ''}
               ${bodyHtml}
               ${scoreHtml}
-              ${isPublishedWod(item) || indice > 0 ? '' : renderWhoopWorkoutStrip(item.athlete, item.date)}
+              ${sessioneSvolta(item) && indice === 0 ? renderWhoopWorkoutStrip(item.athlete, item.date) : ''}
               ${notaRaggruppata}
               <div class="item-actions-row">
                 <div><button class="btn-secondary" onclick="editWodSession('${idEsc}')">✏️ Modifica</button></div>
@@ -3799,6 +3821,15 @@
           ` });
         });
       });
+
+      // Puo' succedere che restino solo WOD programmati e non ancora fatti: allora lo Storico e'
+      // davvero vuoto, non una lista di giornate senza card dentro.
+      if (cardsPerGiorno.length === 0) {
+        historyList.innerHTML = searchQuery !== ''
+          ? '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento trovato.</p>'
+          : '<p style="color: var(--text-muted); font-size: 13px;">Nessun allenamento registrato per il tuo profilo. I WOD che pubblichi compaiono qui quando ne logghi il risultato.</p>';
+        return;
+      }
 
       // Un gruppo per giornata, nell'ordine già ordinato (più recente in cima, vedi v51).
       const perGiorno = [];
