@@ -880,8 +880,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v70";
-    const APP_VERSION_DATE = "07/09/2026";
+    const APP_VERSION = "v71";
+    const APP_VERSION_DATE = "08/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -3315,31 +3315,47 @@
       // forzare sempre "Time" indipendentemente dal tipo di WOD.
       const defaultScoreTypeMap = { 'For Time': 'Time', 'AMRAP': 'AMRAP', 'Sets': 'Weight', 'EMOM': 'Time' };
 
+      // Risultati già assegnati a un'altra Parte di questa sessione: due Parti non possono
+      // rivendicare lo stesso Log Result.
+      const risultatiGiaPresi = new Set();
+
       (session.blocks || []).forEach(b => {
         addWorkoutBlock(b.type || 'For Time', b.title || '', b.explanation || '', b.category || session.mode || 'RX');
         const newBlockId = blockCounter;
 
-        // Se esiste un Log Result strutturato corrispondente (stesso atleta/WOD/tipo/data),
-        // lo ripristiniamo così "Modifica Risultato" mostra i valori esatti già loggati,
-        // non solo il testo sintetico salvato nel blocco.
-        let matchingResult = (globalData.results || []).find(r =>
+        const disponibili = (globalData.results || []).filter(r =>
           r.athlete && norm(r.athlete) === sessionAthleteLower &&
           r.date === session.date &&
+          !risultatiGiaPresi.has(String(r.id))
+        );
+        // Il punteggio sintetico salvato sul blocco è l'unica prova che un Log Result è di
+        // QUESTO lavoro e non di un altro della stessa giornata.
+        const stessoPunteggio = (r) => norm(r.scoreDisplay || r.score) === norm(b.result);
+
+        // Se esiste un Log Result strutturato corrispondente (stesso atleta/WOD/tipo/data),
+        // lo ripristiniamo così "Modifica Risultato" mostra i valori esatti già loggati,
+        // non solo il testo sintetico salvato nel blocco. Fra più omonimi vince quello col
+        // punteggio identico a quello salvato sul blocco.
+        const perTitolo = disponibili.filter(r =>
           norm(r.workout) === norm(b.title || 'WOD') &&
           norm(r.workoutType) === norm(b.type || '')
         );
+        let matchingResult = perTitolo.find(stessoPunteggio) || perTitolo[0] || null;
 
-        // Fallback: se il titolo non combacia esattamente (es. rinominato dopo aver loggato
-        // il risultato), proviamo ad abbinare solo per atleta+data+tipo, ma solo se quel
-        // giorno c'è un unico candidato di quel tipo (altrimenti l'abbinamento è ambiguo).
-        if (!matchingResult) {
-          const candidatesByType = (globalData.results || []).filter(r =>
-            r.athlete && norm(r.athlete) === sessionAthleteLower &&
-            r.date === session.date &&
-            norm(r.workoutType) === norm(b.type || '')
+        // Fallback per un lavoro RINOMINATO dopo aver loggato il risultato: il titolo non
+        // combacia più, ma il punteggio salvato sul blocco sì. Il confronto sul punteggio non
+        // è un di più, è ciò che tiene insieme l'abbinamento: prima bastava "unico risultato
+        // di quel tipo in quel giorno", e dalla v48 una giornata sono più lavori singoli, così
+        // aprendo un lavoro SENZA risultato si vedeva addosso quello di un altro lavoro dello
+        // stesso tipo (segnalato: un "Pull Up" che mostrava il punteggio del "Ring Dip").
+        if (!matchingResult && b.result) {
+          const perPunteggio = disponibili.filter(r =>
+            norm(r.workoutType) === norm(b.type || '') && stessoPunteggio(r)
           );
-          if (candidatesByType.length === 1) matchingResult = candidatesByType[0];
+          if (perPunteggio.length === 1) matchingResult = perPunteggio[0];
         }
+
+        if (matchingResult) risultatiGiaPresi.add(String(matchingResult.id));
 
         if (matchingResult) {
           // I risultati caricati dal cloud hanno "movements" come testo (es. "Squat, Deadlift"),

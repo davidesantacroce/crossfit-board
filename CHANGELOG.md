@@ -4,6 +4,20 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v71 — 2026-09-08
+- **Corretto: aprendo in modifica un lavoro senza risultato, ci finiva addosso il risultato di
+  un altro lavoro della stessa giornata.** Per ritrovare il Log Result di un lavoro rinominato
+  c'era un ripiego che abbinava per atleta + giorno + tipo, e bastava che quel giorno ci fosse
+  un unico risultato di quel tipo. Era sensato quando una giornata era una sessione sola; dalla
+  v48 una giornata sono più lavori singoli, quindi non identificava più niente. Caso reale:
+  l'8/09 il solo "Weighted Ring Dip" aveva 8/8/8 kg, e aprendo "Tempo Weighted Strict Lean Away
+  Pull Up" (Sets, senza punteggio) compariva addosso quel risultato, note comprese.
+- Ora l'abbinamento per un lavoro rinominato richiede che **il punteggio salvato sul blocco
+  coincida** con quello del Log Result: è l'unica prova che il risultato è di quel lavoro e non
+  di un altro. Un lavoro senza punteggio non ne aggancia nessuno.
+- Due Parti della stessa riga non possono più rivendicare lo stesso Log Result, e fra più
+  lavori omonimi dello stesso giorno vince quello col punteggio identico.
+
 ## v70 — 2026-09-07
 - **Nel Log Result il giorno dell'allenamento è un campo, con oggi come default.** Chi logga il
   giorno dopo (o recupera un lavoro di qualche giorno prima) sceglie la data lì, senza dover
