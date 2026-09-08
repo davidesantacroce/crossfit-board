@@ -80,7 +80,9 @@ test('con due allenamenti nello stesso giorno li mostra entrambi, senza sceglier
   await expect(page.locator('#historyList .wod-whoop-note')).toContainText('2 allenamenti rilevati');
 });
 
-test('un WOD solo pubblicato non è un allenamento fatto: niente dati della fascia', async ({ page }) => {
+test('un WOD solo pubblicato non è un allenamento fatto: non è proprio nello Storico', async ({ page }) => {
+  // Dalla v72 un WOD pubblicato senza punteggio è programmazione e nello Storico non compare
+  // affatto: a maggior ragione non gli si attaccano i dati della fascia.
   await mockBackend(page, {
     athletes: [{ name: 'Test Athlete', hasPin: false }],
     wods: [{ id: 'p1', date: IERI, athlete: 'Test Athlete', mode: 'PUBLISHED', blocks: [{ title: 'Murph', type: 'For Time', explanation: '', result: '' }] }],
@@ -90,8 +92,23 @@ test('un WOD solo pubblicato non è un allenamento fatto: niente dati della fasc
   await loginAs(page, 'Test Athlete');
   await apriStorico(page);
 
-  await expect(page.locator('#historyList .history-item')).toHaveCount(1);
+  await expect(page.locator('#historyList .history-item')).toHaveCount(0);
   await expect(page.locator('#historyList .wod-whoop')).toHaveCount(0);
+});
+
+test('un WOD pubblicato e poi svolto i dati della fascia ce li ha', async ({ page }) => {
+  // L'hai messo in bacheca per tutti e poi l'hai fatto: è un allenamento tuo a tutti gli effetti.
+  await mockBackend(page, {
+    athletes: [{ name: 'Test Athlete', hasPin: false }],
+    wods: [{ id: 'p1', date: IERI, athlete: 'Test Athlete', mode: 'PUBLISHED', blocks: [{ title: 'Murph', type: 'For Time', explanation: '', result: '42:00' }] }],
+    whoop: [allenamentoFascia()],
+  });
+  await gotoApp(page);
+  await loginAs(page, 'Test Athlete');
+  await apriStorico(page);
+
+  await expect(page.locator('#historyList .history-item')).toHaveCount(1);
+  await expect(page.locator('#historyList .wod-whoop')).toHaveCount(1);
 });
 
 test('i dati di un altro atleta non finiscono sulla tua sessione', async ({ page }) => {
