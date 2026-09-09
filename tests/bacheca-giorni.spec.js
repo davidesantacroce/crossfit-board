@@ -21,10 +21,26 @@ function giornoDellaSettimana(i) {
   return d.toISOString().slice(0, 10);
 }
 
+// Tre giorni della settimana corrente che comprendono SEMPRE oggi: prima erano fissi i primi
+// tre (dom/lun/mar) e girando di mercoledì oggi non era fra questi, quindi i test sul giorno
+// corrente non avevano una giornata da trovare.
+const INDICI_GIORNI = (() => {
+  const oggi = new Date().getDay();
+  const altri = [0, 1, 2, 3, 4, 5, 6].filter((i) => i !== oggi);
+  return [oggi, altri[0], altri[1]].sort((a, b) => a - b);
+})();
+
+const GIORNI = INDICI_GIORNI.map(giornoDellaSettimana);
+
 // Un giorno della settimana che NON sia oggi: i test che aprono una giornata chiusa non possono
 // pescarla per posizione, perché quale posto occupi oggi dipende dal giorno in cui girano.
 function unGiornoNonOggi() {
-  return [0, 1, 2].map(giornoDellaSettimana).find((g) => g !== OGGI);
+  return GIORNI.find((g) => g !== OGGI);
+}
+
+// Posizione di una giornata nel fixture, che è anche il suffisso dei suoi lavori (A0, B0, C0...).
+function posizioneDi(dateStr) {
+  return GIORNI.indexOf(dateStr);
 }
 
 // Il gruppo di una giornata, cercato per data invece che per indice.
@@ -41,13 +57,13 @@ async function apriBacheca(page, wods) {
   await page.evaluate(() => switchTab('bacheca'));
 }
 
-// Tre lavori in ciascuno dei primi tre giorni della settimana corrente.
+// Tre lavori in ciascuna delle tre giornate del fixture (oggi compreso).
 function settimanaProgrammata() {
   const wods = [];
   let id = 100;
-  [0, 1, 2].forEach((i) => {
+  GIORNI.forEach((giorno, pos) => {
     ['A', 'B', 'C'].forEach((t) => {
-      wods.push({ id: String(++id), date: giornoDellaSettimana(i), athlete: 'Test Athlete', mode: 'PUBLISHED', blocks: [{ title: `${t}${i}`, type: 'For Time', explanation: 'testo del wod', result: '' }] });
+      wods.push({ id: String(++id), date: giorno, athlete: 'Test Athlete', mode: 'PUBLISHED', blocks: [{ title: `${t}${pos}`, type: 'For Time', explanation: 'testo del wod', result: '' }] });
     });
   });
   return wods;
@@ -61,7 +77,7 @@ test('i lavori sono raggruppati per giornata, con il conteggio', async ({ page }
 
   // v69: i giorni si leggono dal più recente in cima, non in ordine di calendario.
   const giorni = await page.evaluate(() => Array.from(document.querySelectorAll('#bachecaContent .day-group-label')).map((e) => e.innerText));
-  const attesi = [2, 1, 0].map((i) => giornoDellaSettimana(i));
+  const attesi = GIORNI.slice().reverse();
   for (let i = 0; i < 3; i++) {
     const [y, m, d] = attesi[i].split('-');
     expect(giorni[i]).toContain(`${d}/${m}/${y}`);
@@ -85,7 +101,7 @@ test('di default è aperto il giorno di oggi, gli altri sono chiusi', async ({ p
 test('toccando una giornata si apre, e si richiude ritoccandola', async ({ page }) => {
   await apriBacheca(page, settimanaProgrammata());
   const giorno = unGiornoNonOggi();
-  const indice = [0, 1, 2].map(giornoDellaSettimana).indexOf(giorno);
+  const indice = posizioneDi(giorno);
   const gruppo = gruppoDelGiorno(page, giorno);
 
   await expect(gruppo.locator('.day-group-body')).toBeHidden();
@@ -116,7 +132,7 @@ test('scegliere un WOD da una giornata aperta porta quel lavoro nel form', async
   await apriBacheca(page, settimanaProgrammata());
 
   const giorno = unGiornoNonOggi();
-  const indice = [0, 1, 2].map(giornoDellaSettimana).indexOf(giorno);
+  const indice = posizioneDi(giorno);
   const gruppo = gruppoDelGiorno(page, giorno);
 
   await gruppo.locator('.day-group-head').click();

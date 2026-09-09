@@ -896,8 +896,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v72";
-    const APP_VERSION_DATE = "08/09/2026";
+    const APP_VERSION = "v73";
+    const APP_VERSION_DATE = "09/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -2402,11 +2402,43 @@
       return parti;
     }
 
-    // La striscia Whoop sotto una sessione registrata: quanto è costato davvero quel lavoro.
-    // I due dati esistevano già entrambi nell'app senza mai incontrarsi.
+    // v73: come stavi la MATTINA di quel giorno — recovery, sonno, HRV, frequenza a riposo.
+    // La striscia diceva solo quanto è costato il lavoro (strain, battiti, calorie): senza lo
+    // stato di partenza un tempo alto o un carico basso non si sanno leggere. Restituisce un
+    // elenco di pezzi già formattati, vuoto se per quel giorno la fascia non ha dati.
+    function whoopDayCondition(athlete, dateStr) {
+      const day = whoopDayKey(dateStr);
+      if (!athlete || !day) return [];
+      const rec = whoopRecordsFor(athlete, 'recovery').find(r => r.day === day);
+      const sonno = whoopRecordsFor(athlete, 'sleep').find(r => r.day === day);
+      const pezzi = [];
+      if (rec && Number.isFinite(rec.data.recoveryScore)) {
+        pezzi.push(`<b class="${whoopRecoveryClass(rec.data.recoveryScore)}">Recovery ${Math.round(rec.data.recoveryScore)}%</b>`);
+      }
+      if (sonno && Number.isFinite(sonno.data.sleepPerformancePercentage)) {
+        pezzi.push(`Sonno ${Math.round(sonno.data.sleepPerformancePercentage)}%`);
+      }
+      if (rec && Number.isFinite(rec.data.hrvMilli)) pezzi.push(`HRV ${Math.round(rec.data.hrvMilli)} ms`);
+      if (rec && Number.isFinite(rec.data.restingHeartRate)) pezzi.push(`FC riposo ${rec.data.restingHeartRate} bpm`);
+      return pezzi;
+    }
+
+    // La striscia Whoop sotto una sessione registrata: come stavi quel giorno e quanto è
+    // costato davvero quel lavoro. I due dati esistevano già entrambi nell'app senza mai
+    // incontrarsi.
     function renderWhoopWorkoutStrip(athlete, dateStr) {
       const workouts = whoopWorkoutsForDay(athlete, dateStr);
-      if (workouts.length === 0) return '';
+      const condizione = whoopDayCondition(athlete, dateStr);
+      if (workouts.length === 0 && condizione.length === 0) return '';
+
+      // Lo stato del mattino sta in cima: viene prima dell'allenamento, e serve a leggere i
+      // numeri che seguono. C'è anche nei giorni in cui la fascia non ha marcato un allenamento.
+      const rigaCondizione = condizione.length
+        ? `<div class="wod-whoop-row">
+             <span class="wod-whoop-sport">🌅 Come stavi</span>
+             <span class="wod-whoop-metrics">${condizione.join(' · ')}</span>
+           </div>`
+        : '';
 
       const righe = workouts.map(w => `
         <div class="wod-whoop-row">
@@ -2418,7 +2450,7 @@
       const nota = workouts.length > 1
         ? `<div class="wod-whoop-note">${workouts.length} allenamenti rilevati dalla fascia quel giorno</div>`
         : '';
-      return `<div class="wod-whoop">${righe}${nota}</div>`;
+      return `<div class="wod-whoop">${rigaCondizione}${righe}${nota}</div>`;
     }
 
     // Le soglie sono quelle usate da Whoop stesso: verde da 67 in su, giallo 34-66, rosso sotto.
