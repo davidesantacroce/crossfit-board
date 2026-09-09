@@ -896,7 +896,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v73";
+    const APP_VERSION = "v74";
     const APP_VERSION_DATE = "09/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1882,6 +1882,29 @@
       }
     }
 
+    // v74: chiede al backend di risincronizzare la fascia SUBITO, invece di aspettare il
+    // trigger delle 6 del mattino: registrando l'allenamento la sera, i dati Whoop di quel
+    // giorno si vedrebbero solo l'indomani. Gira in sottofondo — il salvataggio non deve
+    // aspettare una chiamata alle API di Whoop — e quando ha finito ricarica i dati, così la
+    // striscia compare da sola. Il backend ha la sua strozzatura (una sincronizzazione ogni
+    // 10 minuti), quindi salvare quattro lavori di fila non ne fa partire quattro.
+    async function requestWhoopSync() {
+      const url = getScriptUrl();
+      if (!url || navigator.onLine === false) return;
+      try {
+        const esito = await postToBackend({ action: 'syncWhoop' });
+        if (!esito.ok || !esito.res) return;
+        const body = await esito.res.json().catch(() => null);
+        // Un backend non ancora ridistribuito ignora l'azione sconosciuta e risponde comunque
+        // "success": in quel caso non c'è nessun sync da aspettare e nulla da ricaricare.
+        if (!body || body.action !== 'syncWhoop') return;
+        if (body.synced) await fetchCloudData();
+      } catch (err) {
+        // Un sync mancato non è un salvataggio perso: l'allenamento è già sul Foglio.
+        console.warn('Sync Whoop su richiesta non riuscita:', err);
+      }
+    }
+
     // Svuota la coda in ordine. Al primo errore si ferma: la rete è ancora giù, si riproverà.
     let flushingPendingWrites = false;
     async function flushPendingWrites() {
@@ -2519,9 +2542,15 @@
 
       const lastDay = all[0].day;
       const daysAgo = Math.round((new Date(getTodayDateString()) - new Date(lastDay)) / 86400000);
-      const staleHint = daysAgo > 7
-        ? ' — la fascia non sincronizza da un po\', i dati si aggiorneranno da soli quando riprendi a indossarla'
-        : '';
+      // v74: se l'ultima sincronizzazione e' fallita lo si dice, invece di dare la colpa alla
+      // fascia. Prima un sync rotto (tipicamente il token Whoop scaduto) era indistinguibile
+      // da una settimana senza allenamenti: l'app mostrava dati vecchi come fossero freschi.
+      const sync = globalData.whoopSync || null;
+      const staleHint = sync && sync.ok === false
+        ? ` — <b>l'ultima sincronizzazione non è riuscita</b>: ${escapeHtml(sync.message || '')}`
+        : (daysAgo > 7
+            ? ' — la fascia non sincronizza da un po\', i dati si aggiorneranno da soli quando riprendi a indossarla'
+            : '');
       const dateHtml = `<div class="whoop-date">Ultimo dato: ${formatDateForDisplay(lastDay)}${staleHint}</div>`;
 
       let workoutsHtml = '';
@@ -3250,6 +3279,10 @@
             updateSaveButtonLabel();
 
             switchTab('storico');
+
+            // Non si aspetta: l'allenamento è già salvato e la striscia della fascia comparirà
+            // da sola quando il sync avrà finito.
+            if (!esito.queued) requestWhoopSync();
           } else {
             hideFunLoadingOverlay();
             alert('Errore durante il salvataggio sul cloud.');

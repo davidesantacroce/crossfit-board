@@ -52,11 +52,13 @@ tornare immediatamente a un codice funzionante.
 
 ### Modifiche di `Code.gs` in attesa di essere distribuite
 
-Nessuna: il web app distribuito è allineato al `Code.gs` di questo repo (verificato il 06/09/2026,
-`doGet` restituisce il campo `order` introdotto in v63).
+Queste stanno nel repo ma hanno effetto **solo dopo** aver ridistribuito il web app
+(**Distribuisci → Gestisci distribuzioni → ✏️ → Nuova versione**). Finché non lo si fa, l'app
+funziona lo stesso ma quelle funzioni restano a vuoto.
 
-Quando una modifica di `Code.gs` viene committata ma non ancora distribuita, elencala qui con
-cosa si vede senza il redeploy, così è chiaro perché una funzione dell'app resta a vuoto.
+| Da | Cosa cambia | Cosa si vede senza redeploy |
+|---|---|---|
+| v74 | Nuova azione `syncWhoop`: l'app chiede una sincronizzazione della fascia subito dopo aver salvato un allenamento, con una strozzatura di 10 minuti. `syncWhoopSince_` restituisce l'esito invece di uscire in silenzio, `doGet` lo espone in `whoopSync`. | I dati Whoop si aggiornano solo col trigger giornaliero delle 6, quindi un allenamento registrato la sera li mostra il giorno dopo. Il vecchio backend ignora l'azione sconosciuta e risponde `success`: l'app se ne accorge e non aspetta nulla. La card Whoop non può dire se l'ultima sincronizzazione è fallita. |
 
 ### Dopo il redeploy: cosa richiede anche un'azione sui dati
 
