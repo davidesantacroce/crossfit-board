@@ -27,6 +27,17 @@ function applyPost(state, body) {
       if (w) w.order = it.order;
     });
     return { status: 'success', action: 'setWodOrder' };
+  } else if (body.action === 'syncWhoop') {
+    // Come il backend vero: con una strozzatura, e con l'esito dell'ultima sincronizzazione.
+    state.syncWhoopCalls = (state.syncWhoopCalls || 0) + 1;
+    const ultimo = state.whoopSync && state.whoopSync.ok ? Number(state.whoopSync.at || 0) : 0;
+    if (!body.force && ultimo && Date.now() - ultimo < 10 * 60 * 1000) {
+      return { status: 'success', action: 'syncWhoop', synced: false, reason: 'recente', lastSync: state.whoopSync };
+    }
+    // Il sync porta dentro le righe che il test ha preparato in whoopInArrivo.
+    if (state.whoopInArrivo) { state.whoop = state.whoop.concat(state.whoopInArrivo); state.whoopInArrivo = null; }
+    state.whoopSync = { ok: true, message: 'Sync Whoop completata', at: Date.now() };
+    return { status: 'success', action: 'syncWhoop', synced: true, lastSync: state.whoopSync };
   } else if (body.action === 'logResult') {
     const idx = state.results.findIndex((r) => String(r.id) === String(body.id));
     const entry = {

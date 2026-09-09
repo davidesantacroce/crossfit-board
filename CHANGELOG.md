@@ -4,6 +4,21 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v74 — 2026-09-09
+- **I dati della fascia si aggiornano quando salvi un allenamento**, non più solo col trigger
+  giornaliero delle 6 del mattino: registrando la sera, i dati Whoop di quel giorno si sarebbero
+  visti solo l'indomani. La sincronizzazione parte in sottofondo — il salvataggio non aspetta le
+  API di Whoop — e quando ha finito la striscia compare da sola.
+- **Una strozzatura di 10 minuti nel backend**: salvare quattro lavori di fila (caso reale) non
+  fa partire quattro sincronizzazioni complete.
+- **Una sincronizzazione fallita ora si vede.** Prima, se il token Whoop era scaduto, il sync
+  usciva in silenzio scrivendo solo nel log: l'app mostrava dati vecchi come se fossero freschi,
+  e un sync rotto era indistinguibile da una settimana senza allenamenti. Ora l'esito viene
+  registrato, `doGet` lo restituisce e la card Whoop lo dice con il motivo.
+- ⚠️ **Richiede una ridistribuzione dell'Apps Script** (vedi `apps-script/README.md`). Senza, il
+  vecchio backend ignora l'azione sconosciuta e l'app se ne accorge senza aspettare nulla:
+  tutto continua a funzionare come prima.
+
 ## v73 — 2026-09-09
 - **Sotto ogni allenamento si legge anche come stavi quella mattina**: recovery (colorato con le
   soglie di Whoop), sonno, HRV e frequenza a riposo. La striscia della fascia diceva solo quanto

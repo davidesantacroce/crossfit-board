@@ -350,6 +350,11 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({"status": "success", "action": "setWodOrder", "updated": aggiornate})).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // Sincronizzazione Whoop su richiesta dell'app (dopo aver salvato un allenamento).
+    if (data.action === 'syncWhoop') {
+      return ContentService.createTextOutput(JSON.stringify(syncWhoopOnDemand_(data))).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // riposo/passi/calorie dall'Apple Watch) inviata da un Comando iOS che legge da Salute.
     if (data.action === 'saveHealthData') {
       return ContentService.createTextOutput(JSON.stringify(saveHealthPayload_(data, ss))).setMimeType(ContentService.MimeType.JSON);
@@ -678,7 +683,11 @@ function doGet(e) {
         steps: h.steps,
         activeEnergy: h.activeenergy
       };
-    })
+    }),
+    // Esito dell'ultima sincronizzazione Whoop: serve all'app per dire "dati aggiornati al ..."
+    // e per accorgersi di un sync fallito, che altrimenti e' indistinguibile da una settimana
+    // senza allenamenti.
+    whoopSync: readWhoopSyncOutcome_()
   };
 
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
@@ -862,7 +871,7 @@ function upsertWhoopRow_(sheet, athlete, type, recordId, dateStr, dataObj) {
 function syncWhoopData() {
   var since = new Date();
   since.setDate(since.getDate() - 14);
-  syncWhoopSince_(since);
+  return syncWhoopSince_(since);
 }
 
 // Backfill una tantum di TUTTO lo storico disponibile sull'account (fino a 3 anni fa, lo
@@ -874,7 +883,7 @@ function syncWhoopData() {
 function backfillWhoopHistory() {
   var since = new Date();
   since.setFullYear(since.getFullYear() - 3);
-  syncWhoopSince_(since);
+  return syncWhoopSince_(since);
 }
 
 // Motore comune: scarica recovery/cicli/sonno/allenamenti da 'since' a oggi e li scrive
@@ -884,15 +893,16 @@ function backfillWhoopHistory() {
 function syncWhoopSince_(since) {
   var accessToken = getValidWhoopAccessToken_();
   if (!accessToken) {
-    Logger.log('Nessun token Whoop valido: collega prima da SCRIPT_URL?whoopConnect=1');
-    return;
+    // v74: prima qui si usciva in silenzio, scrivendo solo nel log. Il trigger giornaliero
+    // falliva ogni notte senza che nessuno lo sapesse e l'app continuava a mostrare i dati
+    // vecchi come se fossero aggiornati. Ora l'esito torna al chiamante e viene registrato.
+    return recordWhoopSyncOutcome_(false, 'Nessun token Whoop valido: ricollega da SCRIPT_URL?whoopConnect=1');
   }
 
   var props = PropertiesService.getScriptProperties();
   var athlete = props.getProperty('WHOOP_ATHLETE_NAME');
   if (!athlete) {
-    Logger.log('Manca WHOOP_ATHLETE_NAME nelle Script Properties.');
-    return;
+    return recordWhoopSyncOutcome_(false, 'Manca WHOOP_ATHLETE_NAME nelle Script Properties.');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -960,8 +970,42 @@ function syncWhoopSince_(since) {
     counts.workout++;
   });
 
-  Logger.log('Sync Whoop completata: ' + counts.recovery + ' recovery, ' + counts.cycle
-    + ' cicli, ' + counts.sleep + ' notti di sonno, ' + counts.workout + ' allenamenti.');
+  var riassunto = counts.recovery + ' recovery, ' + counts.cycle + ' cicli, '
+    + counts.sleep + ' notti di sonno, ' + counts.workout + ' allenamenti';
+  return recordWhoopSyncOutcome_(true, 'Sync Whoop completata: ' + riassunto, counts);
+}
+
+// Registra l'esito dell'ultima sincronizzazione nelle Script Properties, cosi' doGet puo'
+// dirlo all'app: senza, un sync che fallisce e' indistinguibile da "non mi sono allenato".
+function recordWhoopSyncOutcome_(ok, message, counts) {
+  var props = PropertiesService.getScriptProperties();
+  var esito = { ok: ok, message: message, at: Date.now(), counts: counts || null };
+  props.setProperty('WHOOP_LAST_SYNC', JSON.stringify(esito));
+  if (ok) props.setProperty('WHOOP_LAST_SYNC_OK_AT', String(esito.at));
+  Logger.log(message);
+  return esito;
+}
+
+function readWhoopSyncOutcome_() {
+  var raw = PropertiesService.getScriptProperties().getProperty('WHOOP_LAST_SYNC');
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// Sincronizzazione su richiesta, chiamata dall'app subito dopo aver salvato un allenamento:
+// aspettare il trigger delle 6 del mattino significherebbe vedere i dati della fascia solo il
+// giorno dopo. Con una strozzatura, perche' salvare quattro lavori di fila non deve far
+// partire quattro sincronizzazioni complete.
+var WHOOP_ON_DEMAND_MIN_INTERVAL_MS = 10 * 60 * 1000;
+
+function syncWhoopOnDemand_(data) {
+  var ultimo = readWhoopSyncOutcome_();
+  var quando = ultimo && ultimo.ok ? Number(ultimo.at || 0) : 0;
+  if (!data.force && quando && (Date.now() - quando) < WHOOP_ON_DEMAND_MIN_INTERVAL_MS) {
+    return { status: 'success', action: 'syncWhoop', synced: false, reason: 'recente', lastSync: ultimo };
+  }
+  var esito = syncWhoopData();
+  return { status: 'success', action: 'syncWhoop', synced: true, lastSync: esito };
 }
 
 // Esegui UNA VOLTA (Esegui ▶ con questa funzione selezionata) per installare la sincronizzazione
