@@ -4,6 +4,16 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v73 — 2026-09-09
+- **Sotto ogni allenamento si legge anche come stavi quella mattina**: recovery (colorato con le
+  soglie di Whoop), sonno, HRV e frequenza a riposo. La striscia della fascia diceva solo quanto
+  era costato il lavoro — strain, battiti, calorie — e senza lo stato di partenza un tempo alto
+  o un carico basso non si sanno leggere.
+- Lo stato del mattino sta **in cima alla striscia**, prima dell'allenamento, e compare **anche
+  nei giorni in cui la fascia non ha marcato un allenamento** (capita spesso: il lavoro lo
+  registri tu, la fascia ha solo i dati del mattino). Le metriche mancanti non lasciano pezzi
+  vuoti, e senza alcun dato la striscia non compare come prima.
+
 ## v72 — 2026-09-08
 - **Un WOD pubblicato ma senza punteggio non compare più nello Storico:** è programmazione, non
   un allenamento fatto. Chi pubblica i lavori della giornata per la palestra si ritrovava lo
