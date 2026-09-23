@@ -154,6 +154,12 @@
     .day-item-heading { min-width: 0; }
     .day-item-title { font-size: 14px; font-weight: 800; color: var(--accent); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .day-item-badges { margin-bottom: 4px; }
+
+    /* v75: la ricarica del giorno. Acceso e spento si distinguono da soli, senza leggere:
+       spento e' un contorno tratteggiato (un posto ancora da riempire), acceso e' pieno. */
+    .btn-ricarica { width: 100%; margin-top: 10px; padding: 11px 10px; border-radius: 8px; font-size: 12px; font-weight: 800; text-transform: uppercase; cursor: pointer;
+      background: transparent; color: var(--text-muted); border: 1px dashed var(--border); }
+    .btn-ricarica.is-on { background: #7b5cff; color: #fff; border: 1px solid #7b5cff; }
     .day-item-type { font-weight: 700; color: var(--text-muted); font-size: 12px; }
     .day-item-more { font-size: 10px; font-weight: 800; color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
     .day-item-published { background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; }
@@ -241,7 +247,15 @@
     .active-days-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; flex: 1 0 34px; min-width: 34px; }
     .active-days-bar-count { font-size: 11px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
     .active-days-bar-count.is-zero { visibility: hidden; }
-    .active-days-bar { width: 20px; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 3px; }
+    .active-days-bar { width: 20px; background: var(--accent); min-height: 3px; }
+    /* v75: barra impilata — allenamenti sotto, ricariche sopra. L'arrotondamento sta sul
+       contenitore, così i due segmenti restano un pezzo solo invece di due mattoncini. */
+    .active-days-stack { display: flex; flex-direction: column; justify-content: flex-end; width: 20px; border-radius: 4px 4px 0 0; overflow: hidden; }
+    .active-days-bar-ric { width: 20px; background: #7b5cff; min-height: 3px; }
+    .active-days-ric-count { color: #7b5cff; margin-left: 2px; }
+    .active-days-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 10px; color: var(--text-muted); }
+    .active-days-key { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--accent); margin-right: 5px; vertical-align: -1px; }
+    .active-days-key.is-ric { background: #7b5cff; }
     .active-days-labels { display: flex; gap: 4px; padding: 6px 2px 0; min-width: 100%; }
     .active-days-labels.is-scrollable { min-width: max-content; }
     .active-days-label-col { flex: 1 0 34px; min-width: 34px; text-align: center; font-size: 8px; color: var(--text-muted); white-space: nowrap; }
@@ -787,7 +801,7 @@
 
   <script>
     let cropper = null;
-    let globalData = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], funPhrases: [] };
+    let globalData = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], funPhrases: [], ricariche: [] };
 
     // Un WOD "pubblicato in bacheca" è una riga della stessa tabella Wods, distinta solo dal
     // valore speciale di "mode" qui sotto (nessun campo/tabella nuova sul backend): niente
@@ -896,8 +910,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v74";
-    const APP_VERSION_DATE = "09/09/2026";
+    const APP_VERSION = "v75";
+    const APP_VERSION_DATE = "23/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -1216,6 +1230,60 @@
       if (!showForm) renderRegistraDayView();
     }
 
+    // ===================== GIORNI DI RICARICA =====================
+    // Si registra solo il GIORNO, non il contenuto del pasto: una riga per atleta+data. Il
+    // grafico dei giorni attivi le impila sopra gli allenamenti, così una settimana si legge
+    // per intero — quanto ti sei allenato e quanto hai ricaricato — in una barra sola.
+
+    function ricaricaDays(athlete) {
+      const nome = String(athlete || '').toLowerCase();
+      if (!nome) return new Set();
+      return new Set((globalData.ricariche || [])
+        .filter(r => String(r.athlete || '').toLowerCase() === nome)
+        .map(r => String(r.date || '').slice(0, 10)));
+    }
+
+    function hasRicarica(athlete, dateStr) {
+      return ricaricaDays(athlete).has(String(dateStr || '').slice(0, 10));
+    }
+
+    async function toggleRicarica(dateStr) {
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) { alert('Effettua prima il login con il tuo profilo atleta!'); return; }
+      const giorno = String(dateStr || '').slice(0, 10);
+      if (!giorno) return;
+      // Una ricarica non si può segnare su un giorno che deve ancora arrivare.
+      if (giorno > getTodayDateString()) {
+        alert('Non puoi segnare una ricarica su un giorno futuro.');
+        return;
+      }
+
+      const accesa = hasRicarica(athleteName, giorno);
+      const payload = { action: 'setRicarica', id: String(Date.now()), athlete: athleteName, date: giorno, on: !accesa };
+      const esito = await postToBackend(payload);
+      if (!esito.ok) { alert('Errore durante il salvataggio della ricarica.'); return; }
+      // Senza linea postToBackend l'ha già applicata in locale e messa in coda: riapplicarla
+      // qui la eseguirebbe due volte.
+      if (!esito.queued) await fetchCloudData();
+      renderRegistraDayView();
+      renderActiveDaysChart();
+    }
+
+    // Il tasto nella vista giorno: dice cosa farà, non solo com'è messo adesso.
+    function renderRicaricaToggle(dateStr) {
+      const athleteName = localStorage.getItem('activeAthlete');
+      if (!athleteName) return '';
+      const giorno = String(dateStr || '').slice(0, 10);
+      if (giorno > getTodayDateString()) return '';
+      const accesa = hasRicarica(athleteName, giorno);
+      const idEsc = giorno.replace(/'/g, "\\'");
+      return `
+        <button type="button" class="btn-ricarica ${accesa ? 'is-on' : ''}" onclick="withButtonGuard(this, () => toggleRicarica('${idEsc}'))">
+          ${accesa ? '🍝 Ricarica segnata · tocca per togliere' : '🍝 Segna una ricarica'}
+        </button>
+      `;
+    }
+
     // Sessioni ancora "vecchio stile": un'unica riga con dentro più lavori. Dalla v48 non se ne
     // creano più, ma quelle già salvate restano raggruppate, e con la giornata a lavori singoli
     // (frecce, riordino, un tasto Risultati per lavoro) stanno strette.
@@ -1392,11 +1460,16 @@
         </button>
       `;
 
+      // La ricarica è indipendente dall'allenamento: si segna anche in un giorno di riposo,
+      // che è poi il giorno in cui capita più spesso.
+      const ricaricaHtml = renderRicaricaToggle(selectedRegistraDate);
+
       if (sessions.length === 0) {
         const vuotoTxt = isFuture
           ? 'Nessun WOD ancora programmato per questo giorno.'
           : `Nessun allenamento registrato per ${dayLabel}.`;
-        contentEl.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 4px;">${vuotoTxt}</p>` + logPastBtnHtml;
+        contentEl.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; margin-bottom: 4px;">${vuotoTxt}</p>` + logPastBtnHtml + ricaricaHtml;
+        pareggiaAltezzeGiorno(contentEl);
         return;
       }
 
@@ -1495,7 +1568,7 @@
             </div>
           </div>
         `;
-      }).join('') + logPastBtnHtml;
+      }).join('') + logPastBtnHtml + ricaricaHtml;
 
       pareggiaAltezzeGiorno(contentEl);
     }
@@ -1764,7 +1837,7 @@
     const OFFLINE_QUEUE_KEY = 'pendingWrites';
     // Solo le scritture che servono davvero in palestra passano dalla coda. Login/PIN e profilo
     // restano online: rimandarli non avrebbe senso e il loro esito va visto subito.
-    const QUEUEABLE_ACTIONS = ['saveWodSession', 'deleteWod', 'logResult', 'saveMassimale', 'setWodOrder'];
+    const QUEUEABLE_ACTIONS = ['saveWodSession', 'deleteWod', 'logResult', 'saveMassimale', 'setWodOrder', 'setRicarica'];
 
     function saveCloudDataCache() {
       try {
@@ -1798,6 +1871,7 @@
       data.whoop = data.whoop || [];
       data.health = data.health || [];
       data.funPhrases = data.funPhrases || [];
+      data.ricariche = data.ricariche || [];
       return data;
     }
 
@@ -1851,6 +1925,13 @@
           const sessione = globalData.wods.find(w => String(w.id) === String(it.id));
           if (sessione) sessione.order = it.order;
         });
+      } else if (payload.action === 'setRicarica') {
+        // Come il backend: si ripulisce sempre il giorno e lo si riscrive solo se acceso.
+        const atleta = String(payload.athlete || '').toLowerCase();
+        const giorno = String(payload.date || '').slice(0, 10);
+        globalData.ricariche = globalData.ricariche.filter(r =>
+          !(String(r.athlete || '').toLowerCase() === atleta && String(r.date || '').slice(0, 10) === giorno));
+        if (payload.on) globalData.ricariche.push({ id: payload.id, athlete: payload.athlete, date: giorno });
       }
       saveCloudDataCache();
     }
@@ -2197,8 +2278,10 @@
           .filter(w => w.athlete && activeAthlete && w.athlete.toLowerCase() === activeAthlete.toLowerCase() && w.date && sessioneSvolta(w))
           .map(w => String(w.date).slice(0, 10))
       );
+      // v75: i giorni di ricarica si impilano sopra gli allenamenti, nella stessa barra.
+      const ricaricaDates = ricaricaDays(activeAthlete);
 
-      if (activeDates.size === 0) {
+      if (activeDates.size === 0 && ricaricaDates.size === 0) {
         container.innerHTML = '<p class="active-days-empty">Nessun allenamento registrato per il tuo profilo.</p>';
         return;
       }
@@ -2210,7 +2293,8 @@
       } else if (activeDaysCurrentRange === 'year') {
         weeksCount = 52;
       } else {
-        const earliestWeekStart = getWeekStartDateString(Array.from(activeDates).sort()[0]);
+        const tuttiIGiorni = Array.from(activeDates).concat(Array.from(ricaricaDates)).sort();
+        const earliestWeekStart = getWeekStartDateString(tuttiIGiorni[0]);
         const diffDays = Math.round((new Date(todayWeekStart) - new Date(earliestWeekStart)) / 86400000);
         weeksCount = Math.max(1, Math.round(diffDays / 7) + 1);
       }
@@ -2219,22 +2303,41 @@
       for (let i = weeksCount - 1; i >= 0; i--) {
         const weekStart = addDaysToDateString(todayWeekStart, -i * 7);
         let count = 0;
+        let ricariche = 0;
         for (let d = 0; d < 7; d++) {
-          if (activeDates.has(addDaysToDateString(weekStart, d))) count++;
+          const giorno = addDaysToDateString(weekStart, d);
+          if (activeDates.has(giorno)) count++;
+          if (ricaricaDates.has(giorno)) ricariche++;
         }
-        weeks.push({ weekStart, count });
+        weeks.push({ weekStart, count, ricariche, totale: count + ricariche });
       }
 
-      const maxCount = Math.max(...weeks.map(w => w.count), 1);
+      // La scala è sul totale impilato, altrimenti una settimana con molte ricariche
+      // sborderebbe dall'altezza del grafico.
+      const maxCount = Math.max(...weeks.map(w => w.totale), 1);
       const scrollable = weeks.length > 10;
       const labelEvery = weeks.length <= 10 ? 1 : (weeks.length <= 20 ? 2 : 4);
+      const conRicariche = weeks.some(w => w.ricariche > 0);
 
+      // Due segmenti nella stessa colonna: sotto gli allenamenti, sopra le ricariche. Il
+      // numero in cima conta gli allenamenti, con le ricariche a fianco solo se ce ne sono:
+      // sono due cose diverse e sommarle in un numero solo non direbbe niente.
       const colsHtml = weeks.map(w => `
         <div class="active-days-col">
-          <div class="active-days-bar-count ${w.count === 0 ? 'is-zero' : ''}">${w.count}</div>
-          <div class="active-days-bar" style="height: ${Math.round((w.count / maxCount) * 100)}%;"></div>
+          <div class="active-days-bar-count ${w.totale === 0 ? 'is-zero' : ''}">${w.count}${w.ricariche ? `<span class="active-days-ric-count">+${w.ricariche}</span>` : ''}</div>
+          <div class="active-days-stack" style="height: ${Math.round((w.totale / maxCount) * 100)}%;">
+            ${w.ricariche ? `<div class="active-days-bar-ric" style="flex: ${w.ricariche} 0 0;"></div>` : ''}
+            ${w.count ? `<div class="active-days-bar" style="flex: ${w.count} 0 0;"></div>` : ''}
+          </div>
         </div>
       `).join('');
+
+      const legendaHtml = conRicariche
+        ? `<div class="active-days-legend">
+             <span><i class="active-days-key"></i>Giorni di allenamento</span>
+             <span><i class="active-days-key is-ric"></i>Ricariche</span>
+           </div>`
+        : '';
 
       const labelsHtml = weeks.map((w, idx) => `
         <div class="active-days-label-col">${idx % labelEvery === 0 ? formatActiveDaysLabel(w.weekStart) : ''}</div>
@@ -2245,6 +2348,7 @@
           <div class="active-days-chart ${scrollable ? 'is-scrollable' : ''}">${colsHtml}</div>
           <div class="active-days-labels ${scrollable ? 'is-scrollable' : ''}">${labelsHtml}</div>
         </div>
+        ${legendaHtml}
       `;
     }
 

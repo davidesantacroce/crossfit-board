@@ -27,6 +27,14 @@ function applyPost(state, body) {
       if (w) w.order = it.order;
     });
     return { status: 'success', action: 'setWodOrder' };
+  } else if (body.action === 'setRicarica') {
+    // Come il backend vero: il giorno viene sempre ripulito e riscritto solo se acceso.
+    const atleta = String(body.athlete || '').toLowerCase();
+    const giorno = String(body.date || '').slice(0, 10);
+    state.ricariche = (state.ricariche || []).filter(
+      (r) => !(String(r.athlete || '').toLowerCase() === atleta && String(r.date || '').slice(0, 10) === giorno));
+    if (body.on) state.ricariche.push({ id: body.id, athlete: body.athlete, date: giorno });
+    return { status: 'success', action: 'setRicarica', on: !!body.on };
   } else if (body.action === 'syncWhoop') {
     // Come il backend vero: con una strozzatura, e con l'esito dell'ultima sincronizzazione.
     state.syncWhoopCalls = (state.syncWhoopCalls || 0) + 1;
@@ -53,7 +61,7 @@ function applyPost(state, body) {
 // Intercetta le chiamate all'endpoint Apps Script. Ritorna lo stato in memoria (wods/athletes/
 // massimali/results), utile per fare assert su cosa è stato effettivamente "salvato".
 async function mockBackend(page, initialData = {}) {
-  const state = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], funPhrases: [], ...initialData };
+  const state = { wods: [], athletes: [], massimali: [], results: [], whoop: [], health: [], funPhrases: [], ricariche: [], ...initialData };
 
   await page.route('**/macros/**', async (route) => {
     const req = route.request();

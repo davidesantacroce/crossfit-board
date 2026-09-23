@@ -350,6 +350,39 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({"status": "success", "action": "setWodOrder", "updated": aggiornate})).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // v75: giorno di ricarica (pasto di ricarica). Si registra solo il GIORNO, non il
+    // contenuto: una riga per atleta+data, e toglierla equivale a dire "non l'ho fatta".
+    if (data.action === 'setRicarica') {
+      var ricSheet = ss.getSheetByName("Ricariche") || ss.insertSheet("Ricariche");
+      if (ricSheet.getLastRow() === 0) ricSheet.appendRow(["id", "athlete", "date"]);
+
+      // La colonna data va tenuta come TESTO: altrimenti Sheets interpreta "2026-09-23" come
+      // data vera e doGet la restituisce come timestamp ISO a mezzanotte locale, cioe' il
+      // giorno prima. Il range parte da getLastRow()+1 cosi' copre anche le righe nuove.
+      var ricDateCol = getColumnIndex(ricSheet, "date");
+      if (ricDateCol > 0) {
+        ricSheet.getRange(1, ricDateCol, ricSheet.getMaxRows(), 1).setNumberFormat("@");
+      }
+
+      var ricAtleta = String(data.athlete || "").toLowerCase();
+      var ricData = String(data.date || "").slice(0, 10);
+      var ricRows = ricSheet.getDataRange().getValues();
+      var ricAthCol = getColumnIndex(ricSheet, "athlete");
+      var rimosse = 0;
+      // Si ripulisce sempre il giorno prima di riscriverlo: rende l'azione idempotente, cosi'
+      // un doppio invio (o una coda offline rigiocata) non lascia due righe sullo stesso giorno.
+      for (var ri = ricRows.length - 1; ri >= 1; ri--) {
+        var rigaAtleta = String(ricRows[ri][ricAthCol - 1] || "").toLowerCase();
+        var rigaData = String(ricRows[ri][ricDateCol - 1] || "").slice(0, 10);
+        if (rigaAtleta === ricAtleta && rigaData === ricData) { ricSheet.deleteRow(ri + 1); rimosse++; }
+      }
+      if (data.on) ricSheet.appendRow([String(data.id || Date.now()), data.athlete, ricData]);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        "status": "success", "action": "setRicarica", "on": !!data.on, "removed": rimosse
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // Sincronizzazione Whoop su richiesta dell'app (dopo aver salvato un allenamento).
     if (data.action === 'syncWhoop') {
       return ContentService.createTextOutput(JSON.stringify(syncWhoopOnDemand_(data))).setMimeType(ContentService.MimeType.JSON);
@@ -683,6 +716,10 @@ function doGet(e) {
         steps: h.steps,
         activeEnergy: h.activeenergy
       };
+    }),
+    // Giorni di ricarica: solo atleta + data, il contenuto del pasto non si registra.
+    ricariche: getSheetData("Ricariche").map(function(r) {
+      return { id: r.id, athlete: r.athlete, date: formatDateValue(r.date, timeZone) };
     }),
     // Esito dell'ultima sincronizzazione Whoop: serve all'app per dire "dati aggiornati al ..."
     // e per accorgersi di un sync fallito, che altrimenti e' indistinguibile da una settimana
