@@ -4,6 +4,14 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v76 — 2026-09-23
+- **Le ricariche sono personali: per gli altri atleti la funzione non esiste.** Niente tasto
+  nella vista giorno e niente parte viola nel grafico dei giorni attivi — non è una funzione
+  della palestra. L'elenco di chi la vede è la costante `RICARICA_ATHLETES` in `index.html`: per
+  abilitare qualcun altro basta aggiungere il suo nome com'è scritto nel foglio `Athletes`.
+- Il controllo sta anche **dentro l'azione**, non solo sul tasto: la funzione resta raggiungibile
+  dalla console e senza il controllo scriverebbe una riga che poi nessuno vedrebbe.
+
 ## v75 — 2026-09-23
 - **Giorni di ricarica.** Nella vista giorno di REGISTRA un tasto segna la ricarica del giorno
   selezionato, e ritoccandolo la toglie. Si registra **solo il giorno**, non il contenuto del
