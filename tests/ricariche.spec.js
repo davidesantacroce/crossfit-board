@@ -98,6 +98,10 @@ test('nel grafico la ricarica si impila sopra gli allenamenti', async ({ page })
     ricariche: [{ id: 'r1', athlete: ATLETA, date: OGGI }],
   });
   await page.evaluate(() => switchTab('atleta'));
+  // Dalla v77 la vista di partenza è SETTIMANA, una colonna per giorno: l'impilamento con i
+  // conteggi aggregati è quello delle viste per settimana (vedi giorni-attivi-settimana.spec.js
+  // per la vista per giorno).
+  await page.locator('.active-days-range-btn[data-range="recent"]').click();
 
   const ultima = page.locator('#activeDaysChartContainer .active-days-col').last();
   await expect(ultima.locator('.active-days-bar')).toHaveCount(1);     // allenamenti

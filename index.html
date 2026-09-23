@@ -253,6 +253,9 @@
     .active-days-stack { display: flex; flex-direction: column; justify-content: flex-end; width: 20px; border-radius: 4px 4px 0 0; overflow: hidden; }
     .active-days-bar-ric { width: 20px; background: #7b5cff; min-height: 3px; }
     .active-days-ric-count { color: #7b5cff; margin-left: 2px; }
+    .active-days-col.is-future { opacity: 0.35; }
+    .active-days-col.is-today .active-days-bar-count { color: var(--accent); }
+    .active-days-label-col.is-today { color: var(--accent); font-weight: 800; }
     .active-days-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 10px; color: var(--text-muted); }
     .active-days-key { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--accent); margin-right: 5px; vertical-align: -1px; }
     .active-days-key.is-ric { background: #7b5cff; }
@@ -527,9 +530,10 @@
   <!-- TAB ATLETA -->
   <div id="tab-atleta" class="tab-content">
     <div class="card">
-      <div class="card-title">📊 GIORNI ATTIVI A SETTIMANA</div>
+      <div class="card-title">📊 GIORNI ATTIVI</div>
       <div class="active-days-range">
-        <button type="button" class="active-days-range-btn active" data-range="recent" onclick="renderActiveDaysChart('recent')">RECENTI</button>
+        <button type="button" class="active-days-range-btn active" data-range="week" onclick="renderActiveDaysChart('week')">SETTIMANA</button>
+        <button type="button" class="active-days-range-btn" data-range="recent" onclick="renderActiveDaysChart('recent')">RECENTI</button>
         <button type="button" class="active-days-range-btn" data-range="year" onclick="renderActiveDaysChart('year')">12 MESI</button>
         <button type="button" class="active-days-range-btn" data-range="all" onclick="renderActiveDaysChart('all')">SEMPRE</button>
       </div>
@@ -910,7 +914,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v76";
+    const APP_VERSION = "v77";
     const APP_VERSION_DATE = "23/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -2271,7 +2275,9 @@
       return `${fmt(weekStartStr)}-${fmt(weekEndStr)}`;
     }
 
-    let activeDaysCurrentRange = 'recent';
+    // v77: si parte dalla settimana corrente, un giorno per colonna: è la vista in cui si vede
+    // in CHE giorno è caduta una ricarica, non solo quante ne hai fatte.
+    let activeDaysCurrentRange = 'week';
 
     // Grafico "giorni attivi a settimana" nel tab ATLETA: una settimana (lun-dom) conta un
     // giorno come attivo se l'atleta ha loggato almeno una sessione WOD in quella data
@@ -2300,50 +2306,83 @@
       }
 
       const todayWeekStart = getWeekStartDateString(getTodayDateString());
-      let weeksCount;
-      if (activeDaysCurrentRange === 'recent') {
-        weeksCount = 8;
-      } else if (activeDaysCurrentRange === 'year') {
-        weeksCount = 52;
-      } else {
-        const tuttiIGiorni = Array.from(activeDates).concat(Array.from(ricaricaDates)).sort();
-        const earliestWeekStart = getWeekStartDateString(tuttiIGiorni[0]);
-        const diffDays = Math.round((new Date(todayWeekStart) - new Date(earliestWeekStart)) / 86400000);
-        weeksCount = Math.max(1, Math.round(diffDays / 7) + 1);
-      }
+      const todayStr = getTodayDateString();
 
-      const weeks = [];
-      for (let i = weeksCount - 1; i >= 0; i--) {
-        const weekStart = addDaysToDateString(todayWeekStart, -i * 7);
-        let count = 0;
-        let ricariche = 0;
+      // v77: la vista SETTIMANA ha una colonna per GIORNO, non per settimana. Le barre
+      // settimanali dicono quante ricariche hai fatto, non in quale giorno: per vedere il
+      // ritmo dentro la settimana serve scendere al giorno.
+      const perGiorno = activeDaysCurrentRange === 'week';
+
+      let colonne = [];
+      if (perGiorno) {
         for (let d = 0; d < 7; d++) {
-          const giorno = addDaysToDateString(weekStart, d);
-          if (activeDates.has(giorno)) count++;
-          if (ricaricaDates.has(giorno)) ricariche++;
+          const giorno = addDaysToDateString(todayWeekStart, d);
+          const data = new Date(giorno + 'T00:00:00');
+          colonne.push({
+            key: giorno,
+            count: activeDates.has(giorno) ? 1 : 0,
+            ricariche: ricaricaDates.has(giorno) ? 1 : 0,
+            // I giorni che devono ancora arrivare restano vuoti e spenti, invece di sembrare
+            // giorni saltati.
+            futuro: giorno > todayStr,
+            oggi: giorno === todayStr,
+            label: `${ITALIAN_DAY_LETTERS[data.getDay()]}${data.getDate()}`,
+          });
         }
-        weeks.push({ weekStart, count, ricariche, totale: count + ricariche });
+      } else {
+        let weeksCount;
+        if (activeDaysCurrentRange === 'recent') {
+          weeksCount = 8;
+        } else if (activeDaysCurrentRange === 'year') {
+          weeksCount = 52;
+        } else {
+          const tuttiIGiorni = Array.from(activeDates).concat(Array.from(ricaricaDates)).sort();
+          const earliestWeekStart = getWeekStartDateString(tuttiIGiorni[0]);
+          const diffDays = Math.round((new Date(todayWeekStart) - new Date(earliestWeekStart)) / 86400000);
+          weeksCount = Math.max(1, Math.round(diffDays / 7) + 1);
+        }
+        for (let i = weeksCount - 1; i >= 0; i--) {
+          const weekStart = addDaysToDateString(todayWeekStart, -i * 7);
+          let count = 0;
+          let ricariche = 0;
+          for (let d = 0; d < 7; d++) {
+            const giorno = addDaysToDateString(weekStart, d);
+            if (activeDates.has(giorno)) count++;
+            if (ricaricaDates.has(giorno)) ricariche++;
+          }
+          colonne.push({ key: weekStart, count, ricariche, label: formatActiveDaysLabel(weekStart) });
+        }
       }
+      colonne.forEach(c => { c.totale = c.count + c.ricariche; });
 
       // La scala è sul totale impilato, altrimenti una settimana con molte ricariche
-      // sborderebbe dall'altezza del grafico.
-      const maxCount = Math.max(...weeks.map(w => w.totale), 1);
-      const scrollable = weeks.length > 10;
-      const labelEvery = weeks.length <= 10 ? 1 : (weeks.length <= 20 ? 2 : 4);
-      const conRicariche = weeks.some(w => w.ricariche > 0);
+      // sborderebbe dall'altezza del grafico. Nella vista per giorno il massimo è fisso a 2
+      // (allenamento + ricarica), così le colonne non cambiano altezza da una settimana
+      // all'altra e i giorni si confrontano fra loro.
+      const maxCount = perGiorno ? 2 : Math.max(...colonne.map(c => c.totale), 1);
+      const scrollable = colonne.length > 10;
+      const labelEvery = colonne.length <= 10 ? 1 : (colonne.length <= 20 ? 2 : 4);
+      const conRicariche = colonne.some(c => c.ricariche > 0);
 
-      // Due segmenti nella stessa colonna: sotto gli allenamenti, sopra le ricariche. Il
-      // numero in cima conta gli allenamenti, con le ricariche a fianco solo se ce ne sono:
-      // sono due cose diverse e sommarle in un numero solo non direbbe niente.
-      const colsHtml = weeks.map(w => `
-        <div class="active-days-col">
-          <div class="active-days-bar-count ${w.totale === 0 ? 'is-zero' : ''}">${w.count}${w.ricariche ? `<span class="active-days-ric-count">+${w.ricariche}</span>` : ''}</div>
-          <div class="active-days-stack" style="height: ${Math.round((w.totale / maxCount) * 100)}%;">
-            ${w.ricariche ? `<div class="active-days-bar-ric" style="flex: ${w.ricariche} 0 0;"></div>` : ''}
-            ${w.count ? `<div class="active-days-bar" style="flex: ${w.count} 0 0;"></div>` : ''}
+      // Due segmenti nella stessa colonna: sotto gli allenamenti, sopra le ricariche. Nella
+      // vista per settimana il numero in cima conta gli allenamenti, con le ricariche a fianco
+      // solo se ce ne sono: sono due cose diverse e sommarle non direbbe niente. Nella vista
+      // per giorno i numeri sarebbero tutti "1", quindi il conteggio lascia il posto al
+      // pittogramma della ricarica.
+      const colsHtml = colonne.map(c => {
+        const testa = perGiorno
+          ? (c.ricariche ? '🍝' : '')
+          : `${c.count}${c.ricariche ? `<span class="active-days-ric-count">+${c.ricariche}</span>` : ''}`;
+        return `
+        <div class="active-days-col ${c.oggi ? 'is-today' : ''} ${c.futuro ? 'is-future' : ''}">
+          <div class="active-days-bar-count ${testa === '' ? 'is-zero' : ''}">${testa || '0'}</div>
+          <div class="active-days-stack" style="height: ${Math.round((c.totale / maxCount) * 100)}%;">
+            ${c.ricariche ? `<div class="active-days-bar-ric" style="flex: ${c.ricariche} 0 0;"></div>` : ''}
+            ${c.count ? `<div class="active-days-bar" style="flex: ${c.count} 0 0;"></div>` : ''}
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       const legendaHtml = conRicariche
         ? `<div class="active-days-legend">
@@ -2352,8 +2391,8 @@
            </div>`
         : '';
 
-      const labelsHtml = weeks.map((w, idx) => `
-        <div class="active-days-label-col">${idx % labelEvery === 0 ? formatActiveDaysLabel(w.weekStart) : ''}</div>
+      const labelsHtml = colonne.map((c, idx) => `
+        <div class="active-days-label-col ${c.oggi ? 'is-today' : ''}">${idx % labelEvery === 0 ? c.label : ''}</div>
       `).join('');
 
       container.innerHTML = `
