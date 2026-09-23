@@ -4,6 +4,21 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v75 — 2026-09-23
+- **Giorni di ricarica.** Nella vista giorno di REGISTRA un tasto segna la ricarica del giorno
+  selezionato, e ritoccandolo la toglie. Si registra **solo il giorno**, non il contenuto del
+  pasto. Si segna anche su un giorno passato (scegliendolo dal calendario) e in un giorno di
+  riposo senza allenamenti, che è poi quello in cui capita più spesso. Su un giorno futuro il
+  tasto non compare.
+- **Il grafico dei giorni attivi le impila sopra gli allenamenti**, nella stessa barra: sotto in
+  arancione i giorni di allenamento, sopra in viola le ricariche, con il conteggio "2+1" e una
+  legenda che compare solo se di ricariche ce ne sono. La scala segue il totale impilato, così
+  una settimana carica non sborda.
+- Funziona anche **senza linea**: la ricarica si segna subito sul telefono e parte da sola al
+  ritorno della connessione, come gli allenamenti.
+- ⚠️ **Richiede una ridistribuzione dell'Apps Script** (nuovo foglio `Ricariche` e azione
+  `setRicarica`, vedi `apps-script/README.md`).
+
 ## v74 — 2026-09-09
 - **I dati della fascia si aggiornano quando salvi un allenamento**, non più solo col trigger
   giornaliero delle 6 del mattino: registrando la sera, i dati Whoop di quel giorno si sarebbero

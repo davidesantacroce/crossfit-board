@@ -58,6 +58,7 @@ funziona lo stesso ma quelle funzioni restano a vuoto.
 
 | Da | Cosa cambia | Cosa si vede senza redeploy |
 |---|---|---|
+| v75 | Nuovo foglio `Ricariche` (id, athlete, date) e azione `setRicarica`; `doGet` lo espone in `ricariche`. | Il tasto "Segna una ricarica" nella vista giorno non salva niente: il vecchio backend ignora l'azione sconosciuta e risponde `success`, quindi l'app la mostra come segnata finché non ricarica i dati. Il grafico dei giorni attivi resta senza la parte viola. |
 | v74 | Nuova azione `syncWhoop`: l'app chiede una sincronizzazione della fascia subito dopo aver salvato un allenamento, con una strozzatura di 10 minuti. `syncWhoopSince_` restituisce l'esito invece di uscire in silenzio, `doGet` lo espone in `whoopSync`. | I dati Whoop si aggiornano solo col trigger giornaliero delle 6, quindi un allenamento registrato la sera li mostra il giorno dopo. Il vecchio backend ignora l'azione sconosciuta e risponde `success`: l'app se ne accorge e non aspetta nulla. La card Whoop non può dire se l'ultima sincronizzazione è fallita. |
 
 ### Dopo il redeploy: cosa richiede anche un'azione sui dati
