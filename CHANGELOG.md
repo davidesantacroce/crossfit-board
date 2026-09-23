@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v77 — 2026-09-23
+- **Il grafico dei giorni attivi parte dalla settimana corrente, con una colonna per giorno.**
+  Le barre settimanali dicono quante ricariche hai fatto, non in quale giorno: per vedere il
+  ritmo dentro la settimana serve scendere al giorno. SETTIMANA è il primo tasto e la vista di
+  partenza; RECENTI, 12 MESI e SEMPRE restano come prima.
+- Nella vista per giorno **oggi è evidenziato** e i giorni che devono ancora arrivare sono
+  spenti, invece di sembrare giorni saltati. Il massimo della scala è fisso (allenamento +
+  ricarica), così le colonne non cambiano altezza da una settimana all'altra.
+- I numeri sarebbero tutti "1" e non direbbero niente: nella vista per giorno il conteggio
+  lascia il posto al **pittogramma della ricarica** sopra la colonna.
+
 ## v76 — 2026-09-23
 - **Le ricariche sono personali: per gli altri atleti la funzione non esiste.** Niente tasto
   nella vista giorno e niente parte viola nel grafico dei giorni attivi — non è una funzione
