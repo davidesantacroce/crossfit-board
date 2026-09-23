@@ -910,7 +910,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v75";
+    const APP_VERSION = "v76";
     const APP_VERSION_DATE = "23/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -1235,11 +1235,21 @@
     // grafico dei giorni attivi le impila sopra gli allenamenti, così una settimana si legge
     // per intero — quanto ti sei allenato e quanto hai ricaricato — in una barra sola.
 
+    // v76: le ricariche sono una cosa personale, non una funzione della palestra: per gli altri
+    // atleti la funzione non esiste proprio — niente tasto nella vista giorno, niente parte
+    // viola nel grafico. Per abilitarne un altro basta aggiungere qui il suo nome, scritto come
+    // nel foglio Athletes (il confronto ignora maiuscole e spazi ai lati).
+    const RICARICA_ATHLETES = ['davide santacroce'];
+
+    function ricaricheAbilitate(athlete) {
+      return RICARICA_ATHLETES.includes(String(athlete || '').trim().toLowerCase());
+    }
+
     function ricaricaDays(athlete) {
-      const nome = String(athlete || '').toLowerCase();
-      if (!nome) return new Set();
+      const nome = String(athlete || '').trim().toLowerCase();
+      if (!nome || !ricaricheAbilitate(nome)) return new Set();
       return new Set((globalData.ricariche || [])
-        .filter(r => String(r.athlete || '').toLowerCase() === nome)
+        .filter(r => String(r.athlete || '').trim().toLowerCase() === nome)
         .map(r => String(r.date || '').slice(0, 10)));
     }
 
@@ -1250,6 +1260,9 @@
     async function toggleRicarica(dateStr) {
       const athleteName = localStorage.getItem('activeAthlete');
       if (!athleteName) { alert('Effettua prima il login con il tuo profilo atleta!'); return; }
+      // Il tasto non c'è per gli altri atleti, ma la funzione è raggiungibile lo stesso: meglio
+      // che si fermi qui, invece di scrivere una riga che poi nessuno vedrebbe.
+      if (!ricaricheAbilitate(athleteName)) return;
       const giorno = String(dateStr || '').slice(0, 10);
       if (!giorno) return;
       // Una ricarica non si può segnare su un giorno che deve ancora arrivare.
@@ -1272,7 +1285,7 @@
     // Il tasto nella vista giorno: dice cosa farà, non solo com'è messo adesso.
     function renderRicaricaToggle(dateStr) {
       const athleteName = localStorage.getItem('activeAthlete');
-      if (!athleteName) return '';
+      if (!athleteName || !ricaricheAbilitate(athleteName)) return '';
       const giorno = String(dateStr || '').slice(0, 10);
       if (giorno > getTodayDateString()) return '';
       const accesa = hasRicarica(athleteName, giorno);
