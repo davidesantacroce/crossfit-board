@@ -914,7 +914,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v79";
+    const APP_VERSION = "v80";
     const APP_VERSION_DATE = "25/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -3293,6 +3293,11 @@
       return active ? active.dataset.cat : 'RX';
     }
 
+    // Quanto può essere lungo un titolo ricavato dall'OCR. I titoli della programmazione veri
+    // arrivano tranquillamente a 40+ caratteri ("Power Snatch + Hang Power Snatch + Snatch" ne
+    // fa 41), quindi il vecchio limite di 40 tagliava roba legittima.
+    const TITOLO_OCR_MAX = 80;
+
     function parseAndFillBlock(blockId, text) {
       const block = document.getElementById(`workout-block-${blockId}`);
       if (!block) return;
@@ -3313,7 +3318,7 @@
       block.querySelector('.block-type').value = type;
 
       // Molti screenshot di altre app hanno un pallino/cerchietto colorato prima del nome
-      // del blocco (es. ⬤ Superset 1): l'OCR spesso lo legge come una "O" (o uno "0") isolata
+      // del blocco (es. ⬤ Superset 1): l'OCR spesso lo legge come una "O" (o uno "0", o una "©") isolata
       // a inizio riga, che finiva nel titolo ("O Superset 1"). La ripuliamo qui: rimuoviamo
       // le righe composte solo da quel carattere e la "O"/"0" isolata a inizio riga, ma solo
       // quando è un token a sé (seguito da uno spazio) per non toccare parole vere che
@@ -3321,12 +3326,13 @@
       const lines = text.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 0)
-        .filter(l => !/^[O0]$/.test(l))
-        .map(l => l.replace(/^[O0](?=\s)\s*/, '').trim());
+        .filter(l => !/^[O0©]$/.test(l))
+        .map(l => l.replace(/^[O0©](?=\s)\s*/, '').trim());
 
       // Titolo: prima riga utile (o la seconda se la prima è solo una keyword tipo "AMRAP")
       let titleLineIndex = -1;
       let titleCandidate = '';
+      let titoloTagliato = false;
       if (lines.length > 0) {
         titleLineIndex = 0;
         titleCandidate = lines[0];
@@ -3334,8 +3340,17 @@
           titleLineIndex = 1;
           titleCandidate = lines[1];
         }
-        if (titleCandidate.length > 40) {
-          titleCandidate = titleCandidate.substring(0, 40).trim();
+        // v80: il taglio era a 40 caratteri netti, in mezzo a una parola ("Pause Snatch Pull +
+        // Floating Power Snatc") e senza tenere da parte il resto, che spariva. Ora il limite è
+        // più largo — titoli come "Power Snatch + Hang Power Snatch + Snatch" sono legittimi e
+        // ne facevano già 41 — e si taglia all'ultimo spazio utile, mai dentro una parola. La
+        // riga intera finisce comunque in spiegazione (vedi più sotto), così non si perde nulla.
+        if (titleCandidate.length > TITOLO_OCR_MAX) {
+          const tagliato = titleCandidate.substring(0, TITOLO_OCR_MAX);
+          const ultimoSpazio = tagliato.lastIndexOf(' ');
+          // Una parola unica più lunga del limite non ha spazi dove spezzare: lì si taglia netto.
+          titleCandidate = (ultimoSpazio > 0 ? tagliato.substring(0, ultimoSpazio) : tagliato).trim();
+          titoloTagliato = true;
         }
       }
       const titleInput = block.querySelector('.block-title');
@@ -3343,11 +3358,12 @@
         titleInput.value = titleCandidate; // .value non passa per innerHTML, non serve escaping
       }
 
-      // Spiegazione WOD: tutto il testo OCR, esclusa l'eventuale riga già usata come titolo
-      // (se la riga era troppo lunga il titolo mostrato è troncato, ma non è un problema per
-      // il rilevamento di set/percentuali/esercizio: le altre righe restano intatte in
-      // spiegazione, e detectExerciseNameForMassimale prova tutte le occorrenze di "%").
-      const explanationLines = lines.filter((_, idx) => idx !== titleLineIndex);
+      // Spiegazione WOD: tutto il testo OCR, esclusa la riga già usata come titolo — che però
+      // viene tenuta quando il titolo è stato accorciato, altrimenti la coda della riga andrebbe
+      // persa per sempre (è così che sono nati titoli come "...Power Snatc", con il resto
+      // sparito). Le altre righe restano intatte, e detectExerciseNameForMassimale prova tutte
+      // le occorrenze di "%".
+      const explanationLines = lines.filter((_, idx) => titoloTagliato || idx !== titleLineIndex);
       const explanationText = explanationLines.length > 0 ? explanationLines.join('\n') : text.trim();
       const explanationEl = block.querySelector('.block-explanation');
       if (explanationEl) {
