@@ -4,6 +4,21 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v80 — 2026-09-25
+- **I titoli letti dalla foto non vengono più troncati a metà parola.** Il titolo ricavato
+  dall'OCR veniva tagliato a **40 caratteri netti**, in mezzo a una parola, e la coda della riga
+  spariva per sempre: non finiva nemmeno in spiegazione. È così che sono nati titoli come
+  `Pause Snatch Pull + Floating Power Snatc` e `Snatch Deadlift + Power Snatch + Floatin` (sul
+  Foglio ce ne sono cinque lunghi esattamente 40).
+- Il limite passa a **80 caratteri** — i titoli veri della programmazione arrivano tranquillamente
+  oltre i 40, `Power Snatch + Hang Power Snatch + Snatch` ne fa 41 — e il taglio avviene
+  **all'ultimo spazio utile**, mai dentro una parola.
+- Quando il titolo viene accorciato, la **riga intera resta in spiegazione**, così la coda non si
+  perde più.
+- Il pallino colorato che precede il nome del blocco negli screenshot veniva già ripulito quando
+  l'OCR lo leggeva come `O` o `0`: ora anche quando lo legge come **©**, che è il caso capitato
+  davvero.
+
 ## v79 — 2026-09-25
 - **Corretto: di un WOD con le virgolette nel titolo non si apriva la finestra Risultati.** I
   valori passati a una funzione dentro un attributo `onclick` venivano interpolati grezzi: una
