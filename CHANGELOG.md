@@ -4,6 +4,21 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v78 — 2026-09-25
+- **Corretto: un massimale con peso numerico non si aggiornava.** Google Sheets restituisce il
+  peso come NUMERO quando la cella è numerica (80) e come stringa quando non lo è ("3:59" di un
+  benchmark a tempo). Il codice lo trattava sempre come testo e chiamava `.trim()` sul valore
+  salvato: con un numero saltava con un errore a metà del salvataggio, **senza avviso e senza
+  scrivere niente**. Caso segnalato: lo Snatch a 80 kg che non si aggiornava.
+- La correzione è **al confine**: il peso viene uniformato a stringa appena i dati arrivano dal
+  Foglio, una volta sola, invece che in ogni punto d'uso.
+- **Un salvataggio fallito ora lo dice.** L'esito della scrittura non veniva guardato: una POST
+  rifiutata veniva contata come riuscita e l'app annunciava "massimale aggiornato con successo"
+  con il Foglio rimasto com'era.
+- I fixture dei test tengono ora **entrambe le forme** del peso (numero e stringa), come il
+  Foglio vero: l'unico test che salvava partiva da un profilo senza massimali, quindi il valore
+  salvato era `undefined` e il difetto non si vedeva.
+
 ## v77 — 2026-09-23
 - **Il grafico dei giorni attivi parte dalla settimana corrente, con una colonna per giorno.**
   Le barre settimanali dicono quante ricariche hai fatto, non in quale giorno: per vedere il

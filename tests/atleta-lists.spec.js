@@ -13,7 +13,10 @@ function daysAgo(n) {
 const CON_MASSIMALI = {
   athletes: [{ name: 'Test Athlete', hasPin: false }],
   massimali: [
-    { athlete: 'Test Athlete', movement: 'Back Squat', weight: '140', date: daysAgo(20) },
+    // Il Foglio restituisce un peso numerico come NUMERO e uno testuale come stringa: il
+    // fixture tiene entrambe le forme, altrimenti i test non vedono i bug del caso numerico
+    // (vedi massimali-peso-numerico.spec.js).
+    { athlete: 'Test Athlete', movement: 'Back Squat', weight: 140, date: daysAgo(20) },
     { athlete: 'Test Athlete', movement: 'Deadlift (Stacco)', weight: '180', date: daysAgo(30) },
   ],
 };

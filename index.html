@@ -914,8 +914,8 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v77";
-    const APP_VERSION_DATE = "23/09/2026";
+    const APP_VERSION = "v78";
+    const APP_VERSION_DATE = "25/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
     // volta sola al prossimo caricamento e devono rifare il login (utile quando si introduce
@@ -1889,6 +1889,12 @@
       data.health = data.health || [];
       data.funPhrases = data.funPhrases || [];
       data.ricariche = data.ricariche || [];
+      // v78: Google Sheets restituisce il peso di un massimale come NUMERO quando la cella è
+      // numerica (80) e come stringa quando non lo è ("3:59" di un benchmark a tempo). Tutto il
+      // resto dell'app lo tratta come testo — lo confronta, lo taglia, lo mette in un input —
+      // quindi lo si uniforma qui, una volta sola, invece che a ogni punto d'uso.
+      data.massimali = (data.massimali || []).map(m =>
+        m && typeof m.weight === 'number' ? { ...m, weight: String(m.weight) } : m);
       return data;
     }
 
@@ -2993,7 +2999,7 @@
       movementSavedMaxs = savedMaxs;
       // Una modifica nel frattempo salvata non è più "in sospeso".
       Object.keys(movementPendingEdits).forEach(key => {
-        if ((savedMaxs[key] || '').trim() === String(movementPendingEdits[key]).trim()) delete movementPendingEdits[key];
+        if (String(savedMaxs[key] ?? '').trim() === String(movementPendingEdits[key]).trim()) delete movementPendingEdits[key];
       });
       renderMovementInputRows('rmContainer', CROSSFIT_STANDARD_RMS, savedMaxs);
       renderMovementInputRows('benchmarkContainer', CROSSFIT_BENCHMARK_WODS.map(b => b.name), savedMaxs);
@@ -3077,18 +3083,27 @@
         .forEach(m => { nomePerChiave[m.toLowerCase()] = m; });
 
       let changedCount = 0;
+      const falliti = [];
       for (const key of Object.keys(movementPendingEdits)) {
         const movement = nomePerChiave[key];
         const weight = String(movementPendingEdits[key]).trim();
         // Ogni salvataggio aggiunge una nuova riga di storico datata (vedi Apps Script):
         // inviamo quindi solo i valori realmente cambiati, per non duplicare righe identiche
         // ogni volta che si preme "Salva Massimali" senza aver modificato nulla.
-        if (movement && weight && weight !== (movementSavedMaxs[key] || '').trim() && url) {
-          await postToBackend({ action: 'saveMassimale', athlete: athleteName, movement, weight, date: getTodayDateString() });
-          changedCount++;
+        if (movement && weight && weight !== String(movementSavedMaxs[key] ?? '').trim() && url) {
+          const esito = await postToBackend({ action: 'saveMassimale', athlete: athleteName, movement, weight, date: getTodayDateString() });
+          // Prima l'esito non si guardava: un salvataggio fallito veniva contato come riuscito
+          // e l'app diceva "aggiornato con successo" con il Foglio rimasto com'era.
+          if (esito.ok) changedCount++;
+          else falliti.push(movement);
         }
       }
 
+      if (falliti.length) {
+        alert(`Non sono riuscito a salvare: ${falliti.join(', ')}. Riprova.`);
+        if (changedCount > 0) await fetchCloudData();
+        return;
+      }
       if (changedCount === 0) {
         alert('Nessuna modifica da salvare.');
         return;
