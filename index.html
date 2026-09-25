@@ -914,7 +914,7 @@
 
     // Versione dell'app: da aggiornare manualmente ad ogni modifica pubblicata, così chi la
     // usa può verificare se sta guardando l'ultima versione (vedi tab IMPOSTAZIONI e header).
-    const APP_VERSION = "v78";
+    const APP_VERSION = "v79";
     const APP_VERSION_DATE = "25/09/2026";
 
     // Cambiando questo valore, tutti i dispositivi già "loggati" vengono disconnessi una
@@ -961,6 +961,15 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/'/g, '&#39;');
+    }
+
+    // v79: un valore da passare a una funzione dentro un attributo onclick. Due escape in fila:
+    // JSON.stringify ne fa una stringa JS valida (virgolette, apostrofi, backslash, a capo), poi
+    // escapeHtml la rende innocua dentro l'attributo. Senza il secondo passaggio una virgoletta
+    // doppia nel testo CHIUDE l'attributo e il bottone smette di funzionare — caso segnalato: il
+    // WOD intitolato «"Miracles happen every day." ?», di cui non si apriva la finestra Risultati.
+    function jsArg(value) {
+      return escapeHtml(JSON.stringify(String(value ?? '')));
     }
 
     // Disabilita il bottone premuto per tutta la durata di un'operazione asincrona (salvataggio,
@@ -1293,9 +1302,9 @@
       const giorno = String(dateStr || '').slice(0, 10);
       if (giorno > getTodayDateString()) return '';
       const accesa = hasRicarica(athleteName, giorno);
-      const idEsc = giorno.replace(/'/g, "\\'");
+      const idEsc = jsArg(giorno);
       return `
-        <button type="button" class="btn-ricarica ${accesa ? 'is-on' : ''}" onclick="withButtonGuard(this, () => toggleRicarica('${idEsc}'))">
+        <button type="button" class="btn-ricarica ${accesa ? 'is-on' : ''}" onclick="withButtonGuard(this, () => toggleRicarica(${idEsc}))">
           ${accesa ? '🍝 Ricarica segnata · tocca per togliere' : '🍝 Segna una ricarica'}
         </button>
       `;
@@ -1512,11 +1521,11 @@
         // Frecce per decidere l'ordine dei lavori della giornata: compaiono solo se ce n'è più
         // di uno, e non aprono la card (stopPropagation), che è il gesto dell'intestazione.
         const posizione = sessions.findIndex(w => String(w.id) === String(item.id));
-        const idEsc = String(item.id).replace(/'/g, "\\'");
+        const idEsc = jsArg(item.id);
         const frecceHtml = sessions.length > 1 ? `
           <span class="day-item-move">
-            <button type="button" class="day-item-move-btn" title="Sposta su" ${posizione === 0 ? 'disabled' : ''} onclick="event.stopPropagation(); moveWodInDay('${idEsc}', -1)">↑</button>
-            <button type="button" class="day-item-move-btn" title="Sposta giù" ${posizione === sessions.length - 1 ? 'disabled' : ''} onclick="event.stopPropagation(); moveWodInDay('${idEsc}', 1)">↓</button>
+            <button type="button" class="day-item-move-btn" title="Sposta su" ${posizione === 0 ? 'disabled' : ''} onclick="event.stopPropagation(); moveWodInDay(${idEsc}, -1)">↑</button>
+            <button type="button" class="day-item-move-btn" title="Sposta giù" ${posizione === sessions.length - 1 ? 'disabled' : ''} onclick="event.stopPropagation(); moveWodInDay(${idEsc}, 1)">↓</button>
           </span>
         ` : '';
 
@@ -1526,8 +1535,8 @@
         // Con una Parte sola la riga è Modifica · Risultati · Elimina; con più Parti il posto
         // centrale lo prende "Spacchetta", perché lì Risultati è per singola Parte.
         const azioniRisultatiHtml = blocchi.length === 1
-          ? renderCommunityButton(`openCommunityResultsModalFor('${String(primo.title || '').replace(/'/g, "\\'")}', '${String(primo.type || '').replace(/'/g, "\\'")}', '${itemDateAzioni}')`, primo.title, primo.type, itemDateAzioni, { row: true })
-          : `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession('${String(item.id).replace(/'/g, "\\'")}'))">⑂ Spacchetta in ${blocchi.length}</button></div>`;
+          ? renderCommunityButton(`openCommunityResultsModalFor(${jsArg(primo.title)}, ${jsArg(primo.type)}, ${jsArg(itemDateAzioni)})`, primo.title, primo.type, itemDateAzioni, { row: true })
+          : `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession(${jsArg(item.id)}))">⑂ Spacchetta in ${blocchi.length}</button></div>`;
 
         let blocksHtml = '';
         if (item.blocks && Array.isArray(item.blocks)) {
@@ -1541,7 +1550,7 @@
               <div style="font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px;">Nessun risultato loggato.</div>
             `;
             const itemDate = String(item.date || '').slice(0, 10);
-            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate);
+            const communityBtn = renderCommunityButton(`openCommunityResultsModalFor(${jsArg(b.title)}, ${jsArg(b.type)}, ${jsArg(itemDate)})`, b.title, b.type, itemDate);
             // Con una Parte sola il titolo è già nell'intestazione della card: ripeterlo qui
             // sarebbe solo rumore. Le sessioni vecchie multi-Parte lo tengono, perché lì serve
             // a distinguere una Parte dall'altra.
@@ -1561,7 +1570,7 @@
 
         return `
           <div class="history-item day-item ${aperta ? 'is-open' : ''}">
-            <div class="day-item-head" onclick="toggleDayItem('${String(item.id).replace(/'/g, "\\'")}')">
+            <div class="day-item-head" onclick="toggleDayItem(${jsArg(item.id)})">
               <div class="day-item-main">
                 ${isPublishedWod(item) ? `<div class="day-item-badges"><span class="day-item-published">${escapeHtml(formatModeBadge(item.mode))}</span></div>` : ''}
                 <div class="day-item-heading">
@@ -1578,9 +1587,9 @@
               ${blocksHtml}
               ${sessioneSvolta(item) ? renderWhoopWorkoutStrip(item.athlete, item.date) : ''}
               <div class="item-actions-row">
-                <div><button class="btn-secondary" onclick="editWodSession('${String(item.id).replace(/'/g, "\\'")}')">✏️ Modifica</button></div>
+                <div><button class="btn-secondary" onclick="editWodSession(${jsArg(item.id)})">✏️ Modifica</button></div>
                 ${azioniRisultatiHtml}
-                <div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${String(item.id).replace(/'/g, "\\'")}'))">✕ Elimina</button></div>
+                <div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod(${jsArg(item.id)}))">✕ Elimina</button></div>
               </div>
             </div>
           </div>
@@ -1762,7 +1771,7 @@
             <div class="fun-phrase-text">${escapeHtml(f.text || '')}</div>
             ${f.athlete ? `<div class="fun-phrase-author">aggiunta da ${escapeHtml(f.athlete)}</div>` : ''}
           </div>
-          <button type="button" class="btn-delete-history" onclick="withButtonGuard(this, () => deleteFunPhrase('${String(f.id).replace(/'/g, "\\'")}'))">✕</button>
+          <button type="button" class="btn-delete-history" onclick="withButtonGuard(this, () => deleteFunPhrase(${jsArg(f.id)}))">✕</button>
         </div>
       `).join('') + `<p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">Più le ${FUN_LOADING_MESSAGES.length} incluse nell'app, che restano sempre.</p>`;
     }
@@ -2947,7 +2956,7 @@
         row.innerHTML = `
           <span>${escapeHtml(movement)}</span>
           <input type="text" class="rm-weight" data-movement="${escapeHtml(movement)}" data-original="${escapeHtml(saved)}" placeholder="Kg / Reps / Tempo" value="${escapeHtml(val)}">
-          ${saved ? `<button type="button" class="rm-history-btn" title="Storico" onclick="openMassimaleHistoryModal('${movement.replace(/'/g, "\\'")}')">📈</button>` : '<span></span>'}
+          ${saved ? `<button type="button" class="rm-history-btn" title="Storico" onclick="openMassimaleHistoryModal(${jsArg(movement)})">📈</button>` : '<span></span>'}
         `;
         container.appendChild(row);
       });
@@ -3983,7 +3992,7 @@
         const raggruppata = blocchiStorico.length > 1;
         const raggruppataPubblicata = isPublishedWod(item);
         const itemDate = String(item.date || '').slice(0, 10);
-        const idEsc = String(item.id).replace(/'/g, "\\'");
+        const idEsc = jsArg(item.id);
 
         // Le sessioni vecchissime non hanno "blocks" ma i campi in cima alla riga: restano una
         // card sola, non c'è niente da dividere.
@@ -4023,13 +4032,13 @@
             scoreHtml = `<div class="history-item-score">Score: ${escapeHtml(b.result)}</div>`;
           }
 
-          const communityBtn = renderCommunityButton(`openCommunityResultsModalFor('${String(b.title || '').replace(/'/g, "\\'")}', '${String(b.type || '').replace(/'/g, "\\'")}', '${itemDate}')`, b.title, b.type, itemDate, { row: true });
+          const communityBtn = renderCommunityButton(`openCommunityResultsModalFor(${jsArg(b.title)}, ${jsArg(b.type)}, ${jsArg(itemDate)})`, b.title, b.type, itemDate, { row: true });
 
           // Terzo tasto: Elimina se il lavoro sta da solo sulla sua riga, Spacchetta se la
           // condivide con altri (cancellarne uno cancellerebbe anche gli altri).
           const terzoTasto = raggruppata
-            ? `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession('${idEsc}'))">⑂ Spacchetta in ${blocchiStorico.length}</button></div>`
-            : `<div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod('${idEsc}'))">✕ Elimina</button></div>`;
+            ? `<div><button class="btn-secondary" onclick="withButtonGuard(this, () => splitWodSession(${idEsc}))">⑂ Spacchetta in ${blocchiStorico.length}</button></div>`
+            : `<div><button class="btn-delete-history" onclick="withButtonGuard(this, () => deleteWod(${idEsc}))">✕ Elimina</button></div>`;
 
           const notaRaggruppata = raggruppata
             ? `<div style="font-size: 10px; color: var(--text-muted); font-style: italic; margin-top: 6px;">Salvato insieme ad altri ${blocchiStorico.length - 1} lavori nella stessa riga (lavoro ${indice + 1} di ${blocchiStorico.length}): spacchettalo per gestirlo da solo.</div>`
@@ -4049,7 +4058,7 @@
               ${sessioneSvolta(item) && indice === 0 ? renderWhoopWorkoutStrip(item.athlete, item.date) : ''}
               ${notaRaggruppata}
               <div class="item-actions-row">
-                <div><button class="btn-secondary" onclick="editWodSession('${idEsc}')">✏️ Modifica</button></div>
+                <div><button class="btn-secondary" onclick="editWodSession(${idEsc})">✏️ Modifica</button></div>
                 ${communityBtn}
                 ${terzoTasto}
               </div>
@@ -4581,7 +4590,7 @@
       }
 
       content.innerHTML = withValue.map(x => `
-        <div class="history-item" style="cursor: pointer;" onclick="closePrsListModal(); openMassimaleHistoryModal('${x.name.replace(/'/g, "\\'")}')">
+        <div class="history-item" style="cursor: pointer;" onclick="closePrsListModal(); openMassimaleHistoryModal(${jsArg(x.name)})">
           <div class="history-item-header">
             <span style="font-weight: 800; font-size: 13px;">${escapeHtml(x.name)}</span>
             <span style="font-weight: 900; color: var(--accent);">${escapeHtml(String(x.entry.weight))}</span>

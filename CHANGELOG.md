@@ -4,6 +4,17 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v79 — 2026-09-25
+- **Corretto: di un WOD con le virgolette nel titolo non si apriva la finestra Risultati.** I
+  valori passati a una funzione dentro un attributo `onclick` venivano interpolati grezzi: una
+  virgoletta doppia nel testo **chiude l'attributo**, e il bottone smette di funzionare. Caso
+  segnalato: il WOD intitolato `"Miracles happen every day." ?`. Sul Foglio ce ne sono diversi
+  così, copiati dalla programmazione.
+- La correzione è un helper unico, `jsArg()`: due escape in fila — `JSON.stringify` per la
+  stringa JS, `escapeHtml` per l'attributo. **Tutti** i punti che costruivano un `onclick` con
+  un valore passano ora di lì (titoli, tipi, date, nomi dei movimenti, id), al posto
+  dell'escape a mano dei soli apostrofi, che con le virgolette non poteva funzionare.
+
 ## v78 — 2026-09-25
 - **Corretto: un massimale con peso numerico non si aggiornava.** Google Sheets restituisce il
   peso come NUMERO quando la cella è numerica (80) e come stringa quando non lo è ("3:59" di un
