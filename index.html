@@ -167,6 +167,9 @@
     /* Sulla sua riga puo' andare a capo: una serie di carichi ("100/100/110/..." ) e' piu' lunga
        della larghezza dello schermo. */
     .day-item-score { display: block; margin-top: 4px; font-size: 12px; font-weight: 800; color: #4caf50; overflow-wrap: anywhere; }
+    /* Nella card aperta il punteggio completo puo' includere molti split per set:
+       deve restare dentro la card e andare a capo invece di allargarla. */
+    .day-item-detail-score { font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
     .day-item-chevron { font-size: 16px; font-weight: 900; color: var(--text-muted); line-height: 1; }
     .day-item-move { display: flex; gap: 2px; }
     .day-item-move-btn { width: 26px; height: 26px; padding: 0; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 13px; font-weight: 900; line-height: 1; cursor: pointer; }
@@ -208,7 +211,7 @@
     .history-item-title { font-size: 15px; font-weight: 800; color: var(--accent); line-height: 1.25; overflow-wrap: anywhere; }
     /* Niente gap: la spaziatura la da' gia' il margin-right del badge della categoria. */
     .history-item-meta { display: flex; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
-    .history-item-score { font-size: 13px; color: #2e7d32; font-weight: 800; margin-top: 8px; }
+    .history-item-score { font-size: 13px; color: #2e7d32; font-weight: 800; margin-top: 8px; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
     .history-item-score-row { font-size: 12px; color: #2e7d32; margin-left: 10px; }
     
     #status { font-size: 12px; color: #0275d8; margin-top: 8px; text-align: center; }
@@ -1545,7 +1548,7 @@
               <div style="font-size: 12px; color: var(--text-muted); white-space: pre-wrap; margin-top: 2px;">${escapeHtml(b.explanation)}</div>
             ` : '';
             const scoreHtml = b.result ? `
-              <div style="font-size: 12px; color: #2e7d32; font-weight: 700; margin-top: 4px;">🏆 Score: ${escapeHtml(b.result)}</div>
+              <div class="day-item-detail-score">🏆 Score: ${escapeHtml(b.result)}</div>
             ` : `
               <div style="font-size: 12px; color: var(--text-muted); font-style: italic; margin-top: 4px;">Nessun risultato loggato.</div>
             `;
