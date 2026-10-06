@@ -4,6 +4,14 @@ Cronologia delle versioni di **CrossFit Bicocca** (`index.html`). Il numero e la
 qui corrispondono a `APP_VERSION`/`APP_VERSION_DATE` nell'header dell'app e nel tab
 Impostazioni. Versioni più recenti in cima.
 
+## v81 — 2026-10-06
+- **I punteggi Time con molti split per set non allargano più le card su telefono.** Un risultato
+  come `40:00 (2:30/2:31/...)` poteva superare la larghezza disponibile perché la sequenza dei
+  parziali non aveva punti di interruzione sufficienti.
+- Il punteggio completo ora **va a capo dentro la card** sia nella vista giorno aperta sia nello
+  Storico; il valore salvato e il totale usato per confronti e ordinamenti restano invariati.
+- Aggiunto un test Playwright con **16 split** su viewport mobile per impedire regressioni.
+
 ## v80 — 2026-09-25
 - **I titoli letti dalla foto non vengono più troncati a metà parola.** Il titolo ricavato
   dall'OCR veniva tagliato a **40 caratteri netti**, in mezzo a una parola, e la coda della riga
